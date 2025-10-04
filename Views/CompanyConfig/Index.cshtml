@@ -1,0 +1,361 @@
+@using BackupPro.ViewModels
+@model CompanyConfigViewModel
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-10 col-lg-8">
+            <!-- Card principal -->
+            <div class="card shadow-lg border-0 rounded-4">
+                <!-- Header -->
+                <div class="card-header bg-primary text-white border-0 rounded-top-4 py-4">
+                    <div class="text-center">
+                        <i class="bi bi-building-gear fs-1 mb-3"></i>
+                        <h3 class="fw-bold mb-2">Configuración de Empresa</h3>
+                        <p class="mb-0 opacity-75">Administra la información de tu empresa</p>
+                    </div>
+                </div>
+
+                <!-- Cuerpo del formulario -->
+                <div class="card-body p-4">
+                    <!-- Formulario -->
+                    <form method="post" id="companyForm">
+                        <!-- Nombre de la Empresa -->
+                        <div class="mb-4">
+                            <label asp-for="CompanyName" class="form-label fw-semibold">
+                                <i class="bi bi-building me-2 text-primary"></i>Nombre de la Empresa
+                            </label>
+                            <input class="form-control form-control-lg rounded-3" asp-for="CompanyName" placeholder="Ingresa el nombre de tu empresa" required oninvalid="this.setCustomValidity('El nombre de la empresa es obligatorio')" oninput="this.setCustomValidity('')" />
+                            <span asp-validation-for="CompanyName" class="text-danger small"></span>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <!-- Datos del Administrador -->
+                        <h5 class="mb-3">
+                            <i class="bi bi-person-badge me-2 text-primary"></i>Datos del Administrador
+                        </h5>
+
+                        <!-- Nombre de Usuario -->
+                        <div class="mb-3">
+                            <label asp-for="AdminUserName" class="form-label fw-semibold">
+                                <i class="bi bi-person-fill me-2 text-primary"></i>Nombre de Usuario
+                            </label>
+                            <input class="form-control form-control-lg rounded-3 bg-light" asp-for="AdminUserName" placeholder="Usuario administrador" readonly />
+                            <small class="text-muted">Este es el usuario con el que iniciaste sesión</small>
+                        </div>
+
+                        <!-- Email del Administrador -->
+                        <div class="mb-3">
+                            <label asp-for="AdminEmail" class="form-label fw-semibold">
+                                <i class="bi bi-envelope-fill me-2 text-primary"></i>Email del Administrador
+                            </label>
+                            <input type="email" class="form-control form-control-lg rounded-3 bg-light" asp-for="AdminEmail" placeholder="correo@empresa.com" readonly />
+                            <small class="text-muted">Correo electrónico del usuario administrador</small>
+                        </div>
+
+                        <!-- Contraseña del Administrador -->
+                        <div class="mb-4">
+                            <label asp-for="AdminPassword" class="form-label fw-semibold">
+                                <i class="bi bi-lock-fill me-2 text-primary"></i>Contraseña
+                            </label>
+                            <div class="input-group input-group-lg">
+                                <input type="password" class="form-control rounded-start-3 border-end-0" asp-for="AdminPassword" id="adminPassword" placeholder="Dejar en blanco para no cambiar" />
+                                <span class="input-group-text bg-white border-start-0 rounded-end-3" style="cursor: pointer;" id="toggleAdminPassword">
+                                    <i class="bi bi-eye-fill" id="toggleAdminIcon"></i>
+                                </span>
+                            </div>
+                            <small class="text-muted">Dejar en blanco si no deseas cambiar la contraseña</small>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <!-- Correos para Notificaciones -->
+                        <h5 class="mb-3">
+                            <i class="bi bi-envelope-at me-2 text-primary"></i>Correos para Notificaciones
+                        </h5>
+
+                        <div class="alert alert-info rounded-3 mb-3" role="alert">
+                            <i class="bi bi-info-circle-fill me-2"></i>
+                            <strong>Las notificaciones de backups se enviarán a estos correos electrónicos.</strong>
+                        </div>
+
+                        <!-- Lista de correos adicionales -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label fw-semibold mb-0">
+                                    <i class="bi bi-people-fill me-2 text-primary"></i>Correos Adicionales
+                                </label>
+                                <button type="button" class="btn btn-sm btn-outline-success rounded-pill" onclick="sendTestEmail()">
+                                    <i class="bi bi-send me-1"></i>Probar Correos
+                                </button>
+                            </div>
+
+                            <div id="emailsList" class="mb-2">
+                                @if (Model.EmailList != null && Model.EmailList.Any())
+                                {
+                                    @foreach (var email in Model.EmailList)
+                                    {
+                                        <div class="d-flex align-items-center mb-2 email-item">
+                                            <input type="text" class="form-control rounded-3 me-2" value="@email" readonly />
+                                            <button type="button" class="btn btn-danger btn-sm rounded-circle" onclick="removeEmail(this, '@email')">
+                                                <i class="bi bi-x-lg"></i>
+                                            </button>
+                                        </div>
+                                    }
+                                }
+                            </div>
+
+                            <!-- Campo para agregar nuevo correo -->
+                            <div class="input-group">
+                                <input type="email" class="form-control rounded-start-3" id="newEmail" placeholder="correo@ejemplo.com" />
+                                <button type="button" class="btn btn-outline-primary rounded-end-3" onclick="addEmail()">
+                                    <i class="bi bi-plus-circle me-1"></i>Agregar Correo
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Campo oculto para enviar los correos -->
+                        <input type="hidden" asp-for="AdditionalEmails" id="additionalEmailsHidden" />
+
+                        <hr class="my-4">
+
+                        <!-- Botón de guardar -->
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg rounded-pill shadow-sm">
+                                <i class="bi bi-save me-2"></i>Guardar Configuración
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+
+    <script>
+        // Lista de correos en memoria
+        let emailsList = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.EmailList ?? new List<string>()));
+
+        // Mostrar/Ocultar contraseña del administrador
+        const adminPassword = document.getElementById('adminPassword');
+        const toggleAdminPassword = document.getElementById('toggleAdminPassword');
+        const toggleAdminIcon = document.getElementById('toggleAdminIcon');
+
+        if (toggleAdminPassword) {
+            toggleAdminPassword.addEventListener('click', function() {
+                const type = adminPassword.getAttribute('type') === 'password' ? 'text' : 'password';
+                adminPassword.setAttribute('type', type);
+
+                if (type === 'text') {
+                    toggleAdminIcon.classList.remove('bi-eye-fill');
+                    toggleAdminIcon.classList.add('bi-eye-slash-fill');
+                } else {
+                    toggleAdminIcon.classList.remove('bi-eye-slash-fill');
+                    toggleAdminIcon.classList.add('bi-eye-fill');
+                }
+            });
+        }
+
+        // Función para agregar correo
+        function addEmail() {
+            const newEmailInput = document.getElementById('newEmail');
+            const email = newEmailInput.value.trim();
+
+            if (!email) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Campo vacío',
+                    text: 'Por favor ingresa un correo electrónico',
+                    confirmButtonColor: '#0d6efd'
+                });
+                return;
+            }
+
+            // Validar formato de correo
+            const emailRegex = /^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/;
+            if (!emailRegex.test(email)) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Correo inválido',
+                    text: 'Por favor ingresa un correo electrónico válido',
+                    confirmButtonColor: '#0d6efd'
+                });
+                return;
+            }
+
+            // Verificar si ya existe
+            if (emailsList.includes(email)) {
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Correo duplicado',
+                    text: 'Este correo ya está en la lista',
+                    confirmButtonColor: '#0d6efd'
+                });
+                return;
+            }
+
+            // Agregar a la lista
+            emailsList.push(email);
+            renderEmails();
+            newEmailInput.value = '';
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Correo agregado',
+                text: 'El correo se agregó correctamente',
+                timer: 1500,
+                showConfirmButton: false
+            });
+        }
+
+        // Función para eliminar correo
+        function removeEmail(button, email) {
+            emailsList = emailsList.filter(e => e !== email);
+            renderEmails();
+        }
+
+        // Renderizar la lista de correos
+        function renderEmails() {
+            const container = document.getElementById('emailsList');
+            container.innerHTML = '';
+
+            emailsList.forEach(email => {
+                const div = document.createElement('div');
+                div.className = 'd-flex align-items-center mb-2 email-item';
+                div.innerHTML = `
+                    <input type="text" class="form-control rounded-3 me-2" value="${email}" readonly />
+                    <button type="button" class="btn btn-danger btn-sm rounded-circle" onclick="removeEmail(this, '${email}')">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                `;
+                container.appendChild(div);
+            });
+
+            // Actualizar campo oculto
+            document.getElementById('additionalEmailsHidden').value = emailsList.join(';');
+        }
+
+        // Al cargar la página, actualizar el campo oculto y mostrar alertas
+        document.addEventListener('DOMContentLoaded', function() {
+            renderEmails();
+
+            // Mostrar mensajes de error
+            @if (ViewBag.Errores is IEnumerable<string> errs)
+            {
+                var erroresList = string.Join("<br>", errs.Select(e => "• " + e));
+                <text>
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error al guardar',
+                    html: '@Html.Raw(erroresList)',
+                    confirmButtonColor: '#0d6efd'
+                });
+                </text>
+            }
+
+            // Mostrar mensaje de éxito
+            @if (ViewBag.Success != null)
+            {
+                <text>
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Éxito!',
+                    text: 'Configuración guardada correctamente.',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+                </text>
+            }
+        });
+
+        // Enviar correo de prueba
+        function sendTestEmail() {
+            // Obtener el email del administrador
+            const adminEmail = document.getElementById('AdminEmail').value;
+
+            // Crear lista de todos los correos (admin + adicionales)
+            const allEmails = [adminEmail, ...emailsList];
+
+            // Validar que haya al menos un correo
+            if (allEmails.length === 0 || !adminEmail) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'No hay correos',
+                    text: 'Debes tener al menos un correo configurado',
+                    confirmButtonColor: '#0d6efd'
+                });
+                return;
+            }
+
+            Swal.fire({
+                icon: 'question',
+                title: '¿Enviar correo de prueba?',
+                text: `Se enviará un correo de prueba a ${allEmails.length} destinatario(s)`,
+                showCancelButton: true,
+                confirmButtonText: '<i class="bi bi-send me-1"></i> Enviar',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#0d6efd',
+                cancelButtonColor: '#6c757d'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Mostrar loading
+                    Swal.fire({
+                        title: 'Enviando...',
+                        text: 'Por favor espera',
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+
+                    // Enviar los correos actuales (sin necesidad de guardar)
+                    fetch('@Url.Action("SendTestEmail", "CompanyConfig")', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ Emails: allEmails })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            Swal.fire({
+                                icon: 'success',
+                                title: '¡Correo enviado!',
+                                text: data.message,
+                                confirmButtonColor: '#0d6efd'
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error al enviar',
+                                text: data.message,
+                                confirmButtonColor: '#0d6efd'
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'Error al enviar el correo de prueba',
+                            confirmButtonColor: '#0d6efd'
+                        });
+                        console.error(error);
+                    });
+                }
+            });
+        }
+
+        // Permitir agregar correo con Enter
+        document.getElementById('newEmail').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addEmail();
+            }
+        });
+    </script>
+}
