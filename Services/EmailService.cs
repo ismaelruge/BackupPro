@@ -9,12 +9,10 @@ namespace BackupPro.Services
     public class EmailService
     {
         private readonly IConfiguration _config;
-        private readonly ILogger<EmailService> _logger;
 
-        public EmailService(IConfiguration config, ILogger<EmailService> logger)
+        public EmailService(IConfiguration config)
         {
             _config = config;
-            _logger = logger;
         }
 
         /// <summary>
@@ -35,7 +33,6 @@ namespace BackupPro.Services
 
                 if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(user))
                 {
-                    _logger.LogWarning("SMTP no configurado. Omitiendo envío de correo a {To}", to);
                     return;
                 }
 
@@ -57,7 +54,6 @@ namespace BackupPro.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error enviando correo a {To} con asunto {Subject}", to, subject);
             }
         }
     }

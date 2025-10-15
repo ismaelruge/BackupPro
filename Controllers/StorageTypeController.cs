@@ -1,24 +1,24 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using FluentFTP;
-using System.Net;
-using Azure.Storage.Blobs;
+﻿using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
+using FluentFTP;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Drive.v3;
 using Google.Apis.Services;
 using Google.Apis.Util.Store;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Net;
 
 namespace BackupPro.Controllers
 {
+    [Authorize]
     public class StorageTypeController : Controller
     {
         private readonly IConfiguration _configuration;
-        private readonly ILogger<StorageTypeController> _logger;
 
-        public StorageTypeController(IConfiguration configuration, ILogger<StorageTypeController> logger)
+        public StorageTypeController(IConfiguration configuration)
         {
             _configuration = configuration;
-            _logger = logger;
         }
 
         public IActionResult Index()
@@ -258,11 +258,8 @@ namespace BackupPro.Controllers
         [HttpGet]
         public async Task<IActionResult> GoogleDriveCallback(string code)
         {
-            _logger.LogInformation("GoogleDriveCallback iniciado. Code recibido: {HasCode}", !string.IsNullOrEmpty(code));
-
             if (string.IsNullOrEmpty(code))
             {
-                _logger.LogWarning("GoogleDriveCallback: No se recibió código de autorización");
                 var errorScript = @"
                     <html>
                     <head><title>Error de autenticación</title></head>
@@ -285,7 +282,6 @@ namespace BackupPro.Controllers
 
             try
             {
-                _logger.LogInformation("GoogleDriveCallback: Iniciando intercambio de tokens");
                 var clientId = _configuration["GoogleOAuth:ClientId"];
                 var clientSecret = _configuration["GoogleOAuth:ClientSecret"];
                 var redirectUri = _configuration["GoogleOAuth:RedirectUri"];
@@ -305,11 +301,9 @@ namespace BackupPro.Controllers
                     new FormUrlEncodedContent(tokenRequest));
 
                 var tokenJson = await tokenResponse.Content.ReadAsStringAsync();
-                _logger.LogInformation("GoogleDriveCallback: Respuesta de token recibida. Success: {Success}", tokenResponse.IsSuccessStatusCode);
 
                 if (!tokenResponse.IsSuccessStatusCode)
                 {
-                    _logger.LogError("GoogleDriveCallback: Error al obtener tokens: {Response}", tokenJson);
                     var errorMsg = System.Text.Json.JsonSerializer.Serialize(tokenJson).Replace("'", "\\'");
                     var errorScript = $@"
                         <html>
@@ -334,16 +328,13 @@ namespace BackupPro.Controllers
                 // Obtener información del usuario
                 var tokenData = System.Text.Json.JsonDocument.Parse(tokenJson);
                 var accessToken = tokenData.RootElement.GetProperty("access_token").GetString();
-                _logger.LogInformation("GoogleDriveCallback: Access token obtenido");
 
                 var userInfoResponse = await httpClient.GetAsync($"https://www.googleapis.com/oauth2/v2/userinfo?access_token={accessToken}");
                 var userInfoJson = await userInfoResponse.Content.ReadAsStringAsync();
                 var userInfo = System.Text.Json.JsonDocument.Parse(userInfoJson);
                 var email = userInfo.RootElement.GetProperty("email").GetString();
-                _logger.LogInformation("GoogleDriveCallback: Email obtenido: {Email}", email);
 
                 // Guardar tokens en sesión (temporal) - con manejo de errores
-                _logger.LogInformation("GoogleDriveCallback: Intentando guardar tokens en sesión");
                 try
                 {
                     HttpContext.Session.SetString($"GoogleDrive_AccessToken_{email}", accessToken!);
@@ -351,21 +342,17 @@ namespace BackupPro.Controllers
                     {
                         HttpContext.Session.SetString($"GoogleDrive_RefreshToken_{email}", refreshTokenElement.GetString()!);
                     }
-                    _logger.LogInformation("GoogleDriveCallback: Tokens guardados en sesión exitosamente");
                 }
                 catch (Exception sessionEx)
                 {
                     // Si falla el guardado en sesión, continuar de todas formas
                     // El token se enviará al frontend igualmente
-                    _logger.LogWarning(sessionEx, "GoogleDriveCallback: No se pudo guardar en sesión");
                     Console.WriteLine($"No se pudo guardar en sesión: {sessionEx.Message}");
                 }
 
                 // Escapar valores para JavaScript
                 var safeEmail = System.Text.Json.JsonSerializer.Serialize(email);
                 var safeAccessToken = System.Text.Json.JsonSerializer.Serialize(accessToken);
-
-                _logger.LogInformation("GoogleDriveCallback: Preparando respuesta exitosa");
 
                 // Retornar éxito con el email
                 var successScript = $@"
@@ -390,12 +377,10 @@ namespace BackupPro.Controllers
                     </body>
                     </html>";
 
-                _logger.LogInformation("GoogleDriveCallback: Retornando respuesta exitosa. Método completado.");
                 return Content(successScript, "text/html");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "GoogleDriveCallback: Excepción durante el proceso de autenticación");
                 var errorMsg = System.Text.Json.JsonSerializer.Serialize(ex.Message).Replace("'", "\\'");
                 var errorScript = $@"
                     <html>
@@ -535,11 +520,8 @@ namespace BackupPro.Controllers
         [HttpGet]
         public async Task<IActionResult> OneDriveCallback(string code)
         {
-            _logger.LogInformation("OneDriveCallback iniciado. Code recibido: {HasCode}", !string.IsNullOrEmpty(code));
-
             if (string.IsNullOrEmpty(code))
             {
-                _logger.LogWarning("OneDriveCallback: No se recibió código de autorización");
                 var errorScript = @"
                     <html>
                     <head><title>Error de autenticación</title></head>
@@ -562,7 +544,6 @@ namespace BackupPro.Controllers
 
             try
             {
-                _logger.LogInformation("OneDriveCallback: Iniciando intercambio de tokens");
                 var clientId = _configuration["OneDrive:ClientId"];
                 var clientSecret = _configuration["OneDrive:ClientSecret"];
                 var redirectUri = _configuration["OneDrive:RedirectUri"];
@@ -582,11 +563,9 @@ namespace BackupPro.Controllers
                     new FormUrlEncodedContent(tokenRequest));
 
                 var tokenJson = await tokenResponse.Content.ReadAsStringAsync();
-                _logger.LogInformation("OneDriveCallback: Respuesta de token recibida. Success: {Success}", tokenResponse.IsSuccessStatusCode);
 
                 if (!tokenResponse.IsSuccessStatusCode)
                 {
-                    _logger.LogError("OneDriveCallback: Error al obtener tokens: {Response}", tokenJson);
                     var errorScript = $@"
                         <html>
                         <head><title>Error de autenticación</title></head>
@@ -610,7 +589,6 @@ namespace BackupPro.Controllers
                 // Obtener información del usuario
                 var tokenData = System.Text.Json.JsonDocument.Parse(tokenJson);
                 var accessToken = tokenData.RootElement.GetProperty("access_token").GetString();
-                _logger.LogInformation("OneDriveCallback: Access token obtenido");
 
                 // Obtener información del usuario de Microsoft Graph
                 var userInfoResponse = await httpClient.GetAsync("https://graph.microsoft.com/v1.0/me");
@@ -619,10 +597,8 @@ namespace BackupPro.Controllers
                 var userInfoJson = await userInfoResponse.Content.ReadAsStringAsync();
                 var userInfo = System.Text.Json.JsonDocument.Parse(userInfoJson);
                 var email = userInfo.RootElement.GetProperty("userPrincipalName").GetString();
-                _logger.LogInformation("OneDriveCallback: Email obtenido: {Email}", email);
 
                 // Guardar tokens en sesión (temporal)
-                _logger.LogInformation("OneDriveCallback: Intentando guardar tokens en sesión");
                 try
                 {
                     HttpContext.Session.SetString($"OneDrive_AccessToken_{email}", accessToken!);
@@ -630,19 +606,15 @@ namespace BackupPro.Controllers
                     {
                         HttpContext.Session.SetString($"OneDrive_RefreshToken_{email}", refreshTokenElement.GetString()!);
                     }
-                    _logger.LogInformation("OneDriveCallback: Tokens guardados en sesión exitosamente");
                 }
                 catch (Exception sessionEx)
                 {
-                    _logger.LogWarning(sessionEx, "OneDriveCallback: No se pudo guardar en sesión");
                     Console.WriteLine($"No se pudo guardar en sesión: {sessionEx.Message}");
                 }
 
                 // Escapar valores para JavaScript
                 var safeEmail = System.Text.Json.JsonSerializer.Serialize(email);
                 var safeAccessToken = System.Text.Json.JsonSerializer.Serialize(accessToken);
-
-                _logger.LogInformation("OneDriveCallback: Preparando respuesta exitosa");
 
                 // Retornar éxito con el email
                 var successScript = $@"
@@ -667,12 +639,10 @@ namespace BackupPro.Controllers
                     </body>
                     </html>";
 
-                _logger.LogInformation("OneDriveCallback: Retornando respuesta exitosa. Método completado.");
                 return Content(successScript, "text/html");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "OneDriveCallback: Excepción durante el proceso de autenticación");
                 var errorMsg = System.Text.Json.JsonSerializer.Serialize(ex.Message).Replace("'", "\\'");
                 var errorScript = $@"
                     <html>

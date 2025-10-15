@@ -15,14 +15,11 @@ namespace BackupPro.Areas.Identity.Pages.Account.Manage
     public class GenerateRecoveryCodesModel : PageModel
     {
         private readonly UserManager<IdentityUser> _userManager;
-        private readonly ILogger<GenerateRecoveryCodesModel> _logger;
 
         public GenerateRecoveryCodesModel(
-            UserManager<IdentityUser> userManager,
-            ILogger<GenerateRecoveryCodesModel> logger)
+            UserManager<IdentityUser> userManager)
         {
             _userManager = userManager;
-            _logger = logger;
         }
 
         /// <summary>
@@ -74,7 +71,6 @@ namespace BackupPro.Areas.Identity.Pages.Account.Manage
             var recoveryCodes = await _userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
             RecoveryCodes = recoveryCodes.ToArray();
 
-            _logger.LogInformation("User with ID '{UserId}' has generated new 2FA recovery codes.", userId);
             StatusMessage = "You have generated new recovery codes.";
             return RedirectToPage("./ShowRecoveryCodes");
         }

@@ -14,14 +14,11 @@ namespace BackupPro.Areas.Identity.Pages.Account.Manage
     public class Disable2faModel : PageModel
     {
         private readonly UserManager<IdentityUser> _userManager;
-        private readonly ILogger<Disable2faModel> _logger;
 
         public Disable2faModel(
-            UserManager<IdentityUser> userManager,
-            ILogger<Disable2faModel> logger)
+            UserManager<IdentityUser> userManager)
         {
             _userManager = userManager;
-            _logger = logger;
         }
 
         /// <summary>
@@ -61,7 +58,6 @@ namespace BackupPro.Areas.Identity.Pages.Account.Manage
                 throw new InvalidOperationException($"Unexpected error occurred disabling 2FA.");
             }
 
-            _logger.LogInformation("User with ID '{UserId}' has disabled 2fa.", _userManager.GetUserId(User));
             StatusMessage = "2fa has been disabled. You can reenable 2fa when you setup an authenticator app";
             return RedirectToPage("./TwoFactorAuthentication");
         }

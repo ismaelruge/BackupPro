@@ -18,16 +18,13 @@ namespace BackupPro.Areas.Identity.Pages.Account
     {
         private readonly SignInManager<IdentityUser> _signInManager;
         private readonly UserManager<IdentityUser> _userManager;
-        private readonly ILogger<LoginWith2faModel> _logger;
 
         public LoginWith2faModel(
             SignInManager<IdentityUser> signInManager,
-            UserManager<IdentityUser> userManager,
-            ILogger<LoginWith2faModel> logger)
+            UserManager<IdentityUser> userManager)
         {
             _signInManager = signInManager;
             _userManager = userManager;
-            _logger = logger;
         }
 
         /// <summary>
@@ -112,17 +109,14 @@ namespace BackupPro.Areas.Identity.Pages.Account
 
             if (result.Succeeded)
             {
-                _logger.LogInformation("User with ID '{UserId}' logged in with 2fa.", user.Id);
                 return LocalRedirect(returnUrl);
             }
             else if (result.IsLockedOut)
             {
-                _logger.LogWarning("User with ID '{UserId}' account locked out.", user.Id);
                 return RedirectToPage("./Lockout");
             }
             else
             {
-                _logger.LogWarning("Invalid authenticator code entered for user with ID '{UserId}'.", user.Id);
                 ModelState.AddModelError(string.Empty, "Invalid authenticator code.");
                 return Page();
             }
