@@ -14,7 +14,6 @@ namespace BackupPro.Controllers
     /// </summary>
     public class HomeController : Controller
     {
-        private readonly ILogger<HomeController> _logger;
         //private readonly BackupService _backupService;
         private readonly EmailService _emailSender;
         private readonly UserManager<IdentityUser> _userManager;
@@ -22,9 +21,8 @@ namespace BackupPro.Controllers
         /// <summary>
         /// Inicializa una nueva instancia del <see cref="HomeController"/>.
         /// </summary>
-        public HomeController(ILogger<HomeController> logger, EmailService emailSender, UserManager<IdentityUser> userManager)
+        public HomeController(EmailService emailSender, UserManager<IdentityUser> userManager)
         {
-            _logger = logger;
             _emailSender = emailSender;
             _userManager = userManager;
         }

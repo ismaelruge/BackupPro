@@ -16,13 +16,31 @@ namespace BackupPro
         /// <param name="args">Argumentos de línea de comandos.</param>
         public static void Main(string[] args)
         {
+            // Manejar excepciones no controladas
+            AppDomain.CurrentDomain.UnhandledException += (sender, eventArgs) =>
+            {
+                var exception = eventArgs.ExceptionObject as Exception;
+                Console.WriteLine($"EXCEPCIÓN NO CONTROLADA: {exception?.Message}");
+                Console.WriteLine($"Stack Trace: {exception?.StackTrace}");
+                Log.Fatal(exception, "Excepción no controlada que causó el cierre de la aplicación");
+            };
+
+            TaskScheduler.UnobservedTaskException += (sender, eventArgs) =>
+            {
+                Console.WriteLine($"EXCEPCIÓN DE TAREA NO OBSERVADA: {eventArgs.Exception.Message}");
+                Log.Error(eventArgs.Exception, "Excepción de tarea no observada");
+                eventArgs.SetObserved();
+            };
+
+            // Crear el builder primero
+            var builder = WebApplication.CreateBuilder(args);
+
             // Configurar Serilog como logger principal
             Log.Logger = new LoggerConfiguration()
-                .ReadFrom.Configuration(WebApplication.CreateBuilder(args).Configuration)
+                .ReadFrom.Configuration(builder.Configuration)
                 .Enrich.FromLogContext()
                 .CreateLogger();
 
-            var builder = WebApplication.CreateBuilder(args);
             builder.Host.UseSerilog();
 
             // Forzar Kestrel a escuchar en el puerto 5070 (HTTP)
@@ -73,6 +91,15 @@ namespace BackupPro
             //builder.Services.AddHostedService<BackupUploadBackgroundService>();
             //builder.Services.AddHostedService<BackupPeriodicService>();
 
+            // Agregar soporte para sesiones
+            builder.Services.AddDistributedMemoryCache();
+            builder.Services.AddSession(options =>
+            {
+                options.IdleTimeout = TimeSpan.FromMinutes(30);
+                options.Cookie.HttpOnly = true;
+                options.Cookie.IsEssential = true;
+            });
+
             var app = builder.Build();
 
             // Aplicar migraciones y crear BD si no existe
@@ -109,15 +136,34 @@ namespace BackupPro
 
             app.UseRouting();
 
+            app.UseSession(); // Habilitar sesiones
+
             app.UseAuthentication();
             app.UseAuthorization();
 
             app.MapControllerRoute(name: "default", pattern: "{controller=Home}/{action=Index}/{id?}");
 
             // Abrir navegador automáticamente (si se ejecuta manualmente)
-            AbrirNavegador("http://localhost:5070");
+            // TEMPORALMENTE DESHABILITADO PARA DEBUG
+            // AbrirNavegador("http://localhost:5070");
 
-            app.Run();
+            try
+            {
+                Log.Information("Iniciando aplicación BackupPro...");
+                app.Run();
+                Log.Information("Aplicación BackupPro finalizada normalmente.");
+            }
+            catch (Exception ex)
+            {
+                Log.Fatal(ex, "La aplicación se detuvo debido a una excepción");
+                Console.WriteLine($"ERROR FATAL: {ex.Message}");
+                Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+                throw;
+            }
+            finally
+            {
+                Log.CloseAndFlush();
+            }
         }
 
         /// <summary>

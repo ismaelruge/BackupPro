@@ -53,9 +53,7 @@ namespace BackupPro.Controllers
             var totalUsuarios = _userManager.Users.Count();
 
             // Si no hay usuarios y se intenta acceder con admin/admin, crear usuario temporal y redirigir a SetupAdmin
-            if (totalUsuarios == 0 &&
-                model.Email?.Equals("admin", StringComparison.OrdinalIgnoreCase) == true &&
-                model.Password == "admin")
+            if (totalUsuarios == 0 && model.Email?.Equals("admin", StringComparison.OrdinalIgnoreCase) == true && model.Password == "admin")
             {
                 // Crear usuario admin temporal
                 var tempAdmin = new IdentityUser
