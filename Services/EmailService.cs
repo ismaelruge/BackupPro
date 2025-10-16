@@ -8,11 +8,11 @@ namespace BackupPro.Services
     /// </summary>
     public class EmailService
     {
-        private readonly IConfiguration _config;
+        private readonly SmtpSettings _smtpSettings;
 
-        public EmailService(IConfiguration config)
+        public EmailService(SmtpSettings smtpSettings)
         {
-            _config = config;
+            _smtpSettings = smtpSettings;
         }
 
         /// <summary>
@@ -25,19 +25,16 @@ namespace BackupPro.Services
         {
             try
             {
-                var host = _config["Smtp:Host"];
-                var portStr = _config["Smtp:Port"];
-                var enableSslStr = _config["Smtp:EnableSSL"];
-                var user = _config["Smtp:Email"];
-                var password = _config["Smtp:Password"];
+                var host = _smtpSettings.Host;
+                var port = _smtpSettings.Port;
+                var enableSsl = _smtpSettings.EnableSSL;
+                var user = _smtpSettings.Email;
+                var password = _smtpSettings.Password;
 
                 if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(user))
                 {
                     return;
                 }
-
-                int port = int.TryParse(portStr, out var p) ? p : 25;
-                bool enableSsl = bool.TryParse(enableSslStr, out var s) ? s : true;
 
                 using var smtp = new SmtpClient(host, port)
                 {

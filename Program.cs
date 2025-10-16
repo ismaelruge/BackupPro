@@ -35,6 +35,14 @@ namespace BackupPro
             // Crear el builder primero
             var builder = WebApplication.CreateBuilder(args);
 
+            // Registrar configuraciones como Singleton
+            var appSettings = new AppSettings();
+            builder.Services.AddSingleton(appSettings);
+            builder.Services.AddSingleton(appSettings.Smtp);
+            builder.Services.AddSingleton(appSettings.GoogleOAuth);
+            builder.Services.AddSingleton(appSettings.OneDrive);
+            builder.Services.AddSingleton(appSettings.Scheduler);
+
             // Configurar Serilog como logger principal
             //Log.Logger = new LoggerConfiguration()
             //    .ReadFrom.Configuration(builder.Configuration)
@@ -380,10 +388,10 @@ if ($response.StatusCode -eq 200) {{
         private static void TryCreateSystemScheduler(WebApplication app)
         {
             //var logger = app.Services.GetRequiredService<ILogger<Program>>();
-            var cfg = app.Services.GetRequiredService<IConfiguration>();
-            var useSystem = cfg.GetValue("Scheduler:UseSystemScheduler", false);
-            var interval = cfg.GetValue("Scheduler:IntervalMinutes", 60);
-            var token = cfg["Scheduler:SecureToken"];
+            var schedulerSettings = app.Services.GetRequiredService<SchedulerSettings>();
+            var useSystem = schedulerSettings.UseSystemScheduler;
+            var interval = schedulerSettings.IntervalMinutes;
+            var token = schedulerSettings.SecureToken;
             if (!useSystem)
             {
                 //logger.LogInformation("Scheduler del sistema deshabilitado; se usará el scheduler interno.");

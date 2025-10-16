@@ -16,7 +16,6 @@ namespace BackupPro.Data
         }
 
         public DbSet<CompanyConfig> CompanyConfigs { get; set; }
-        public DbSet<DatabaseSource> DatabaseSources { get; set; }
         public DbSet<BackupHistory> BackupHistories { get; set; }
 
         // Storage Configurations

@@ -11,12 +11,12 @@ namespace BackupPro.Controllers.StorageTypes
     public class OneDriveStorageController : Controller
     {
         private readonly ApplicationDbContext _context;
-        private readonly IConfiguration _configuration;
+        private readonly OneDriveSettings _oneDriveSettings;
 
-        public OneDriveStorageController(ApplicationDbContext context, IConfiguration configuration)
+        public OneDriveStorageController(ApplicationDbContext context, OneDriveSettings oneDriveSettings)
         {
             _context = context;
-            _configuration = configuration;
+            _oneDriveSettings = oneDriveSettings;
         }
 
         public async Task<IActionResult> Index()
@@ -216,8 +216,8 @@ namespace BackupPro.Controllers.StorageTypes
         {
             try
             {
-                var clientId = _configuration["OneDrive:ClientId"];
-                var redirectUri = _configuration["OneDrive:RedirectUri"];
+                var clientId = _oneDriveSettings.ClientId;
+                var redirectUri = _oneDriveSettings.RedirectUri;
 
                 if (string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(redirectUri))
                 {
@@ -266,9 +266,9 @@ namespace BackupPro.Controllers.StorageTypes
 
             try
             {
-                var clientId = _configuration["OneDrive:ClientId"];
-                var clientSecret = _configuration["OneDrive:ClientSecret"];
-                var redirectUri = _configuration["OneDrive:RedirectUri"];
+                var clientId = _oneDriveSettings.ClientId;
+                var clientSecret = _oneDriveSettings.ClientSecret;
+                var redirectUri = _oneDriveSettings.RedirectUri;
 
                 // Intercambiar el código por tokens
                 var tokenRequest = new Dictionary<string, string>

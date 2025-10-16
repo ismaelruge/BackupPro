@@ -11,12 +11,12 @@ namespace BackupPro.Controllers.StorageTypes
     public class GoogleDriveStorageController : Controller
     {
         private readonly ApplicationDbContext _context;
-        private readonly IConfiguration _configuration;
+        private readonly GoogleOAuthSettings _googleOAuthSettings;
 
-        public GoogleDriveStorageController(ApplicationDbContext context, IConfiguration configuration)
+        public GoogleDriveStorageController(ApplicationDbContext context, GoogleOAuthSettings googleOAuthSettings)
         {
             _context = context;
-            _configuration = configuration;
+            _googleOAuthSettings = googleOAuthSettings;
         }
 
         public async Task<IActionResult> Index()
@@ -216,8 +216,8 @@ namespace BackupPro.Controllers.StorageTypes
         {
             try
             {
-                var clientId = _configuration["GoogleOAuth:ClientId"];
-                var redirectUri = _configuration["GoogleOAuth:RedirectUri"];
+                var clientId = _googleOAuthSettings.ClientId;
+                var redirectUri = _googleOAuthSettings.RedirectUri;
 
                 if (string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(redirectUri))
                 {
@@ -267,9 +267,9 @@ namespace BackupPro.Controllers.StorageTypes
 
             try
             {
-                var clientId = _configuration["GoogleOAuth:ClientId"];
-                var clientSecret = _configuration["GoogleOAuth:ClientSecret"];
-                var redirectUri = _configuration["GoogleOAuth:RedirectUri"];
+                var clientId = _googleOAuthSettings.ClientId;
+                var clientSecret = _googleOAuthSettings.ClientSecret;
+                var redirectUri = _googleOAuthSettings.RedirectUri;
 
                 // Intercambiar el código por tokens
                 var tokenRequest = new Dictionary<string, string>
