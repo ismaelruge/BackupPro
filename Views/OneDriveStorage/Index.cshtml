@@ -1,4 +1,5 @@
-﻿@{
+﻿@model IEnumerable<BackupPro.Models.OneDriveStorage>
+@{
     ViewData["Title"] = "Almacenamiento One Drive";
 }
 
@@ -64,88 +65,69 @@
                                     <h6 class="fw-semibold mb-0">
                                         <i class="bi bi-gear-fill me-2 text-primary"></i>Configuraciones Activas
                                     </h6>
-                                    <span class="badge bg-primary rounded-pill">2 configuradas</span>
+                                    <span class="badge bg-primary rounded-pill">@Model.Count() configuradas</span>
                                 </div>
 
-                                <!-- Configuración 1 -->
-                                <div class="card mb-3 border-0 shadow-sm">
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between align-items-start">
-                                            <div class="flex-grow-1">
-                                                <div class="d-flex align-items-center mb-2">
-                                                    <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3">
-                                                        <i class="bi bi-person-circle text-primary fs-5"></i>
+                                @if (!Model.Any())
+                                {
+                                    <div class="alert alert-info" role="alert">
+                                        <i class="bi bi-info-circle me-2"></i>
+                                        No hay configuraciones de OneDrive registradas. Haz clic en "Agregar Nueva Configuración" para comenzar.
+                                    </div>
+                                }
+                                else
+                                {
+                                    @foreach (var config in Model)
+                                    {
+                                        <!-- Configuración -->
+                                        <div class="card mb-3 border-0 shadow-sm">
+                                            <div class="card-body">
+                                                <div class="d-flex justify-content-between align-items-start">
+                                                    <div class="flex-grow-1">
+                                                        <div class="d-flex align-items-center mb-2">
+                                                            <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3">
+                                                                <i class="bi bi-person-circle text-primary fs-5"></i>
+                                                            </div>
+                                                            <div>
+                                                                <h6 class="mb-0 fw-semibold">
+                                                                    <span class="text-primary">@config.ConfigurationName</span>
+                                                                    <span class="text-muted fw-normal"> - @config.Email</span>
+                                                                </h6>
+                                                                @if (config.TokenExpiresAt.HasValue)
+                                                                {
+                                                                    var daysAgo = (DateTime.Now - config.TokenExpiresAt.Value).Days;
+                                                                    <small class="text-muted">Conectado hace @Math.Abs(daysAgo) días</small>
+                                                                }
+                                                            </div>
+                                                        </div>
+                                                        <div class="ms-5 ps-2">
+                                                            <div class="mb-1">
+                                                                <i class="bi bi-folder me-2 text-muted"></i>
+                                                                <span class="text-muted">Ruta:</span>
+                                                                <code class="ms-1">@(string.IsNullOrEmpty(config.FolderPath) ? "/" : config.FolderPath)</code>
+                                                            </div>
+                                                            <span class="badge bg-success">
+                                                                <i class="bi bi-check-circle me-1"></i>Activo
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                     <div>
-                                                        <h6 class="mb-0 fw-semibold">
-                                                            <span class="text-primary">Backup Empresarial</span>
-                                                            <span class="text-muted fw-normal"> - usuario@outlook.com</span>
-                                                        </h6>
-                                                        <small class="text-muted">Conectado hace 3 días</small>
+                                                        <button class="btn btn-sm btn-outline-primary rounded-pill me-2"
+                                                                onclick="openEditModal(@config.Id)"
+                                                                aria-label="Editar configuración">
+                                                            <i class="bi bi-pencil"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-danger rounded-pill"
+                                                                onclick="openDeleteModal(@config.Id, '@config.ConfigurationName', '@config.Email', '@(string.IsNullOrEmpty(config.FolderPath) ? "/" : config.FolderPath)')"
+                                                                aria-label="Eliminar configuración">
+                                                            <i class="bi bi-trash"></i>
+                                                        </button>
                                                     </div>
                                                 </div>
-                                                <div class="ms-5 ps-2">
-                                                    <div class="mb-1">
-                                                        <i class="bi bi-folder me-2 text-muted"></i>
-                                                        <span class="text-muted">Ruta:</span>
-                                                        <code class="ms-1">/Backups/Producción</code>
-                                                    </div>
-                                                    <span class="badge bg-success">
-                                                        <i class="bi bi-check-circle me-1"></i>Activo
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <button class="btn btn-sm btn-outline-primary rounded-pill me-2" data-bs-toggle="modal" data-bs-target="#editOneDriveModal" aria-label="Editar configuración">
-                                                    <i class="bi bi-pencil"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-outline-danger rounded-pill" data-bs-toggle="modal" data-bs-target="#deleteOneDriveModal" aria-label="Eliminar configuración">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
                                             </div>
                                         </div>
-                                    </div>
-                                </div>
-
-                                <!-- Configuración 2 -->
-                                <div class="card mb-3 border-0 shadow-sm">
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between align-items-start">
-                                            <div class="flex-grow-1">
-                                                <div class="d-flex align-items-center mb-2">
-                                                    <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3">
-                                                        <i class="bi bi-person-circle text-primary fs-5"></i>
-                                                    </div>
-                                                    <div>
-                                                        <h6 class="mb-0 fw-semibold">
-                                                            <span class="text-primary">Respaldo Documentos</span>
-                                                            <span class="text-muted fw-normal"> - empresa@hotmail.com</span>
-                                                        </h6>
-                                                        <small class="text-muted">Conectado hace 5 días</small>
-                                                    </div>
-                                                </div>
-                                                <div class="ms-5 ps-2">
-                                                    <div class="mb-1">
-                                                        <i class="bi bi-folder me-2 text-muted"></i>
-                                                        <span class="text-muted">Ruta:</span>
-                                                        <code class="ms-1">/Documentos/Backups</code>
-                                                    </div>
-                                                    <span class="badge bg-success">
-                                                        <i class="bi bi-check-circle me-1"></i>Activo
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <button class="btn btn-sm btn-outline-primary rounded-pill me-2" data-bs-toggle="modal" data-bs-target="#editOneDriveModal" aria-label="Editar configuración">
-                                                    <i class="bi bi-pencil"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-outline-danger rounded-pill" data-bs-toggle="modal" data-bs-target="#deleteOneDriveModal" aria-label="Eliminar configuración">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                    }
+                                }
                             </div>
 
                             <!-- Botón agregar nueva configuración -->
@@ -247,11 +229,13 @@
             </div>
             <div class="modal-body p-4">
                 <form id="editOneDriveForm">
+                    <input type="hidden" id="editOneDriveId">
+                    <input type="hidden" id="editOneDriveItemId">
                     <div class="mb-3">
                         <label for="editOneDriveConfigName" class="form-label fw-semibold">
                             <i class="bi bi-tag me-2 text-warning"></i>Nombre de Configuración
                         </label>
-                        <input type="text" class="form-control" id="editOneDriveConfigName" value="Backup Principal" required>
+                        <input type="text" class="form-control" id="editOneDriveConfigName" required>
                         <div class="form-text">Dale un nombre descriptivo a esta configuración</div>
                     </div>
                     <div class="mb-3">
@@ -259,19 +243,19 @@
                             <i class="bi bi-envelope me-2 text-warning"></i>Correo de Microsoft
                         </label>
                         <div class="input-group">
-                            <input type="email" class="form-control" id="editOneDriveEmail" value="usuario@outlook.com" readonly>
+                            <input type="email" class="form-control" id="editOneDriveEmail" readonly>
                             <button class="btn btn-outline-warning" type="button" id="btnEditConnectOneDrive">
-                                <i class="bi bi-microsoft me-1"></i>Conectar
+                                <i class="bi bi-microsoft me-1"></i>Reconectar
                             </button>
                         </div>
-                        <div class="form-text">Conéctate con tu cuenta de Microsoft para acceder a OneDrive</div>
+                        <div class="form-text">Reconéctate si necesitas actualizar el acceso</div>
                     </div>
                     <div class="mb-3">
                         <label for="editOneDriveFolderPath" class="form-label fw-semibold">
                             <i class="bi bi-folder me-2 text-warning"></i>Ruta de Carpeta
                         </label>
                         <div class="input-group">
-                            <input type="text" class="form-control" id="editOneDriveFolderPath" value="/Backups/Empresa" required readonly>
+                            <input type="text" class="form-control" id="editOneDriveFolderPath" required readonly>
                             <button class="btn btn-outline-secondary" type="button" id="btnExploreEditOneDrive">
                                 <i class="bi bi-folder2-open me-1"></i>Explorar
                             </button>
@@ -311,13 +295,13 @@
                 </div>
                 <div class="bg-light rounded-3 p-3 mb-3">
                     <div class="mb-2">
-                        <strong class="text-primary">Backup Principal</strong>
-                        <span class="text-muted"> - usuario@outlook.com</span>
+                        <strong class="text-primary" id="deleteOneDriveConfigName"></strong>
+                        <span class="text-muted"> - <span id="deleteOneDriveEmail"></span></span>
                     </div>
                     <div class="text-muted">
                         <small>
                             <i class="bi bi-folder me-2"></i>
-                            Ruta: <code>/Backups/Empresa</code>
+                            Ruta: <code id="deleteOneDrivePath"></code>
                         </small>
                     </div>
                 </div>
@@ -330,7 +314,7 @@
                 <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">
                     <i class="bi bi-x-circle me-2"></i>Cancelar
                 </button>
-                <button type="button" class="btn btn-danger rounded-pill">
+                <button type="button" class="btn btn-danger rounded-pill" id="btnConfirmDeleteOneDrive">
                     <i class="bi bi-trash me-2"></i>Sí, Eliminar Configuración
                 </button>
             </div>
@@ -630,8 +614,10 @@
         authenticateWithOneDrive();
     });
 
-    // Botón para conectar con OneDrive (modal editar)
+    // Botón para reconectar con OneDrive (modal editar)
     document.getElementById('btnEditConnectOneDrive')?.addEventListener('click', function() {
+        // Guardar el ID de la configuración actual para actualizar tokens después
+        currentOneDriveConfigId = parseInt(document.getElementById('editOneDriveId').value);
         authenticateWithOneDrive(true);
     });
 
@@ -673,6 +659,13 @@
 
                     // Habilitar el botón de explorar
                     document.getElementById('btnExploreEditOneDrive').disabled = false;
+
+                    // Si hay un ID de configuración guardado, actualizar los tokens inmediatamente
+                    if (currentOneDriveConfigId) {
+                        saveOneDriveTokens(currentOneDriveConfigId, oneDriveAccessToken, '').then(() => {
+                            showToast('success', 'Tokens actualizados correctamente.');
+                        });
+                    }
                 } else {
                     // Actualizar el email en el modal de agregar
                     document.getElementById('oneDriveEmail').value = oneDriveEmail;
@@ -925,5 +918,229 @@
             document.getElementById('btnConfirmCreateOneDriveFolder').click();
         }
     });
+
+    // ========== CRUD OPERATIONS ==========
+
+    // Variables globales para CRUD
+    let deleteOneDriveId = null;
+    let currentOneDriveConfigId = null; // Para guardar tokens después de autenticar
+
+    // Agregar nueva configuración de OneDrive
+    document.getElementById('addOneDriveForm')?.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const configName = document.getElementById('oneDriveConfigName').value.trim();
+        const email = document.getElementById('oneDriveEmail').value.trim();
+        const folderPath = document.getElementById('oneDriveFolderPath').value.trim();
+
+        if (!configName || !email || !folderPath) {
+            showToast('warning', 'Por favor, completa todos los campos. Debes conectarte con OneDrive y seleccionar una carpeta.');
+            return;
+        }
+
+        try {
+            const response = await fetch('/OneDriveStorage/Create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
+                },
+                body: JSON.stringify({
+                    ConfigurationName: configName,
+                    Email: email,
+                    ItemId: oneDriveExplorerData.currentItemId || '',
+                    FolderPath: folderPath
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Guardar tokens si hay acceso token
+                if (oneDriveAccessToken && data.id) {
+                    await saveOneDriveTokens(data.id, oneDriveAccessToken, '');
+                }
+
+                showToast('success', data.message || 'Configuración creada exitosamente.');
+
+                // Cerrar modal
+                const addModal = bootstrap.Modal.getInstance(document.getElementById('addOneDriveModal'));
+                addModal.hide();
+
+                // Limpiar formulario
+                document.getElementById('addOneDriveForm').reset();
+                document.getElementById('btnExploreOneDrive').disabled = true;
+                oneDriveAccessToken = null;
+                oneDriveEmail = null;
+
+                // Recargar página
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast('error', data.message || 'Error al crear la configuración.');
+            }
+        } catch (error) {
+            showToast('error', 'Error de conexión: ' + error.message);
+        }
+    });
+
+    // Abrir modal de edición
+    async function openEditModal(id) {
+        try {
+            const response = await fetch(`/OneDriveStorage/GetById?id=${id}`);
+            const data = await response.json();
+
+            if (data.success) {
+                const config = data.data;
+
+                // Cargar datos en el formulario
+                document.getElementById('editOneDriveId').value = config.id;
+                document.getElementById('editOneDriveConfigName').value = config.configurationName;
+                document.getElementById('editOneDriveEmail').value = config.email;
+                document.getElementById('editOneDriveItemId').value = config.itemId || '';
+                document.getElementById('editOneDriveFolderPath').value = config.folderPath || '/Mi unidad';
+
+                // Si hay token guardado, usarlo para el explorador
+                if (data.accessToken && data.hasValidToken) {
+                    oneDriveExplorerData.accessToken = data.accessToken;
+                    oneDriveAccessToken = data.accessToken;
+                    document.getElementById('btnExploreEditOneDrive').disabled = false;
+                } else {
+                    document.getElementById('btnExploreEditOneDrive').disabled = true;
+                }
+
+                // Abrir modal
+                const editModal = new bootstrap.Modal(document.getElementById('editOneDriveModal'));
+                editModal.show();
+            } else {
+                showToast('error', 'Error al cargar la configuración.');
+            }
+        } catch (error) {
+            showToast('error', 'Error de conexión: ' + error.message);
+        }
+    }
+
+    // Actualizar configuración de OneDrive
+    document.getElementById('editOneDriveForm')?.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const id = document.getElementById('editOneDriveId').value;
+        const configName = document.getElementById('editOneDriveConfigName').value.trim();
+        const email = document.getElementById('editOneDriveEmail').value.trim();
+        const folderPath = document.getElementById('editOneDriveFolderPath').value.trim();
+
+        if (!configName || !email || !folderPath) {
+            showToast('warning', 'Por favor, completa todos los campos requeridos.');
+            return;
+        }
+
+        try {
+            const response = await fetch('/OneDriveStorage/Edit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
+                },
+                body: JSON.stringify({
+                    Id: parseInt(id),
+                    ConfigurationName: configName,
+                    Email: email,
+                    ItemId: oneDriveExplorerData.currentItemId || document.getElementById('editOneDriveItemId').value,
+                    FolderPath: folderPath
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Guardar tokens si se reconectó
+                if (oneDriveAccessToken) {
+                    await saveOneDriveTokens(parseInt(id), oneDriveAccessToken, '');
+                }
+
+                showToast('success', data.message || 'Configuración actualizada exitosamente.');
+
+                // Cerrar modal
+                const editModal = bootstrap.Modal.getInstance(document.getElementById('editOneDriveModal'));
+                editModal.hide();
+
+                // Recargar página
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast('error', data.message || 'Error al actualizar la configuración.');
+            }
+        } catch (error) {
+            showToast('error', 'Error de conexión: ' + error.message);
+        }
+    });
+
+    // Abrir modal de eliminación
+    function openDeleteModal(id, name, email, path) {
+        deleteOneDriveId = id;
+        document.getElementById('deleteOneDriveConfigName').textContent = name;
+        document.getElementById('deleteOneDriveEmail').textContent = email;
+        document.getElementById('deleteOneDrivePath').textContent = path;
+
+        const deleteModal = new bootstrap.Modal(document.getElementById('deleteOneDriveModal'));
+        deleteModal.show();
+    }
+
+    // Confirmar eliminación
+    document.getElementById('btnConfirmDeleteOneDrive')?.addEventListener('click', async function() {
+        if (!deleteOneDriveId) {
+            showToast('error', 'ID de configuración no válido.');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/OneDriveStorage/Delete?id=${deleteOneDriveId}`, {
+                method: 'POST',
+                headers: {
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showToast('success', data.message || 'Configuración eliminada exitosamente.');
+
+                // Cerrar modal
+                const deleteModal = bootstrap.Modal.getInstance(document.getElementById('deleteOneDriveModal'));
+                deleteModal.hide();
+
+                // Recargar página
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast('error', data.message || 'Error al eliminar la configuración.');
+            }
+        } catch (error) {
+            showToast('error', 'Error de conexión: ' + error.message);
+        }
+    });
+
+    // Función auxiliar para guardar tokens de OneDrive
+    async function saveOneDriveTokens(configId, accessToken, refreshToken) {
+        try {
+            const response = await fetch('/OneDriveStorage/SaveTokens', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
+                },
+                body: JSON.stringify({
+                    Id: configId,
+                    AccessToken: accessToken,
+                    RefreshToken: refreshToken
+                })
+            });
+
+            const data = await response.json();
+            if (!data.success) {
+                console.error('Error al guardar tokens:', data.message);
+            }
+        } catch (error) {
+            console.error('Error al guardar tokens:', error);
+        }
+    }
 
 </script>

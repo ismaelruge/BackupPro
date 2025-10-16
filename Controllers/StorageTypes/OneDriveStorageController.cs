@@ -1,21 +1,212 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using BackupPro.Data;
+using BackupPro.Models;
+using BackupPro.ViewModels;
+using Microsoft.EntityFrameworkCore;
 
 namespace BackupPro.Controllers.StorageTypes
 {
     [Authorize]
     public class OneDriveStorageController : Controller
     {
+        private readonly ApplicationDbContext _context;
         private readonly IConfiguration _configuration;
 
-        public OneDriveStorageController(IConfiguration configuration)
+        public OneDriveStorageController(ApplicationDbContext context, IConfiguration configuration)
         {
+            _context = context;
             _configuration = configuration;
         }
 
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
-            return View();
+            var list = await _context.OneDriveStorages.ToListAsync();
+            return View(list);
+        }
+
+        // ========== CRUD OPERATIONS ==========
+
+        /// <summary>
+        /// Crea una nueva configuración de OneDrive.
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> Create([FromBody] OneDriveStorageViewModel model)
+        {
+            try
+            {
+                if (ModelState.IsValid)
+                {
+                    // Verificar si ya existe una configuración con el mismo nombre
+                    bool exists = await _context.OneDriveStorages.AnyAsync(o => o.ConfigurationName == model.ConfigurationName);
+
+                    if (exists)
+                    {
+                        return Json(new { success = false, message = "Ya existe una configuración con este nombre." });
+                    }
+
+                    var oneDrive = new OneDriveStorage
+                    {
+                        ConfigurationName = model.ConfigurationName,
+                        Email = model.Email,
+                        ItemId = model.ItemId ?? string.Empty,
+                        FolderPath = model.FolderPath ?? string.Empty,
+                        AccessToken = null, // Se guardará después de la autenticación
+                        RefreshToken = null,
+                        CreatedAt = DateTime.Now,
+                        CreatedBy = User.Identity?.Name
+                    };
+
+                    _context.OneDriveStorages.Add(oneDrive);
+                    await _context.SaveChangesAsync();
+
+                    return Json(new { success = true, message = "Configuración de OneDrive creada exitosamente.", id = oneDrive.Id });
+                }
+
+                return Json(new { success = false, message = "Datos inválidos." });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error al crear configuración: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
+        /// Actualiza una configuración de OneDrive existente.
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> Edit([FromBody] OneDriveStorageViewModel model)
+        {
+            try
+            {
+                if (!model.Id.HasValue)
+                {
+                    return Json(new { success = false, message = "ID de configuración no especificado." });
+                }
+
+                var oneDrive = await _context.OneDriveStorages.FindAsync(model.Id.Value);
+                if (oneDrive == null)
+                {
+                    return Json(new { success = false, message = "Configuración no encontrada." });
+                }
+
+                // Verificar si otro registro tiene el mismo nombre
+                bool exists = await _context.OneDriveStorages.AnyAsync(o => o.ConfigurationName == model.ConfigurationName && o.Id != model.Id);
+                if (exists)
+                {
+                    return Json(new { success = false, message = "Ya existe otra configuración con este nombre." });
+                }
+
+                oneDrive.ConfigurationName = model.ConfigurationName;
+                oneDrive.Email = model.Email;
+                oneDrive.ItemId = model.ItemId ?? string.Empty;
+                oneDrive.FolderPath = model.FolderPath ?? string.Empty;
+                oneDrive.LastModifiedAt = DateTime.Now;
+
+                _context.OneDriveStorages.Update(oneDrive);
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true, message = "Configuración actualizada exitosamente." });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error al actualizar configuración: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
+        /// Elimina una configuración de OneDrive.
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> Delete(int id)
+        {
+            try
+            {
+                var oneDrive = await _context.OneDriveStorages.FindAsync(id);
+                if (oneDrive == null)
+                {
+                    return Json(new { success = false, message = "Configuración no encontrada." });
+                }
+
+                _context.OneDriveStorages.Remove(oneDrive);
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true, message = "Configuración eliminada exitosamente." });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error al eliminar configuración: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
+        /// Obtiene una configuración de OneDrive por su ID.
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetById(int id)
+        {
+            try
+            {
+                var oneDrive = await _context.OneDriveStorages.FindAsync(id);
+                if (oneDrive == null)
+                {
+                    return Json(new { success = false, message = "Configuración no encontrada." });
+                }
+
+                var viewModel = new OneDriveStorageViewModel
+                {
+                    Id = oneDrive.Id,
+                    ConfigurationName = oneDrive.ConfigurationName,
+                    Email = oneDrive.Email,
+                    ItemId = oneDrive.ItemId,
+                    FolderPath = oneDrive.FolderPath,
+                    TokenExpiresAt = oneDrive.TokenExpiresAt
+                };
+
+                // Incluir AccessToken para permitir exploración sin reconectar
+                // TODO: En producción, verificar expiración antes de enviar
+                return Json(new {
+                    success = true,
+                    data = viewModel,
+                    accessToken = oneDrive.AccessToken, // Para usar el explorador sin reconectar
+                    hasValidToken = !string.IsNullOrEmpty(oneDrive.AccessToken)
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error al obtener configuración: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
+        /// Guarda los tokens de OneDrive para una configuración.
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> SaveTokens([FromBody] SaveTokensRequest request)
+        {
+            try
+            {
+                var oneDrive = await _context.OneDriveStorages.FindAsync(request.Id);
+                if (oneDrive == null)
+                {
+                    return Json(new { success = false, message = "Configuración no encontrada." });
+                }
+
+                // TODO: En producción, encriptar los tokens antes de guardarlos
+                oneDrive.AccessToken = request.AccessToken;
+                oneDrive.RefreshToken = request.RefreshToken;
+                oneDrive.TokenExpiresAt = DateTime.Now.AddHours(1); // Los tokens de Microsoft duran ~1 hora
+                oneDrive.LastModifiedAt = DateTime.Now;
+
+                _context.OneDriveStorages.Update(oneDrive);
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true, message = "Tokens guardados exitosamente." });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error al guardar tokens: {ex.Message}" });
+            }
         }
 
         // ========== ONEDRIVE ENDPOINTS ==========
@@ -306,5 +497,12 @@ namespace BackupPro.Controllers.StorageTypes
         public string Id { get; set; }
         public string Name { get; set; }
         public DateTime LastModifiedDateTime { get; set; }
+    }
+
+    public class SaveTokensRequest
+    {
+        public int Id { get; set; }
+        public string AccessToken { get; set; }
+        public string RefreshToken { get; set; }
     }
 }
