@@ -2,6 +2,8 @@
     ViewData["Title"] = "Almacenamiento Local";
 }
 
+@Html.AntiForgeryToken()
+
 <div class="container mt-5">
     <div class="row justify-content-center">
         <div class="col-12 col-lg-10">
@@ -64,70 +66,16 @@
                                     <h6 class="fw-semibold mb-0">
                                         <i class="bi bi-gear-fill me-2 text-primary"></i>Configuraciones Activas
                                     </h6>
-                                    <span class="badge bg-primary rounded-pill">2 configuradas</span>
+                                    <span class="badge bg-primary rounded-pill" id="configCount">0 configuradas</span>
                                 </div>
 
-                                <!-- Configuración 1 -->
-                                <div class="card mb-3 border-0 shadow-sm">
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <div class="flex-grow-1">
-                                                <div class="d-flex align-items-center">
-                                                    <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3">
-                                                        <i class="bi bi-folder-fill text-primary fs-5"></i>
-                                                    </div>
-                                                    <div>
-                                                        <h6 class="mb-0 fw-semibold">
-                                                            <span class="text-primary">Almacenamiento Local Principal</span>
-                                                            <span class="text-muted fw-normal"> - C:\Backups\Principal</span>
-                                                        </h6>
-                                                        <span class="badge bg-success mt-1">
-                                                            <i class="bi bi-check-circle me-1"></i>Activo
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <button class="btn btn-sm btn-outline-primary rounded-pill me-2" data-bs-toggle="modal" data-bs-target="#editLocalModal" aria-label="Editar configuración local">
-                                                    <i class="bi bi-pencil"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-outline-danger rounded-pill" data-bs-toggle="modal" data-bs-target="#deleteLocalModal" aria-label="Eliminar configuración local">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Configuración 2 -->
-                                <div class="card mb-3 border-0 shadow-sm">
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <div class="flex-grow-1">
-                                                <div class="d-flex align-items-center">
-                                                    <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3">
-                                                        <i class="bi bi-folder-fill text-primary fs-5"></i>
-                                                    </div>
-                                                    <div>
-                                                        <h6 class="mb-0 fw-semibold">
-                                                            <span class="text-primary">Respaldo Empresa Local</span>
-                                                            <span class="text-muted fw-normal"> - D:\Respaldos\Empresa</span>
-                                                        </h6>
-                                                        <span class="badge bg-success mt-1">
-                                                            <i class="bi bi-check-circle me-1"></i>Activo
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <button class="btn btn-sm btn-outline-primary rounded-pill me-2" data-bs-toggle="modal" data-bs-target="#editLocalModal" aria-label="Editar configuración local">
-                                                    <i class="bi bi-pencil"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-outline-danger rounded-pill" data-bs-toggle="modal" data-bs-target="#deleteLocalModal" aria-label="Eliminar configuración local">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
-                                            </div>
-                                        </div>
+                                <!-- Contenedor dinámico de configuraciones -->
+                                <div id="configurationsContainer">
+                                    <!-- Las configuraciones se cargarán dinámicamente aquí -->
+                                    <div class="text-center py-5 text-muted">
+                                        <i class="bi bi-folder-x" style="font-size: 3rem;"></i>
+                                        <p class="mt-3">No hay configuraciones de almacenamiento local</p>
+                                        <small>Haz clic en "Agregar Nueva Carpeta" para crear una</small>
                                     </div>
                                 </div>
                             </div>
@@ -213,17 +161,18 @@
             </div>
             <div class="modal-body p-4">
                 <form id="editLocalForm">
+                    <input type="hidden" id="editLocalId">
                     <div class="mb-3">
                         <label for="editLocalConfigName" class="form-label fw-semibold">
                             <i class="bi bi-tag me-2 text-warning"></i>Nombre de Configuración
                         </label>
-                        <input type="text" class="form-control" id="editLocalConfigName" value="Almacenamiento Local Principal" required>
+                        <input type="text" class="form-control" id="editLocalConfigName" required>
                     </div>
                     <div class="mb-3">
                         <label for="editLocalFolderPath" class="form-label fw-semibold">
                             <i class="bi bi-folder me-2 text-warning"></i>Ruta de Carpeta
                         </label>
-                        <input type="text" class="form-control" id="editLocalFolderPath" value="C:\Backups\Principal" required>
+                        <input type="text" class="form-control" id="editLocalFolderPath" required>
                         <div class="form-text">Ingresa la ruta completa donde se guardarán los backups</div>
                     </div>
                 </form>
@@ -251,20 +200,21 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
             <div class="modal-body p-4">
+                <input type="hidden" id="deleteLocalId">
                 <div class="text-center mb-4">
                     <div class="bg-danger bg-opacity-10 rounded-circle p-3 d-inline-flex mb-3">
                         <i class="bi bi-trash text-danger" style="font-size: 3rem;"></i>
                     </div>
                     <h5 class="fw-semibold">¿Estás seguro de eliminar esta configuración?</h5>
                 </div>
-                <div class="bg-light rounded-3 p-3 mb-3">
+                <div class="bg-light rounded-3 p-3 mb-3" id="deleteConfigInfo">
                     <div class="mb-2">
-                        <strong class="text-primary">Almacenamiento Local Principal</strong>
+                        <strong class="text-primary" id="deleteConfigName"></strong>
                     </div>
                     <div class="text-muted">
                         <small>
                             <i class="bi bi-folder me-2"></i>
-                            Ruta: <code>C:\Backups\Principal</code>
+                            Ruta: <code id="deleteConfigPath"></code>
                         </small>
                     </div>
                 </div>
@@ -284,7 +234,7 @@
                 <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">
                     <i class="bi bi-x-circle me-2"></i>Cancelar
                 </button>
-                <button type="button" class="btn btn-danger rounded-pill">
+                <button type="button" class="btn btn-danger rounded-pill" id="confirmDeleteBtn">
                     <i class="bi bi-trash me-2"></i>Sí, Eliminar Configuración
                 </button>
             </div>
@@ -453,58 +403,248 @@
         toast.show();
     }
 
-    // Variables globales para el explorador FTP
-    let ftpExplorerData = {
-        host: '',
-        username: '',
-        password: '',
-        currentPath: '/',
-        targetInputId: '',
-        isEditMode: false
-    };
+    // Función para formatear bytes
+    function formatBytes(bytes) {
+        if (bytes === null || bytes === undefined) return 'N/A';
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        if (bytes === 0) return '0 B';
+        const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
+        return Math.round(bytes / Math.pow(1024, i), 2) + ' ' + sizes[i];
+    }
 
-    // Abrir explorador FTP desde modal de agregar
-    document.getElementById('btnExploreFtp')?.addEventListener('click', function() {
-        openFtpExplorer('ftpPath', false);
+    // Cargar configuraciones al iniciar la página
+    document.addEventListener('DOMContentLoaded', function() {
+        loadConfigurations();
     });
 
-    // Abrir explorador FTP desde modal de editar
-    document.getElementById('btnExploreEditFtp')?.addEventListener('click', function() {
-        openFtpExplorer('editFtpPath', true);
-    });
+    // Función para cargar todas las configuraciones
+    function loadConfigurations() {
+        fetch('/LocalStorage/GetAll', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                renderConfigurations(result.data);
+            } else {
+                showToast('error', result.message || 'Error al cargar configuraciones');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('error', 'Error al cargar las configuraciones');
+        });
+    }
 
-    // Función para abrir el explorador FTP
-    function openFtpExplorer(targetInputId, isEditMode) {
-        // Obtener credenciales del modal correspondiente
-        const hostInput = isEditMode ? 'editFtpHost' : 'ftpHost';
-        const userInput = isEditMode ? 'editFtpUsername' : 'ftpUsername';
-        const passInput = isEditMode ? 'editFtpPassword' : 'ftpPassword';
+    // Función para renderizar las configuraciones
+    function renderConfigurations(configurations) {
+        const container = document.getElementById('configurationsContainer');
+        const countBadge = document.getElementById('configCount');
 
-        const host = document.getElementById(hostInput).value;
-        const username = document.getElementById(userInput).value;
-        const password = document.getElementById(passInput).value;
+        // Actualizar contador
+        countBadge.textContent = `${configurations.length} configurada${configurations.length !== 1 ? 's' : ''}`;
 
-        // Validar que se hayan ingresado las credenciales
-        if (!host || !username || !password) {
-            showToast('warning', 'Por favor, ingresa el servidor, usuario y contraseña antes de explorar.');
+        if (configurations.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-folder-x" style="font-size: 3rem;"></i>
+                    <p class="mt-3">No hay configuraciones de almacenamiento local</p>
+                    <small>Haz clic en "Agregar Nueva Carpeta" para crear una</small>
+                </div>
+            `;
             return;
         }
 
-        // Guardar datos
-        ftpExplorerData = {
-            host: host,
-            username: username,
-            password: password,
-            currentPath: '/',
-            targetInputId: targetInputId,
-            isEditMode: isEditMode
+        container.innerHTML = configurations.map(config => `
+            <div class="card mb-3 border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="flex-grow-1">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3">
+                                    <i class="bi bi-folder-fill text-primary fs-5"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 fw-semibold">
+                                        <span class="text-primary">${escapeHtml(config.configurationName)}</span>
+                                        <span class="text-muted fw-normal"> - ${escapeHtml(config.folderPath)}</span>
+                                    </h6>
+                                    <div class="mt-1">
+                                        ${config.isAccessible
+                                            ? '<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Accesible</span>'
+                                            : '<span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>No accesible</span>'}
+                                        ${config.availableSpaceBytes
+                                            ? `<span class="badge bg-info ms-1"><i class="bi bi-hdd me-1"></i>${formatBytes(config.availableSpaceBytes)} disponibles</span>`
+                                            : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary rounded-pill me-2"
+                                    onclick="openEditModal(${config.id})"
+                                    aria-label="Editar configuración local">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger rounded-pill"
+                                    onclick="openDeleteModal(${config.id}, '${escapeHtml(config.configurationName)}', '${escapeHtml(config.folderPath)}')"
+                                    aria-label="Eliminar configuración local">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // Función para escapar HTML
+    function escapeHtml(text) {
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;',
+            '\\': '&#92;'
+        };
+        return text.replace(/[&<>"'\\]/g, m => map[m]);
+    }
+
+    // CRUD - Crear configuración
+    document.getElementById('addLocalForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const data = {
+            configurationName: document.getElementById('localConfigName').value,
+            folderPath: document.getElementById('localFolderPath').value
         };
 
-        // Abrir modal del explorador
-        const explorerModal = new bootstrap.Modal(document.getElementById('ftpExplorerModal'));
-        explorerModal.show();
+        fetch('/LocalStorage/Create', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                showToast('success', result.message || 'Configuración creada exitosamente');
+                bootstrap.Modal.getInstance(document.getElementById('addLocalModal')).hide();
+                document.getElementById('addLocalForm').reset();
+                loadConfigurations();
+            } else {
+                showToast('error', result.message || 'Error al crear configuración');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('error', 'Error al crear la configuración');
+        });
+    });
 
-        // Cargar directorio raíz
-        loadFtpDirectory('/');
+    // CRUD - Abrir modal de edición
+    function openEditModal(id) {
+        fetch(`/LocalStorage/GetById?id=${id}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                document.getElementById('editLocalId').value = result.data.id;
+                document.getElementById('editLocalConfigName').value = result.data.configurationName;
+                document.getElementById('editLocalFolderPath').value = result.data.folderPath;
+
+                const editModal = new bootstrap.Modal(document.getElementById('editLocalModal'));
+                editModal.show();
+            } else {
+                showToast('error', result.message || 'Error al cargar configuración');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('error', 'Error al cargar la configuración');
+        });
     }
+
+    // CRUD - Actualizar configuración
+    document.getElementById('editLocalForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const data = {
+            id: parseInt(document.getElementById('editLocalId').value),
+            configurationName: document.getElementById('editLocalConfigName').value,
+            folderPath: document.getElementById('editLocalFolderPath').value
+        };
+
+        fetch('/LocalStorage/Update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                showToast('success', result.message || 'Configuración actualizada exitosamente');
+                bootstrap.Modal.getInstance(document.getElementById('editLocalModal')).hide();
+                loadConfigurations();
+            } else {
+                showToast('error', result.message || 'Error al actualizar configuración');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('error', 'Error al actualizar la configuración');
+        });
+    });
+
+    // CRUD - Abrir modal de eliminación
+    function openDeleteModal(id, name, path) {
+        document.getElementById('deleteLocalId').value = id;
+        document.getElementById('deleteConfigName').textContent = name;
+        document.getElementById('deleteConfigPath').textContent = path;
+        document.getElementById('deleteLocalFiles').checked = false;
+
+        const deleteModal = new bootstrap.Modal(document.getElementById('deleteLocalModal'));
+        deleteModal.show();
+    }
+
+    // CRUD - Eliminar configuración
+    document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
+        const id = document.getElementById('deleteLocalId').value;
+        const deleteFiles = document.getElementById('deleteLocalFiles').checked;
+
+        fetch(`/LocalStorage/Delete?id=${id}&deleteFiles=${deleteFiles}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
+            }
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                showToast('success', result.message || 'Configuración eliminada exitosamente');
+                bootstrap.Modal.getInstance(document.getElementById('deleteLocalModal')).hide();
+                loadConfigurations();
+            } else {
+                showToast('error', result.message || 'Error al eliminar configuración');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('error', 'Error al eliminar la configuración');
+        });
+    });
 </script>

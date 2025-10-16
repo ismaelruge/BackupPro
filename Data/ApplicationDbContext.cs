@@ -18,5 +18,12 @@ namespace BackupPro.Data
         public DbSet<CompanyConfig> CompanyConfigs { get; set; }
         public DbSet<DatabaseSource> DatabaseSources { get; set; }
         public DbSet<BackupHistory> BackupHistories { get; set; }
+
+        // Storage Configurations
+        public DbSet<GoogleDriveStorage> GoogleDriveStorages { get; set; }
+        public DbSet<OneDriveStorage> OneDriveStorages { get; set; }
+        public DbSet<AzureBlobStorage> AzureBlobStorages { get; set; }
+        public DbSet<FtpStorage> FtpStorages { get; set; }
+        public DbSet<LocalStorage> LocalStorages { get; set; }
     }
 }
