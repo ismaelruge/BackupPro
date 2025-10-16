@@ -1,4 +1,5 @@
-﻿@{
+﻿@model IEnumerable<BackupPro.Models.FtpStorage>
+@{
     ViewData["Title"] = "Ftp Storage";
 }
 
@@ -64,80 +65,61 @@
                                     <h6 class="fw-semibold mb-0">
                                         <i class="bi bi-gear-fill me-2 text-primary"></i>Configuraciones Activas
                                     </h6>
-                                    <span class="badge bg-primary rounded-pill">2 configuradas</span>
+                                    <span class="badge bg-primary rounded-pill">@Model.Count() configuradas</span>
                                 </div>
 
-                                <!-- Configuración 1 -->
-                                <div class="card mb-3 border-0 shadow-sm">
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between align-items-start">
-                                            <div class="flex-grow-1">
-                                                <h6 class="mb-2 fw-semibold">
-                                                    <span class="text-primary">Servidor FTP Principal</span>
-                                                    <span class="text-muted fw-normal"> - ftp.servidor1.com:21</span>
-                                                </h6>
-                                                <div class="ms-4">
-                                                    <div class="mb-1">
-                                                        <i class="bi bi-person me-2 text-muted"></i>
-                                                        <small class="text-muted">Usuario: usuario_ftp</small>
+                                @if (!Model.Any())
+                                {
+                                    <div class="alert alert-info" role="alert">
+                                        <i class="bi bi-info-circle me-2"></i>
+                                        No hay configuraciones FTP registradas. Haz clic en "Agregar Nueva Configuración" para comenzar.
+                                    </div>
+                                }
+                                else
+                                {
+                                    @foreach (var config in Model)
+                                    {
+                                        <!-- Configuración -->
+                                        <div class="card mb-3 border-0 shadow-sm">
+                                            <div class="card-body">
+                                                <div class="d-flex justify-content-between align-items-start">
+                                                    <div class="flex-grow-1">
+                                                        <h6 class="mb-2 fw-semibold">
+                                                            <span class="text-primary">@config.ConfigurationName</span>
+                                                            <span class="text-muted fw-normal"> - @config.Host:@config.Port</span>
+                                                        </h6>
+                                                        <div class="ms-4">
+                                                            <div class="mb-1">
+                                                                <i class="bi bi-person me-2 text-muted"></i>
+                                                                <small class="text-muted">Usuario: @config.Username</small>
+                                                            </div>
+                                                            <div class="mb-1">
+                                                                <i class="bi bi-folder me-2 text-muted"></i>
+                                                                <span class="text-muted">Ruta:</span>
+                                                                <code class="ms-1">@config.RemotePath</code>
+                                                            </div>
+                                                            <span class="badge bg-success mt-1">
+                                                                <i class="bi bi-check-circle me-1"></i>Activo
+                                                            </span>
+                                                        </div>
                                                     </div>
-                                                    <div class="mb-1">
-                                                        <i class="bi bi-folder me-2 text-muted"></i>
-                                                        <span class="text-muted">Ruta:</span>
-                                                        <code class="ms-1">/backups/principal</code>
+                                                    <div>
+                                                        <button class="btn btn-sm btn-outline-primary rounded-pill me-2"
+                                                                onclick="openEditModal(@config.Id)"
+                                                                aria-label="Editar configuración FTP">
+                                                            <i class="bi bi-pencil"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-danger rounded-pill"
+                                                                onclick="openDeleteModal(@config.Id, '@config.ConfigurationName', '@config.Host:@config.Port', '@config.Username', '@config.RemotePath')"
+                                                                aria-label="Eliminar configuración FTP">
+                                                            <i class="bi bi-trash"></i>
+                                                        </button>
                                                     </div>
-                                                    <span class="badge bg-success mt-1">
-                                                        <i class="bi bi-check-circle me-1"></i>Activo
-                                                    </span>
                                                 </div>
                                             </div>
-                                            <div>
-                                                <button class="btn btn-sm btn-outline-primary rounded-pill me-2" data-bs-toggle="modal" data-bs-target="#editFtpModal" aria-label="Editar configuración FTP">
-                                                    <i class="bi bi-pencil"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-outline-danger rounded-pill" data-bs-toggle="modal" data-bs-target="#deleteFtpModal" aria-label="Eliminar configuración FTP">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
-                                            </div>
                                         </div>
-                                    </div>
-                                </div>
-
-                                <!-- Configuración 2 -->
-                                <div class="card mb-3 border-0 shadow-sm">
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between align-items-start">
-                                            <div class="flex-grow-1">
-                                                <h6 class="mb-2 fw-semibold">
-                                                    <span class="text-primary">Backup Secundario FTP</span>
-                                                    <span class="text-muted fw-normal"> - ftp.servidor1.com:21</span>
-                                                </h6>
-                                                <div class="ms-4">
-                                                    <div class="mb-1">
-                                                        <i class="bi bi-person me-2 text-muted"></i>
-                                                        <small class="text-muted">Usuario: usuario_ftp</small>
-                                                    </div>
-                                                    <div class="mb-1">
-                                                        <i class="bi bi-folder me-2 text-muted"></i>
-                                                        <span class="text-muted">Ruta:</span>
-                                                        <code class="ms-1">/backups/secundario</code>
-                                                    </div>
-                                                    <span class="badge bg-success mt-1">
-                                                        <i class="bi bi-check-circle me-1"></i>Activo
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <button class="btn btn-sm btn-outline-primary rounded-pill me-2" data-bs-toggle="modal" data-bs-target="#editFtpModal" aria-label="Editar configuración FTP">
-                                                    <i class="bi bi-pencil"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-outline-danger rounded-pill" data-bs-toggle="modal" data-bs-target="#deleteFtpModal" aria-label="Eliminar configuración FTP">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                    }
+                                }
                             </div>
 
                             <!-- Botón agregar nueva configuración -->
@@ -188,8 +170,14 @@
                         <label for="ftpHost" class="form-label fw-semibold">
                             <i class="bi bi-hdd-network me-2 text-primary"></i>Servidor FTP
                         </label>
-                        <input type="text" class="form-control" id="ftpHost" placeholder="ftp.servidor.com:21" required>
-                        <div class="form-text">Dirección del servidor y puerto (por defecto: 21)</div>
+                        <input type="text" class="form-control" id="ftpHost" placeholder="ftp.servidor.com" required>
+                        <div class="form-text">Dirección del servidor (sin el puerto)</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="ftpPort" class="form-label fw-semibold">
+                            <i class="bi bi-hdd-network me-2 text-primary"></i>Puerto
+                        </label>
+                        <input type="number" class="form-control" id="ftpPort" placeholder="21" value="21" min="1" max="65535" required>
                     </div>
                     <div class="mb-3">
                         <label for="ftpUsername" class="form-label fw-semibold">
@@ -208,7 +196,7 @@
                             <i class="bi bi-folder me-2 text-primary"></i>Ruta en el Servidor
                         </label>
                         <div class="input-group">
-                            <input type="text" class="form-control" id="ftpPath" placeholder="/backups/principal" required>
+                            <input type="text" class="form-control" id="ftpPath" placeholder="/backups/principal" value="/" required>
                             <button class="btn btn-outline-secondary" type="button" id="btnExploreFtp">
                                 <i class="bi bi-folder2-open me-1"></i>Explorar
                             </button>
@@ -245,38 +233,46 @@
             </div>
             <div class="modal-body p-4">
                 <form id="editFtpForm">
+                    <input type="hidden" id="editFtpId">
+                    <input type="hidden" id="editFtpCurrentPassword">
                     <div class="mb-3">
                         <label for="editFtpConfigName" class="form-label fw-semibold">
                             <i class="bi bi-tag me-2 text-warning"></i>Nombre de Configuración
                         </label>
-                        <input type="text" class="form-control" id="editFtpConfigName" value="Servidor FTP Principal" required>
+                        <input type="text" class="form-control" id="editFtpConfigName" required>
                     </div>
                     <div class="mb-3">
                         <label for="editFtpHost" class="form-label fw-semibold">
                             <i class="bi bi-hdd-network me-2 text-warning"></i>Servidor FTP
                         </label>
-                        <input type="text" class="form-control" id="editFtpHost" value="ftp.servidor1.com:21" required>
-                        <div class="form-text">Dirección del servidor y puerto</div>
+                        <input type="text" class="form-control" id="editFtpHost" placeholder="ftp.servidor.com" required>
+                        <div class="form-text">Dirección del servidor (sin el puerto)</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editFtpPort" class="form-label fw-semibold">
+                            <i class="bi bi-hdd-network me-2 text-warning"></i>Puerto
+                        </label>
+                        <input type="number" class="form-control" id="editFtpPort" min="1" max="65535" required>
                     </div>
                     <div class="mb-3">
                         <label for="editFtpUsername" class="form-label fw-semibold">
                             <i class="bi bi-person me-2 text-warning"></i>Usuario
                         </label>
-                        <input type="text" class="form-control" id="editFtpUsername" value="usuario_ftp" required>
+                        <input type="text" class="form-control" id="editFtpUsername" required>
                     </div>
                     <div class="mb-3">
                         <label for="editFtpPassword" class="form-label fw-semibold">
                             <i class="bi bi-key me-2 text-warning"></i>Contraseña
                         </label>
-                        <input type="password" class="form-control" id="editFtpPassword" placeholder="••••••••" required>
-                        <div class="form-text">Deja vacío si no deseas cambiar la contraseña</div>
+                        <input type="password" class="form-control" id="editFtpPassword" placeholder="••••••••">
+                        <div class="form-text">Deja vacío para mantener la contraseña actual. Escribe una nueva para cambiarla.</div>
                     </div>
                     <div class="mb-3">
                         <label for="editFtpPath" class="form-label fw-semibold">
                             <i class="bi bi-folder me-2 text-warning"></i>Ruta en el Servidor
                         </label>
                         <div class="input-group">
-                            <input type="text" class="form-control" id="editFtpPath" value="/backups/principal" required>
+                            <input type="text" class="form-control" id="editFtpPath" required>
                             <button class="btn btn-outline-secondary" type="button" id="btnExploreEditFtp">
                                 <i class="bi bi-folder2-open me-1"></i>Explorar
                             </button>
@@ -308,6 +304,7 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
             <div class="modal-body p-4">
+                <input type="hidden" id="deleteFtpId">
                 <div class="text-center mb-4">
                     <div class="bg-danger bg-opacity-10 rounded-circle p-3 d-inline-flex mb-3">
                         <i class="bi bi-trash text-danger" style="font-size: 3rem;"></i>
@@ -316,19 +313,19 @@
                 </div>
                 <div class="bg-light rounded-3 p-3 mb-3">
                     <div class="mb-2">
-                        <strong class="text-primary">Servidor FTP Principal</strong>
-                        <span class="text-muted"> - ftp.servidor1.com:21</span>
+                        <strong class="text-primary" id="deleteConfigName"></strong>
+                        <span class="text-muted" id="deleteHostPort"></span>
                     </div>
                     <div class="text-muted">
                         <small>
                             <i class="bi bi-person me-2"></i>
-                            Usuario: <code>usuario_ftp</code>
+                            Usuario: <code id="deleteUsername"></code>
                         </small>
                     </div>
                     <div class="text-muted">
                         <small>
                             <i class="bi bi-folder me-2"></i>
-                            Ruta: <code>/backups/principal</code>
+                            Ruta: <code id="deleteRemotePath"></code>
                         </small>
                     </div>
                 </div>
@@ -341,7 +338,7 @@
                 <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">
                     <i class="bi bi-x-circle me-2"></i>Cancelar
                 </button>
-                <button type="button" class="btn btn-danger rounded-pill">
+                <button type="button" class="btn btn-danger rounded-pill" id="btnConfirmDelete">
                     <i class="bi bi-trash me-2"></i>Sí, Eliminar Configuración
                 </button>
             </div>
@@ -626,9 +623,156 @@
         toast.show();
     }
 
+    // CRUD Operations
+
+    // Crear nueva configuración FTP
+    document.getElementById('addFtpForm')?.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const data = {
+            configurationName: document.getElementById('ftpConfigName').value,
+            host: document.getElementById('ftpHost').value,
+            port: parseInt(document.getElementById('ftpPort').value),
+            username: document.getElementById('ftpUsername').value,
+            password: document.getElementById('ftpPassword').value,
+            remotePath: document.getElementById('ftpPath').value
+        };
+
+        try {
+            const response = await fetch('/FtpStorage/Create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showToast('success', result.message);
+                bootstrap.Modal.getInstance(document.getElementById('addFtpModal')).hide();
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                showToast('error', result.message);
+            }
+        } catch (error) {
+            showToast('error', 'Error de conexión: ' + error.message);
+        }
+    });
+
+    // Abrir modal de editar y cargar datos
+    async function openEditModal(id) {
+        try {
+            const response = await fetch(`/FtpStorage/GetById?id=${id}`);
+            const result = await response.json();
+
+            if (result.success) {
+                const data = result.data;
+                document.getElementById('editFtpId').value = data.id;
+                document.getElementById('editFtpConfigName').value = data.configurationName;
+                document.getElementById('editFtpHost').value = data.host;
+                document.getElementById('editFtpPort').value = data.port;
+                document.getElementById('editFtpUsername').value = data.username;
+                document.getElementById('editFtpPassword').value = ''; // Dejar vacío para que el usuario pueda cambiarla
+                document.getElementById('editFtpCurrentPassword').value = data.password; // Guardar contraseña actual en campo oculto
+                document.getElementById('editFtpPath').value = data.remotePath;
+
+                const modal = new bootstrap.Modal(document.getElementById('editFtpModal'));
+                modal.show();
+            } else {
+                showToast('error', result.message);
+            }
+        } catch (error) {
+            showToast('error', 'Error al cargar la configuración: ' + error.message);
+        }
+    }
+
+    // Guardar cambios de edición
+    document.getElementById('editFtpForm')?.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        // Si el campo de contraseña visible está vacío, usar la contraseña actual
+        let passwordToSend = document.getElementById('editFtpPassword').value;
+        if (!passwordToSend) {
+            passwordToSend = document.getElementById('editFtpCurrentPassword').value;
+        }
+
+        const data = {
+            id: parseInt(document.getElementById('editFtpId').value),
+            configurationName: document.getElementById('editFtpConfigName').value,
+            host: document.getElementById('editFtpHost').value,
+            port: parseInt(document.getElementById('editFtpPort').value),
+            username: document.getElementById('editFtpUsername').value,
+            password: passwordToSend,
+            remotePath: document.getElementById('editFtpPath').value
+        };
+
+        try {
+            const response = await fetch('/FtpStorage/Edit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showToast('success', result.message);
+                bootstrap.Modal.getInstance(document.getElementById('editFtpModal')).hide();
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                showToast('error', result.message);
+            }
+        } catch (error) {
+            showToast('error', 'Error de conexión: ' + error.message);
+        }
+    });
+
+    // Abrir modal de eliminar
+    function openDeleteModal(id, name, hostPort, username, remotePath) {
+        document.getElementById('deleteFtpId').value = id;
+        document.getElementById('deleteConfigName').textContent = name;
+        document.getElementById('deleteHostPort').textContent = ' - ' + hostPort;
+        document.getElementById('deleteUsername').textContent = username;
+        document.getElementById('deleteRemotePath').textContent = remotePath;
+
+        const modal = new bootstrap.Modal(document.getElementById('deleteFtpModal'));
+        modal.show();
+    }
+
+    // Confirmar eliminación
+    document.getElementById('btnConfirmDelete')?.addEventListener('click', async function() {
+        const id = document.getElementById('deleteFtpId').value;
+
+        try {
+            const response = await fetch('/FtpStorage/Delete?id=' + id, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showToast('success', result.message);
+                bootstrap.Modal.getInstance(document.getElementById('deleteFtpModal')).hide();
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                showToast('error', result.message);
+            }
+        } catch (error) {
+            showToast('error', 'Error de conexión: ' + error.message);
+        }
+    });
+
     // Variables globales para el explorador FTP
     let ftpExplorerData = {
         host: '',
+        port: 21,
         username: '',
         password: '',
         currentPath: '/',
@@ -650,22 +794,36 @@
     function openFtpExplorer(targetInputId, isEditMode) {
         // Obtener credenciales del modal correspondiente
         const hostInput = isEditMode ? 'editFtpHost' : 'ftpHost';
+        const portInput = isEditMode ? 'editFtpPort' : 'ftpPort';
         const userInput = isEditMode ? 'editFtpUsername' : 'ftpUsername';
         const passInput = isEditMode ? 'editFtpPassword' : 'ftpPassword';
 
         const host = document.getElementById(hostInput).value;
+        const port = document.getElementById(portInput).value || 21;
         const username = document.getElementById(userInput).value;
-        const password = document.getElementById(passInput).value;
 
-        // Validar que se hayan ingresado las credenciales
-        if (!host || !username || !password) {
-            showToast('warning', 'Por favor, ingresa el servidor, usuario y contraseña antes de explorar.');
+        // En modo edición, usar la contraseña del campo oculto si el campo visible está vacío
+        let password = document.getElementById(passInput).value;
+        if (isEditMode && !password) {
+            password = document.getElementById('editFtpCurrentPassword').value;
+        }
+
+        // Validar host y username
+        if (!host || !username) {
+            showToast('warning', 'Por favor, ingresa el servidor y usuario antes de explorar.');
+            return;
+        }
+
+        // Validar contraseña
+        if (!password) {
+            showToast('warning', 'Por favor, ingresa la contraseña antes de explorar.');
             return;
         }
 
         // Guardar datos
         ftpExplorerData = {
-            host: host,
+            host: host + ':' + port, // Concatenar host y puerto para compatibilidad con ListFtpDirectories
+            port: port,
             username: username,
             password: password,
             currentPath: '/',

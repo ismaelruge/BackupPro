@@ -15,12 +15,10 @@ namespace BackupPro.Controllers.StorageTypes
     public class LocalStorageController : Controller
     {
         private readonly ApplicationDbContext _context;
-        private readonly ILogger<LocalStorageController> _logger;
 
-        public LocalStorageController(ApplicationDbContext context, ILogger<LocalStorageController> logger)
+        public LocalStorageController(ApplicationDbContext context)
         {
             _context = context;
-            _logger = logger;
         }
 
         // GET: LocalStorage
@@ -48,15 +46,13 @@ namespace BackupPro.Controllers.StorageTypes
                     Id = c.Id,
                     ConfigurationName = c.ConfigurationName,
                     FolderPath = c.FolderPath,
-                    IsAccessible = Directory.Exists(c.FolderPath),
-                    AvailableSpaceBytes = GetAvailableSpace(c.FolderPath)
+                    IsAccessible = Directory.Exists(c.FolderPath)
                 }).ToList();
 
                 return Json(new { success = true, data = viewModels });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al obtener configuraciones de almacenamiento local");
                 return Json(new { success = false, message = $"Error: {ex.Message}" });
             }
         }
@@ -102,7 +98,7 @@ namespace BackupPro.Controllers.StorageTypes
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al crear configuración de almacenamiento local");
+                //_logger.LogError(ex, "Error al crear configuración de almacenamiento local");
                 return Json(new { success = false, message = $"Error: {ex.Message}" });
             }
         }
@@ -124,15 +120,13 @@ namespace BackupPro.Controllers.StorageTypes
                     Id = localStorage.Id,
                     ConfigurationName = localStorage.ConfigurationName,
                     FolderPath = localStorage.FolderPath,
-                    IsAccessible = Directory.Exists(localStorage.FolderPath),
-                    AvailableSpaceBytes = GetAvailableSpace(localStorage.FolderPath)
+                    IsAccessible = Directory.Exists(localStorage.FolderPath)
                 };
 
                 return Json(new { success = true, data = viewModel });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al obtener configuración de almacenamiento local");
                 return Json(new { success = false, message = $"Error: {ex.Message}" });
             }
         }
@@ -185,7 +179,7 @@ namespace BackupPro.Controllers.StorageTypes
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al actualizar configuración de almacenamiento local");
+                //_logger.LogError(ex, "Error al actualizar configuración de almacenamiento local");
                 return Json(new { success = false, message = $"Error: {ex.Message}" });
             }
         }
@@ -212,7 +206,6 @@ namespace BackupPro.Controllers.StorageTypes
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, $"No se pudo eliminar la carpeta {localStorage.FolderPath}");
                         return Json(new { success = false, message = $"Configuración eliminada pero no se pudo eliminar la carpeta: {ex.Message}" });
                     }
                 }
@@ -224,42 +217,8 @@ namespace BackupPro.Controllers.StorageTypes
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al eliminar configuración de almacenamiento local");
                 return Json(new { success = false, message = $"Error: {ex.Message}" });
             }
-        }
-
-        // Métodos auxiliares
-        private long? GetAvailableSpace(string folderPath)
-        {
-            try
-            {
-                if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath))
-                    return null;
-
-                var driveInfo = new DriveInfo(Path.GetPathRoot(folderPath)!);
-                return driveInfo.AvailableFreeSpace;
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        private string FormatBytes(long? bytes)
-        {
-            if (!bytes.HasValue)
-                return "N/A";
-
-            string[] sizes = { "B", "KB", "MB", "GB", "TB" };
-            double len = bytes.Value;
-            int order = 0;
-            while (len >= 1024 && order < sizes.Length - 1)
-            {
-                order++;
-                len = len / 1024;
-            }
-            return $"{len:0.##} {sizes[order]}";
         }
     }
 }

@@ -38,9 +38,6 @@ namespace BackupPro.ViewModels
         [Display(Name = "Ruta en el Servidor")]
         public string RemotePath { get; set; } = "/";
 
-        [Display(Name = "Usar FTP sobre SSL/TLS (FTPS)")]
-        public bool UseFtps { get; set; } = false;
-
         [Display(Name = "Configuración Activa")]
         public bool IsActive { get; set; } = true;
 

@@ -17,31 +17,31 @@ namespace BackupPro
         public static void Main(string[] args)
         {
             // Manejar excepciones no controladas
-            AppDomain.CurrentDomain.UnhandledException += (sender, eventArgs) =>
-            {
-                var exception = eventArgs.ExceptionObject as Exception;
-                Console.WriteLine($"EXCEPCIÓN NO CONTROLADA: {exception?.Message}");
-                Console.WriteLine($"Stack Trace: {exception?.StackTrace}");
-                Log.Fatal(exception, "Excepción no controlada que causó el cierre de la aplicación");
-            };
+            //AppDomain.CurrentDomain.UnhandledException += (sender, eventArgs) =>
+            //{
+            //    var exception = eventArgs.ExceptionObject as Exception;
+            //    Console.WriteLine($"EXCEPCIÓN NO CONTROLADA: {exception?.Message}");
+            //    Console.WriteLine($"Stack Trace: {exception?.StackTrace}");
+            //    Log.Fatal(exception, "Excepción no controlada que causó el cierre de la aplicación");
+            //};
 
-            TaskScheduler.UnobservedTaskException += (sender, eventArgs) =>
-            {
-                Console.WriteLine($"EXCEPCIÓN DE TAREA NO OBSERVADA: {eventArgs.Exception.Message}");
-                Log.Error(eventArgs.Exception, "Excepción de tarea no observada");
-                eventArgs.SetObserved();
-            };
+            //TaskScheduler.UnobservedTaskException += (sender, eventArgs) =>
+            //{
+            //    Console.WriteLine($"EXCEPCIÓN DE TAREA NO OBSERVADA: {eventArgs.Exception.Message}");
+            //    Log.Error(eventArgs.Exception, "Excepción de tarea no observada");
+            //    eventArgs.SetObserved();
+            //};
 
             // Crear el builder primero
             var builder = WebApplication.CreateBuilder(args);
 
             // Configurar Serilog como logger principal
-            Log.Logger = new LoggerConfiguration()
-                .ReadFrom.Configuration(builder.Configuration)
-                .Enrich.FromLogContext()
-                .CreateLogger();
+            //Log.Logger = new LoggerConfiguration()
+            //    .ReadFrom.Configuration(builder.Configuration)
+            //    .Enrich.FromLogContext()
+            //    .CreateLogger();
 
-            builder.Host.UseSerilog();
+            //builder.Host.UseSerilog();
 
             // Forzar Kestrel a escuchar en el puerto 5070 (HTTP)
             builder.WebHost.ConfigureKestrel(options =>
@@ -103,29 +103,29 @@ namespace BackupPro
             var app = builder.Build();
 
             // Aplicar migraciones y crear BD si no existe
-            AplicarMigraciones(app);
+            //AplicarMigraciones(app);
 
             // NO crear usuario por defecto automáticamente
             // El login permitirá admin/admin solo si no hay usuarios
 
-            var backupPath = Path.Combine(app.Environment.ContentRootPath, "Backups");
-            if (!Directory.Exists(backupPath)) Directory.CreateDirectory(backupPath);
+            //var backupPath = Path.Combine(app.Environment.ContentRootPath, "Backups");
+            //if (!Directory.Exists(backupPath)) Directory.CreateDirectory(backupPath);
 
             // Limitar acceso a /Backups solo a usuarios autenticados
-            app.UseWhen(context => context.Request.Path.StartsWithSegments("/Backups"), appBuilder =>
-            {
-                appBuilder.UseAuthentication();
-                appBuilder.UseAuthorization();
-            });
+            //app.UseWhen(context => context.Request.Path.StartsWithSegments("/Backups"), appBuilder =>
+            //{
+            //    appBuilder.UseAuthentication();
+            //    appBuilder.UseAuthorization();
+            //});
 
-            app.UseStaticFiles(new StaticFileOptions
-            {
-                FileProvider = new PhysicalFileProvider(backupPath),
-                RequestPath = "/Backups"
-            });
+            //app.UseStaticFiles(new StaticFileOptions
+            //{
+            //    FileProvider = new PhysicalFileProvider(backupPath),
+            //    RequestPath = "/Backups"
+            //});
 
             // Intentar crear tarea programada del sistema si está habilitado por configuración
-            TryCreateSystemScheduler(app);
+            //TryCreateSystemScheduler(app);
 
             // Pipeline HTTP
             app.UseExceptionHandler("/Home/Error");
@@ -145,17 +145,17 @@ namespace BackupPro
 
             // Abrir navegador automáticamente (si se ejecuta manualmente)
             // TEMPORALMENTE DESHABILITADO PARA DEBUG
-            // AbrirNavegador("http://localhost:5070");
+            AbrirNavegador("http://localhost:5070");
 
             try
             {
-                Log.Information("Iniciando aplicación BackupPro...");
+                //Log.Information("Iniciando aplicación BackupPro...");
                 app.Run();
-                Log.Information("Aplicación BackupPro finalizada normalmente.");
+                //Log.Information("Aplicación BackupPro finalizada normalmente.");
             }
             catch (Exception ex)
             {
-                Log.Fatal(ex, "La aplicación se detuvo debido a una excepción");
+                //Log.Fatal(ex, "La aplicación se detuvo debido a una excepción");
                 Console.WriteLine($"ERROR FATAL: {ex.Message}");
                 Console.WriteLine($"Stack Trace: {ex.StackTrace}");
                 throw;
@@ -181,8 +181,8 @@ namespace BackupPro
             }
             catch (Exception ex)
             {
-                var logger = services.GetRequiredService<ILogger<Program>>();
-                logger.LogError(ex, "Error aplicando migraciones de la base de datos");
+                //var logger = services.GetRequiredService<ILogger<Program>>();
+                //logger.LogError(ex, "Error aplicando migraciones de la base de datos");
                 throw;
             }
         }
@@ -229,7 +229,7 @@ namespace BackupPro
         {
             using var scope = app.Services.CreateScope();
             var services = scope.ServiceProvider;
-            var logger = services.GetRequiredService<ILogger<Program>>();
+            //var logger = services.GetRequiredService<ILogger<Program>>();
             var userManager = services.GetRequiredService<UserManager<IdentityUser>>();
 
             try
@@ -251,21 +251,21 @@ namespace BackupPro
                     var result = userManager.CreateAsync(user).GetAwaiter().GetResult();
                     if (result.Succeeded)
                     {
-                        logger.LogInformation("Usuario por defecto creado: admin/admin");
+                        //logger.LogInformation("Usuario por defecto creado: admin/admin");
                     }
                     else
                     {
-                        logger.LogError("Error creando usuario por defecto: {Errors}", string.Join(", ", result.Errors.Select(e => e.Description)));
+                        //logger.LogError("Error creando usuario por defecto: {Errors}", string.Join(", ", result.Errors.Select(e => e.Description)));
                     }
                 }
                 else
                 {
-                    logger.LogInformation("La base de usuarios no está vacía. No se crea usuario por defecto.");
+                    //logger.LogInformation("La base de usuarios no está vacía. No se crea usuario por defecto.");
                 }
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Excepción creando usuario por defecto");
+                //logger.LogError(ex, "Excepción creando usuario por defecto");
             }
         }
 
@@ -379,19 +379,19 @@ if ($response.StatusCode -eq 200) {{
         /// </summary>
         private static void TryCreateSystemScheduler(WebApplication app)
         {
-            var logger = app.Services.GetRequiredService<ILogger<Program>>();
+            //var logger = app.Services.GetRequiredService<ILogger<Program>>();
             var cfg = app.Services.GetRequiredService<IConfiguration>();
             var useSystem = cfg.GetValue("Scheduler:UseSystemScheduler", false);
             var interval = cfg.GetValue("Scheduler:IntervalMinutes", 60);
             var token = cfg["Scheduler:SecureToken"];
             if (!useSystem)
             {
-                logger.LogInformation("Scheduler del sistema deshabilitado; se usará el scheduler interno.");
+                //logger.LogInformation("Scheduler del sistema deshabilitado; se usará el scheduler interno.");
                 return;
             }
             if (string.IsNullOrWhiteSpace(token))
             {
-                logger.LogWarning("No se pudo crear tarea del sistema: Scheduler:SecureToken no configurado.");
+                //logger.LogWarning("No se pudo crear tarea del sistema: Scheduler:SecureToken no configurado.");
                 return;
             }
 
@@ -413,7 +413,7 @@ if ($response.StatusCode -eq 200) {{
                     proc.WaitForExit();
                     if (proc.ExitCode == 0)
                     {
-                        logger.LogInformation("La tarea de Windows '{Task}' ya existe.", taskName);
+                        //logger.LogInformation("La tarea de Windows '{Task}' ya existe.", taskName);
                         return;
                     }
                     // Crear script temporal que invoque el endpoint
@@ -432,10 +432,10 @@ if ($response.StatusCode -eq 200) {{
                     var outp = p.StandardOutput.ReadToEnd();
                     var err = p.StandardError.ReadToEnd();
                     p.WaitForExit();
-                    if (p.ExitCode == 0)
-                        logger.LogInformation("Tarea de Windows creada: {Msg}", outp.Trim());
-                    else
-                        logger.LogWarning("No se pudo crear tarea de Windows: {Err}", err.Trim());
+                    //if (p.ExitCode == 0)
+                    //    logger.LogInformation("Tarea de Windows creada: {Msg}", outp.Trim());
+                    //else
+                    //    logger.LogWarning("No se pudo crear tarea de Windows: {Err}", err.Trim());
                 }
                 else if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
                 {
@@ -451,15 +451,15 @@ if ($response.StatusCode -eq 200) {{
                     };
                     using var p = Process.Start(exportCron)!;
                     p.WaitForExit();
-                    if (p.ExitCode == 0)
-                        logger.LogInformation("Entrada de crontab añadida para ejecutar backups automáticos.");
-                    else
-                        logger.LogWarning("No se pudo añadir entrada a crontab: {Err}", p.StandardError.ReadToEnd().Trim());
+                    //if (p.ExitCode == 0)
+                        //logger.LogInformation("Entrada de crontab añadida para ejecutar backups automáticos.");
+                    //else
+                        //logger.LogWarning("No se pudo añadir entrada a crontab: {Err}", p.StandardError.ReadToEnd().Trim());
                 }
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Fallo creando tarea programada del sistema. Se usará el scheduler interno.");
+                //logger.LogWarning(ex, "Fallo creando tarea programada del sistema. Se usará el scheduler interno.");
             }
         }
     }

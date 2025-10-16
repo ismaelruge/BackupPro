@@ -403,15 +403,6 @@
         toast.show();
     }
 
-    // Función para formatear bytes
-    function formatBytes(bytes) {
-        if (bytes === null || bytes === undefined) return 'N/A';
-        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-        if (bytes === 0) return '0 B';
-        const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
-        return Math.round(bytes / Math.pow(1024, i), 2) + ' ' + sizes[i];
-    }
-
     // Cargar configuraciones al iniciar la página
     document.addEventListener('DOMContentLoaded', function() {
         loadConfigurations();
@@ -476,9 +467,6 @@
                                         ${config.isAccessible
                                             ? '<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Accesible</span>'
                                             : '<span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>No accesible</span>'}
-                                        ${config.availableSpaceBytes
-                                            ? `<span class="badge bg-info ms-1"><i class="bi bi-hdd me-1"></i>${formatBytes(config.availableSpaceBytes)} disponibles</span>`
-                                            : ''}
                                     </div>
                                 </div>
                             </div>

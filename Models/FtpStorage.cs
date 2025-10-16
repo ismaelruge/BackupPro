@@ -55,11 +55,6 @@ namespace BackupPro.Models
         public string RemotePath { get; set; } = "/";
 
         /// <summary>
-        /// Indica si se usa FTP sobre SSL/TLS (FTPS).
-        /// </summary>
-        public bool UseFtps { get; set; } = false;
-
-        /// <summary>
         /// Fecha de creación de la configuración.
         /// </summary>
         public DateTime CreatedAt { get; set; } = DateTime.Now;

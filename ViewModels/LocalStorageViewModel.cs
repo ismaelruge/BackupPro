@@ -21,6 +21,5 @@ namespace BackupPro.ViewModels
 
         // Propiedades calculadas en tiempo de ejecución para la UI
         public bool IsAccessible { get; set; }
-        public long? AvailableSpaceBytes { get; set; }
     }
 }
