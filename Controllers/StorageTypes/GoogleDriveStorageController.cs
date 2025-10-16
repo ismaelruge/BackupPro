@@ -1,21 +1,212 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using BackupPro.Data;
+using BackupPro.Models;
+using BackupPro.ViewModels;
+using Microsoft.EntityFrameworkCore;
 
 namespace BackupPro.Controllers.StorageTypes
 {
     [Authorize]
     public class GoogleDriveStorageController : Controller
     {
+        private readonly ApplicationDbContext _context;
         private readonly IConfiguration _configuration;
 
-        public GoogleDriveStorageController(IConfiguration configuration)
+        public GoogleDriveStorageController(ApplicationDbContext context, IConfiguration configuration)
         {
+            _context = context;
             _configuration = configuration;
         }
 
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
-            return View();
+            var list = await _context.GoogleDriveStorages.ToListAsync();
+            return View(list);
+        }
+
+        // ========== CRUD OPERATIONS ==========
+
+        /// <summary>
+        /// Crea una nueva configuración de Google Drive.
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> Create([FromBody] GoogleDriveStorageViewModel model)
+        {
+            try
+            {
+                if (ModelState.IsValid)
+                {
+                    // Verificar si ya existe una configuración con el mismo nombre
+                    bool exists = await _context.GoogleDriveStorages.AnyAsync(g => g.ConfigurationName == model.ConfigurationName);
+
+                    if (exists)
+                    {
+                        return Json(new { success = false, message = "Ya existe una configuración con este nombre." });
+                    }
+
+                    var googleDrive = new GoogleDriveStorage
+                    {
+                        ConfigurationName = model.ConfigurationName,
+                        Email = model.Email,
+                        FolderId = model.FolderId ?? string.Empty,
+                        FolderPath = model.FolderPath ?? string.Empty,
+                        AccessToken = null, // Se guardará después de la autenticación
+                        RefreshToken = null,
+                        CreatedAt = DateTime.Now,
+                        CreatedBy = User.Identity?.Name
+                    };
+
+                    _context.GoogleDriveStorages.Add(googleDrive);
+                    await _context.SaveChangesAsync();
+
+                    return Json(new { success = true, message = "Configuración de Google Drive creada exitosamente.", id = googleDrive.Id });
+                }
+
+                return Json(new { success = false, message = "Datos inválidos." });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error al crear configuración: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
+        /// Actualiza una configuración de Google Drive existente.
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> Edit([FromBody] GoogleDriveStorageViewModel model)
+        {
+            try
+            {
+                if (!model.Id.HasValue)
+                {
+                    return Json(new { success = false, message = "ID de configuración no especificado." });
+                }
+
+                var googleDrive = await _context.GoogleDriveStorages.FindAsync(model.Id.Value);
+                if (googleDrive == null)
+                {
+                    return Json(new { success = false, message = "Configuración no encontrada." });
+                }
+
+                // Verificar si otro registro tiene el mismo nombre
+                bool exists = await _context.GoogleDriveStorages.AnyAsync(g => g.ConfigurationName == model.ConfigurationName && g.Id != model.Id);
+                if (exists)
+                {
+                    return Json(new { success = false, message = "Ya existe otra configuración con este nombre." });
+                }
+
+                googleDrive.ConfigurationName = model.ConfigurationName;
+                googleDrive.Email = model.Email;
+                googleDrive.FolderId = model.FolderId ?? string.Empty;
+                googleDrive.FolderPath = model.FolderPath ?? string.Empty;
+                googleDrive.LastModifiedAt = DateTime.Now;
+
+                _context.GoogleDriveStorages.Update(googleDrive);
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true, message = "Configuración actualizada exitosamente." });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error al actualizar configuración: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
+        /// Elimina una configuración de Google Drive.
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> Delete(int id)
+        {
+            try
+            {
+                var googleDrive = await _context.GoogleDriveStorages.FindAsync(id);
+                if (googleDrive == null)
+                {
+                    return Json(new { success = false, message = "Configuración no encontrada." });
+                }
+
+                _context.GoogleDriveStorages.Remove(googleDrive);
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true, message = "Configuración eliminada exitosamente." });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error al eliminar configuración: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
+        /// Obtiene una configuración de Google Drive por su ID.
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetById(int id)
+        {
+            try
+            {
+                var googleDrive = await _context.GoogleDriveStorages.FindAsync(id);
+                if (googleDrive == null)
+                {
+                    return Json(new { success = false, message = "Configuración no encontrada." });
+                }
+
+                var viewModel = new GoogleDriveStorageViewModel
+                {
+                    Id = googleDrive.Id,
+                    ConfigurationName = googleDrive.ConfigurationName,
+                    Email = googleDrive.Email,
+                    FolderId = googleDrive.FolderId,
+                    FolderPath = googleDrive.FolderPath,
+                    TokenExpiresAt = googleDrive.TokenExpiresAt
+                };
+
+                // Incluir AccessToken para permitir exploración sin reconectar
+                // TODO: En producción, verificar expiración antes de enviar
+                return Json(new {
+                    success = true,
+                    data = viewModel,
+                    accessToken = googleDrive.AccessToken, // Para usar el explorador sin reconectar
+                    hasValidToken = !string.IsNullOrEmpty(googleDrive.AccessToken)
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error al obtener configuración: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
+        /// Guarda los tokens de Google Drive para una configuración.
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> SaveTokens([FromBody] GoogleDriveSaveTokensRequest request)
+        {
+            try
+            {
+                var googleDrive = await _context.GoogleDriveStorages.FindAsync(request.Id);
+                if (googleDrive == null)
+                {
+                    return Json(new { success = false, message = "Configuración no encontrada." });
+                }
+
+                // TODO: En producción, encriptar los tokens antes de guardarlos
+                googleDrive.AccessToken = request.AccessToken;
+                googleDrive.RefreshToken = request.RefreshToken;
+                googleDrive.TokenExpiresAt = DateTime.Now.AddHours(1); // Los tokens de Google duran ~1 hora
+                googleDrive.LastModifiedAt = DateTime.Now;
+
+                _context.GoogleDriveStorages.Update(googleDrive);
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true, message = "Tokens guardados exitosamente." });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error al guardar tokens: {ex.Message}" });
+            }
         }
 
         // ========== GOOGLE DRIVE ENDPOINTS ==========
@@ -299,5 +490,12 @@ namespace BackupPro.Controllers.StorageTypes
         public string Id { get; set; }
         public string Name { get; set; }
         public DateTime ModifiedTime { get; set; }
+    }
+
+    public class GoogleDriveSaveTokensRequest
+    {
+        public int Id { get; set; }
+        public string AccessToken { get; set; }
+        public string RefreshToken { get; set; }
     }
 }

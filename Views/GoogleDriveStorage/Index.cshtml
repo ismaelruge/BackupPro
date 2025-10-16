@@ -1,4 +1,5 @@
-﻿@{
+@model IEnumerable<BackupPro.Models.GoogleDriveStorage>
+@{
     ViewData["Title"] = "Google Drive Storage";
 }
 
@@ -63,88 +64,64 @@
                                     <h6 class="fw-semibold mb-0">
                                         <i class="bi bi-gear-fill me-2 text-primary"></i>Configuraciones Activas
                                     </h6>
-                                    <span class="badge bg-primary rounded-pill">2 configuradas</span>
+                                    <span class="badge bg-primary rounded-pill">@Model.Count() configuradas</span>
                                 </div>
 
-                                <!-- Configuración 1 -->
-                                <div class="card mb-3 border-0 shadow-sm">
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between align-items-start">
-                                            <div class="flex-grow-1">
-                                                <div class="d-flex align-items-center mb-2">
-                                                    <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3">
-                                                        <i class="bi bi-person-circle text-primary fs-5"></i>
+                                @if (Model != null && Model.Any())
+                                {
+                                    @foreach (var googleDrive in Model)
+                                    {
+                                        <div class="card mb-3 border-0 shadow-sm">
+                                            <div class="card-body">
+                                                <div class="d-flex justify-content-between align-items-start">
+                                                    <div class="flex-grow-1">
+                                                        <div class="d-flex align-items-center mb-2">
+                                                            <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3">
+                                                                <i class="bi bi-person-circle text-primary fs-5"></i>
+                                                            </div>
+                                                            <div>
+                                                                <h6 class="mb-0 fw-semibold">
+                                                                    <span class="text-primary">@googleDrive.ConfigurationName</span>
+                                                                    <span class="text-muted fw-normal"> - @googleDrive.Email</span>
+                                                                </h6>
+                                                                <small class="text-muted">Creado: @googleDrive.CreatedAt.ToString("dd/MM/yyyy HH:mm")</small>
+                                                            </div>
+                                                        </div>
+                                                        <div class="ms-5 ps-2">
+                                                            <div class="mb-1">
+                                                                <i class="bi bi-folder me-2 text-muted"></i>
+                                                                <span class="text-muted">Ruta:</span>
+                                                                <code class="ms-1">@googleDrive.FolderPath</code>
+                                                            </div>
+                                                            <span class="badge bg-success">
+                                                                <i class="bi bi-check-circle me-1"></i>Activo
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                     <div>
-                                                        <h6 class="mb-0 fw-semibold">
-                                                            <span class="text-primary">Backup Principal</span>
-                                                            <span class="text-muted fw-normal"> - usuario@gmail.com</span>
-                                                        </h6>
-                                                        <small class="text-muted">Conectado hace 2 días</small>
+                                                        <button class="btn btn-sm btn-outline-primary rounded-pill me-2"
+                                                                onclick="openEditModal(@googleDrive.Id)"
+                                                                aria-label="Editar configuración">
+                                                            <i class="bi bi-pencil"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-danger rounded-pill"
+                                                                onclick="openDeleteModal(@googleDrive.Id, '@googleDrive.ConfigurationName', '@googleDrive.Email', '@googleDrive.FolderPath')"
+                                                                aria-label="Eliminar configuración">
+                                                            <i class="bi bi-trash"></i>
+                                                        </button>
                                                     </div>
                                                 </div>
-                                                <div class="ms-5 ps-2">
-                                                    <div class="mb-1">
-                                                        <i class="bi bi-folder me-2 text-muted"></i>
-                                                        <span class="text-muted">Ruta:</span>
-                                                        <code class="ms-1">/Backups/Empresa</code>
-                                                    </div>
-                                                    <span class="badge bg-success">
-                                                        <i class="bi bi-check-circle me-1"></i>Activo
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <button class="btn btn-sm btn-outline-primary rounded-pill me-2" data-bs-toggle="modal" data-bs-target="#editGoogleDriveModal" aria-label="Editar configuración">
-                                                    <i class="bi bi-pencil"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-outline-danger rounded-pill" data-bs-toggle="modal" data-bs-target="#deleteGoogleDriveModal" aria-label="Eliminar configuración">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
                                             </div>
                                         </div>
+                                    }
+                                }
+                                else
+                                {
+                                    <div class="text-center py-4">
+                                        <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+                                        <p class="text-muted mt-3">No hay configuraciones de Google Drive registradas</p>
                                     </div>
-                                </div>
-
-                                <!-- Configuración 2 -->
-                                <div class="card mb-3 border-0 shadow-sm">
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between align-items-start">
-                                            <div class="flex-grow-1">
-                                                <div class="d-flex align-items-center mb-2">
-                                                    <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3">
-                                                        <i class="bi bi-person-circle text-primary fs-5"></i>
-                                                    </div>
-                                                    <div>
-                                                        <h6 class="mb-0 fw-semibold">
-                                                            <span class="text-primary">Respaldo Bases de Datos</span>
-                                                            <span class="text-muted fw-normal"> - empresa@gmail.com</span>
-                                                        </h6>
-                                                        <small class="text-muted">Conectado hace 1 semana</small>
-                                                    </div>
-                                                </div>
-                                                <div class="ms-5 ps-2">
-                                                    <div class="mb-1">
-                                                        <i class="bi bi-folder me-2 text-muted"></i>
-                                                        <span class="text-muted">Ruta:</span>
-                                                        <code class="ms-1">/Respaldos/DB</code>
-                                                    </div>
-                                                    <span class="badge bg-success">
-                                                        <i class="bi bi-check-circle me-1"></i>Activo
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <button class="btn btn-sm btn-outline-primary rounded-pill me-2" data-bs-toggle="modal" data-bs-target="#editGoogleDriveModal" aria-label="Editar configuración">
-                                                    <i class="bi bi-pencil"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-outline-danger rounded-pill" data-bs-toggle="modal" data-bs-target="#deleteGoogleDriveModal" aria-label="Eliminar configuración">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                }
                             </div>
 
                             <!-- Botón agregar nueva configuración -->
@@ -245,6 +222,10 @@
             </div>
             <div class="modal-body p-4">
                 <form id="editGoogleDriveForm">
+                    <!-- Hidden fields -->
+                    <input type="hidden" id="editGoogleDriveId">
+                    <input type="hidden" id="editGoogleDriveFolderId">
+
                     <div class="mb-3">
                         <label for="editConfigName" class="form-label fw-semibold">
                             <i class="bi bi-tag me-2 text-warning"></i>Nombre de Configuración
@@ -259,10 +240,10 @@
                         <div class="input-group">
                             <input type="email" class="form-control" id="editGoogleEmail" value="usuario@gmail.com" readonly>
                             <button class="btn btn-outline-warning" type="button" id="btnEditConnectGoogle">
-                                <i class="bi bi-google me-1"></i>Conectar
+                                <i class="bi bi-google me-1"></i>Reconectar
                             </button>
                         </div>
-                        <div class="form-text">Conéctate con tu cuenta de Google para acceder a Drive</div>
+                        <div class="form-text">Reconéctate con tu cuenta de Google para acceder a Drive</div>
                     </div>
                     <div class="mb-3">
                         <label for="editFolderPath" class="form-label fw-semibold">
@@ -309,13 +290,13 @@
                 </div>
                 <div class="bg-light rounded-3 p-3 mb-3">
                     <div class="mb-2">
-                        <strong class="text-primary">Backup Principal</strong>
-                        <span class="text-muted"> - usuario@gmail.com</span>
+                        <strong class="text-primary" id="deleteGoogleDriveName">Backup Principal</strong>
+                        <span class="text-muted"> - <span id="deleteGoogleDriveEmail">usuario@gmail.com</span></span>
                     </div>
                     <div class="text-muted">
                         <small>
                             <i class="bi bi-folder me-2"></i>
-                            Ruta: <code>/Backups/Empresa</code>
+                            Ruta: <code id="deleteGoogleDrivePath">/Backups/Empresa</code>
                         </small>
                     </div>
                 </div>
@@ -325,10 +306,11 @@
                 </div>
             </div>
             <div class="modal-footer border-0 bg-light">
+                <input type="hidden" id="deleteGoogleDriveId">
                 <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">
                     <i class="bi bi-x-circle me-2"></i>Cancelar
                 </button>
-                <button type="button" class="btn btn-danger rounded-pill">
+                <button type="button" class="btn btn-danger rounded-pill" id="btnConfirmDeleteGoogleDrive">
                     <i class="bi bi-trash me-2"></i>Sí, Eliminar Configuración
                 </button>
             </div>
@@ -1036,5 +1018,240 @@
             }
         }, 500);
     }
+
+    // ========== CRUD OPERATIONS ==========
+
+    // Función helper para guardar tokens
+    async function saveGoogleDriveTokens(id, accessToken, refreshToken) {
+        try {
+            const response = await fetch('/GoogleDriveStorage/SaveTokens', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    id: id,
+                    accessToken: accessToken,
+                    refreshToken: refreshToken
+                })
+            });
+
+            const data = await response.json();
+            return data.success;
+        } catch (error) {
+            console.error('Error al guardar tokens:', error);
+            return false;
+        }
+    }
+
+    // Form submission para agregar Google Drive
+    document.getElementById('addGoogleDriveForm')?.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const configName = document.getElementById('configName').value.trim();
+        const email = document.getElementById('googleEmail').value.trim();
+        const folderPath = document.getElementById('folderPath').value.trim();
+
+        if (!configName || !email || !folderPath) {
+            showToast('warning', 'Por favor completa todos los campos requeridos.');
+            return;
+        }
+
+        if (!googleDriveAccessToken) {
+            showToast('warning', 'Por favor conéctate con Google Drive primero.');
+            return;
+        }
+
+        try {
+            const response = await fetch('/GoogleDriveStorage/Create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    configurationName: configName,
+                    email: email,
+                    folderId: driveExplorerData.currentParentId,
+                    folderPath: folderPath
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Guardar tokens con el ID retornado
+                const tokensSaved = await saveGoogleDriveTokens(data.id, googleDriveAccessToken, null);
+
+                if (tokensSaved) {
+                    showToast('success', 'Configuración de Google Drive creada exitosamente.');
+
+                    // Cerrar modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('addGoogleDriveModal'));
+                    modal.hide();
+
+                    // Resetear formulario y variables
+                    document.getElementById('addGoogleDriveForm').reset();
+                    googleDriveAccessToken = null;
+                    googleDriveEmail = null;
+                    driveExplorerData.accessToken = '';
+                    document.getElementById('btnExploreDrive').disabled = true;
+
+                    // Recargar página
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    showToast('error', 'Configuración creada pero error al guardar tokens. Por favor reconéctate.');
+                }
+            } else {
+                showToast('error', data.message || 'Error al crear configuración.');
+            }
+        } catch (error) {
+            showToast('error', 'Error de conexión: ' + error.message);
+        }
+    });
+
+    // Función para abrir modal de edición
+    async function openEditModal(id) {
+        try {
+            const response = await fetch('/GoogleDriveStorage/GetById?id=' + id);
+            const result = await response.json();
+
+            if (result.success) {
+                const data = result.data;
+
+                // Llenar campos del modal
+                document.getElementById('editGoogleDriveId').value = data.id;
+                document.getElementById('editConfigName').value = data.configurationName;
+                document.getElementById('editGoogleEmail').value = data.email;
+                document.getElementById('editFolderPath').value = data.folderPath;
+                document.getElementById('editGoogleDriveFolderId').value = data.folderId || '';
+
+                // Si tiene token guardado, cargarlo automáticamente
+                if (result.accessToken && result.hasValidToken) {
+                    googleDriveAccessToken = result.accessToken;
+                    driveExplorerData.accessToken = result.accessToken;
+                    document.getElementById('btnExploreEditDrive').disabled = false;
+                } else {
+                    googleDriveAccessToken = null;
+                    driveExplorerData.accessToken = '';
+                    document.getElementById('btnExploreEditDrive').disabled = true;
+                }
+
+                // Abrir modal
+                const modal = new bootstrap.Modal(document.getElementById('editGoogleDriveModal'));
+                modal.show();
+            } else {
+                showToast('error', result.message || 'Error al cargar configuración.');
+            }
+        } catch (error) {
+            showToast('error', 'Error de conexión: ' + error.message);
+        }
+    }
+
+    // Form submission para editar Google Drive
+    document.getElementById('editGoogleDriveForm')?.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const id = parseInt(document.getElementById('editGoogleDriveId').value);
+        const configName = document.getElementById('editConfigName').value.trim();
+        const email = document.getElementById('editGoogleEmail').value.trim();
+        const folderPath = document.getElementById('editFolderPath').value.trim();
+
+        if (!configName || !email || !folderPath) {
+            showToast('warning', 'Por favor completa todos los campos requeridos.');
+            return;
+        }
+
+        try {
+            const response = await fetch('/GoogleDriveStorage/Edit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    id: id,
+                    configurationName: configName,
+                    email: email,
+                    folderId: driveExplorerData.currentParentId || document.getElementById('editGoogleDriveFolderId').value,
+                    folderPath: folderPath
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Si hay un nuevo token, guardarlo
+                if (googleDriveAccessToken) {
+                    await saveGoogleDriveTokens(id, googleDriveAccessToken, null);
+                }
+
+                showToast('success', 'Configuración actualizada exitosamente.');
+
+                // Cerrar modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('editGoogleDriveModal'));
+                modal.hide();
+
+                // Recargar página
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                showToast('error', data.message || 'Error al actualizar configuración.');
+            }
+        } catch (error) {
+            showToast('error', 'Error de conexión: ' + error.message);
+        }
+    });
+
+    // Función para abrir modal de eliminación
+    function openDeleteModal(id, configName, email, folderPath) {
+        document.getElementById('deleteGoogleDriveId').value = id;
+        document.getElementById('deleteGoogleDriveName').textContent = configName;
+        document.getElementById('deleteGoogleDriveEmail').textContent = email;
+        document.getElementById('deleteGoogleDrivePath').textContent = folderPath;
+
+        const modal = new bootstrap.Modal(document.getElementById('deleteGoogleDriveModal'));
+        modal.show();
+    }
+
+    // Confirmar eliminación
+    document.getElementById('btnConfirmDeleteGoogleDrive')?.addEventListener('click', async function() {
+        const id = parseInt(document.getElementById('deleteGoogleDriveId').value);
+
+        const btn = this;
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Eliminando...';
+
+        try {
+            const response = await fetch('/GoogleDriveStorage/Delete?id=' + id, {
+                method: 'POST'
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showToast('success', 'Configuración eliminada exitosamente.');
+
+                // Cerrar modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('deleteGoogleDriveModal'));
+                modal.hide();
+
+                // Recargar página
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                showToast('error', data.message || 'Error al eliminar configuración.');
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        } catch (error) {
+            showToast('error', 'Error de conexión: ' + error.message);
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    });
 
 </script>
