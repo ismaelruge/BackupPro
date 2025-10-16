@@ -1,0 +1,510 @@
+﻿@{
+    ViewData["Title"] = "Almacenamiento Local";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-10">
+            <!-- Card principal -->
+            <div class="card shadow-lg border-0 rounded-4">
+                <!-- Header -->
+                <div class="card-header bg-primary text-white border-0 rounded-top-4 py-4">
+                    <div class="text-center">
+                        <i class="bi bi-cloud-arrow-up fs-1 mb-3"></i>
+                        <h3 class="fw-bold mb-2">Tipos de Almacenamiento</h3>
+                        <p class="mb-0 opacity-75">Configura múltiples destinos donde se guardarán tus backups</p>
+                    </div>
+                </div>
+
+                <!-- Cuerpo con pestañas -->
+                <div class="card-body p-4">
+                    <!-- Nav Tabs -->
+                    <ul class="nav nav-pills nav-fill mb-4" id="storageTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="google-tab" role="tab" asp-area="" asp-controller="GoogleDriveStorage" asp-action="Index">
+                                <i class="bi bi-google me-2"></i>Google Drive
+                            </a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="onedrive-tab" role="tab" asp-area="" asp-controller="OneDriveStorage" asp-action="Index">
+                                <i class="bi bi-microsoft me-2"></i>OneDrive
+                            </a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="blob-tab" role="tab" asp-area="" asp-controller="BlobStorage" asp-action="Index">
+                                <i class="bi bi-cloud me-2"></i>Azure Blob
+                            </a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="ftp-tab" role="tab" asp-area="" asp-controller="FtpStorage" asp-action="Index">
+                                <i class="bi bi-hdd-network me-2"></i>FTP
+                            </a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link active" id="local-tab" role="tab" asp-area="" asp-controller="LocalStorage" asp-action="Index">
+                                <i class="bi bi-folder me-2"></i>Local
+                            </a>
+                        </li>
+                    </ul>
+
+                    <!-- Tab Content -->
+                    <div class="tab-content" id="storageTabContent">
+                        
+                        <!-- Local -->
+                        <div class="tab-pane fade show active" id="local" role="tabpanel">
+                            <div class="text-center mb-4">
+                                <i class="bi bi-folder text-primary" style="font-size: 3rem;"></i>
+                                <h4 class="mt-3">Almacenamiento Local</h4>
+                                <p class="text-muted">Configura múltiples carpetas locales</p>
+                            </div>
+
+                            <!-- Lista de configuraciones -->
+                            <div class="mb-4">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h6 class="fw-semibold mb-0">
+                                        <i class="bi bi-gear-fill me-2 text-primary"></i>Configuraciones Activas
+                                    </h6>
+                                    <span class="badge bg-primary rounded-pill">2 configuradas</span>
+                                </div>
+
+                                <!-- Configuración 1 -->
+                                <div class="card mb-3 border-0 shadow-sm">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div class="flex-grow-1">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3">
+                                                        <i class="bi bi-folder-fill text-primary fs-5"></i>
+                                                    </div>
+                                                    <div>
+                                                        <h6 class="mb-0 fw-semibold">
+                                                            <span class="text-primary">Almacenamiento Local Principal</span>
+                                                            <span class="text-muted fw-normal"> - C:\Backups\Principal</span>
+                                                        </h6>
+                                                        <span class="badge bg-success mt-1">
+                                                            <i class="bi bi-check-circle me-1"></i>Activo
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <button class="btn btn-sm btn-outline-primary rounded-pill me-2" data-bs-toggle="modal" data-bs-target="#editLocalModal" aria-label="Editar configuración local">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger rounded-pill" data-bs-toggle="modal" data-bs-target="#deleteLocalModal" aria-label="Eliminar configuración local">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Configuración 2 -->
+                                <div class="card mb-3 border-0 shadow-sm">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div class="flex-grow-1">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3">
+                                                        <i class="bi bi-folder-fill text-primary fs-5"></i>
+                                                    </div>
+                                                    <div>
+                                                        <h6 class="mb-0 fw-semibold">
+                                                            <span class="text-primary">Respaldo Empresa Local</span>
+                                                            <span class="text-muted fw-normal"> - D:\Respaldos\Empresa</span>
+                                                        </h6>
+                                                        <span class="badge bg-success mt-1">
+                                                            <i class="bi bi-check-circle me-1"></i>Activo
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <button class="btn btn-sm btn-outline-primary rounded-pill me-2" data-bs-toggle="modal" data-bs-target="#editLocalModal" aria-label="Editar configuración local">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger rounded-pill" data-bs-toggle="modal" data-bs-target="#deleteLocalModal" aria-label="Eliminar configuración local">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Botón agregar nueva configuración -->
+                            <div class="d-grid">
+                                <button type="button" class="btn btn-outline-primary btn-lg rounded-pill" data-bs-toggle="modal" data-bs-target="#addLocalModal">
+                                    <i class="bi bi-plus-circle me-2"></i>Agregar Nueva Carpeta
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Información adicional -->
+            <div class="alert alert-info rounded-4 mt-4 shadow-sm" role="alert">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-info-circle-fill fs-3 me-3"></i>
+                    <div>
+                        <h6 class="mb-1 fw-semibold">Múltiples destinos</h6>
+                        <p class="mb-0">Puedes configurar múltiples destinos del mismo tipo. Los backups se copiarán a todos los destinos configurados como activos.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Agregar Local -->
+<div class="modal fade" id="addLocalModal" tabindex="-1" aria-labelledby="addLocalModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white border-0">
+                <h5 class="modal-title" id="addLocalModalLabel">
+                    <i class="bi bi-folder-plus me-2"></i>Agregar Carpeta Local
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="addLocalForm">
+                    <div class="mb-3">
+                        <label for="localConfigName" class="form-label fw-semibold">
+                            <i class="bi bi-tag me-2 text-primary"></i>Nombre de Configuración
+                        </label>
+                        <input type="text" class="form-control" id="localConfigName" placeholder="Ej: Almacenamiento Local Principal" required>
+                        <div class="form-text">Dale un nombre descriptivo a esta configuración</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="localFolderPath" class="form-label fw-semibold">
+                            <i class="bi bi-folder me-2 text-primary"></i>Ruta de Carpeta
+                        </label>
+                        <input type="text" class="form-control" id="localFolderPath" placeholder="C:\Backups\Principal" required>
+                        <div class="form-text">Ingresa la ruta completa donde se guardarán los backups</div>
+                    </div>
+                    <div class="alert alert-warning rounded-3 mb-0" role="alert">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <small><strong>Nota:</strong> Asegúrate de que la carpeta tenga suficiente espacio de almacenamiento y permisos de escritura.</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0 bg-light">
+                <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>Cancelar
+                </button>
+                <button type="submit" form="addLocalForm" class="btn btn-primary rounded-pill">
+                    <i class="bi bi-folder-plus me-2"></i>Agregar Carpeta
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Editar Local -->
+<div class="modal fade" id="editLocalModal" tabindex="-1" aria-labelledby="editLocalModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-warning text-dark border-0">
+                <h5 class="modal-title" id="editLocalModalLabel">
+                    <i class="bi bi-pencil-square me-2"></i>Editar Carpeta Local
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="editLocalForm">
+                    <div class="mb-3">
+                        <label for="editLocalConfigName" class="form-label fw-semibold">
+                            <i class="bi bi-tag me-2 text-warning"></i>Nombre de Configuración
+                        </label>
+                        <input type="text" class="form-control" id="editLocalConfigName" value="Almacenamiento Local Principal" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editLocalFolderPath" class="form-label fw-semibold">
+                            <i class="bi bi-folder me-2 text-warning"></i>Ruta de Carpeta
+                        </label>
+                        <input type="text" class="form-control" id="editLocalFolderPath" value="C:\Backups\Principal" required>
+                        <div class="form-text">Ingresa la ruta completa donde se guardarán los backups</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0 bg-light">
+                <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>Cancelar
+                </button>
+                <button type="submit" form="editLocalForm" class="btn btn-warning rounded-pill">
+                    <i class="bi bi-save me-2"></i>Guardar Cambios
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Eliminar Local -->
+<div class="modal fade" id="deleteLocalModal" tabindex="-1" aria-labelledby="deleteLocalModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-danger text-white border-0">
+                <h5 class="modal-title" id="deleteLocalModalLabel">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Confirmar Eliminación
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="text-center mb-4">
+                    <div class="bg-danger bg-opacity-10 rounded-circle p-3 d-inline-flex mb-3">
+                        <i class="bi bi-trash text-danger" style="font-size: 3rem;"></i>
+                    </div>
+                    <h5 class="fw-semibold">¿Estás seguro de eliminar esta configuración?</h5>
+                </div>
+                <div class="bg-light rounded-3 p-3 mb-3">
+                    <div class="mb-2">
+                        <strong class="text-primary">Almacenamiento Local Principal</strong>
+                    </div>
+                    <div class="text-muted">
+                        <small>
+                            <i class="bi bi-folder me-2"></i>
+                            Ruta: <code>C:\Backups\Principal</code>
+                        </small>
+                    </div>
+                </div>
+                <div class="alert alert-danger rounded-3 mb-3" role="alert">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>Advertencia:</strong> Esta acción no se puede deshacer. Solo se removerá la configuración de este sistema.
+                </div>
+                <div class="form-check mb-0">
+                    <input class="form-check-input" type="checkbox" id="deleteLocalFiles">
+                    <label class="form-check-label" for="deleteLocalFiles">
+                        <strong class="text-danger">También eliminar todos los archivos de backup en esta carpeta</strong>
+                        <div class="form-text">Si no marcas esta opción, los archivos permanecerán en la carpeta local</div>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer border-0 bg-light">
+                <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-danger rounded-pill">
+                    <i class="bi bi-trash me-2"></i>Sí, Eliminar Configuración
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .nav-pills .nav-link {
+        border-radius: 50rem;
+        padding: 0.75rem 1.5rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+        .nav-pills .nav-link:hover {
+            background-color: rgba(13, 110, 253, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .nav-pills .nav-link.active {
+            background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+            box-shadow: 0 4px 6px rgba(13, 110, 253, 0.3);
+        }
+
+    .tab-pane {
+        animation: fadeIn 0.3s ease-in;
+    }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .rounded-circle {
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Estilos del explorador FTP */
+    .ftp-folder-item {
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+        .ftp-folder-item:hover {
+            background-color: rgba(13, 110, 253, 0.1);
+            transform: translateX(5px);
+        }
+
+        .ftp-folder-item.selected {
+            background-color: rgba(13, 110, 253, 0.15);
+            border-left: 3px solid #0d6efd;
+        }
+
+    .breadcrumb-item.breadcrumb-link {
+        cursor: pointer;
+        color: #0d6efd;
+    }
+
+        .breadcrumb-item.breadcrumb-link:hover {
+            text-decoration: underline;
+        }
+
+    /* Estilos del explorador Blob */
+    .blob-container-item,
+    .blob-folder-item {
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+        .blob-container-item:hover,
+        .blob-folder-item:hover {
+            background-color: rgba(13, 110, 253, 0.1);
+            transform: translateX(5px);
+        }
+
+        .blob-container-item.selected,
+        .blob-folder-item.selected {
+            background-color: rgba(13, 110, 253, 0.15);
+            border-left: 3px solid #0d6efd;
+        }
+
+    /* Estilos para modales de crear carpeta */
+    #createFtpFolderModal,
+    #createBlobFolderModal,
+    #createDriveFolderModal {
+        z-index: 1060 !important;
+    }
+
+        #createFtpFolderModal .modal-backdrop,
+        #createBlobFolderModal .modal-backdrop,
+        #createDriveFolderModal .modal-backdrop {
+            z-index: 1059 !important;
+        }
+
+    /* Estilos del explorador Google Drive */
+    .drive-folder-item {
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+        .drive-folder-item:hover {
+            background-color: rgba(13, 110, 253, 0.1);
+            transform: translateX(5px);
+        }
+
+        .drive-folder-item.selected {
+            background-color: rgba(13, 110, 253, 0.15);
+            border-left: 3px solid #0d6efd;
+        }
+</style>
+
+<!-- Contenedor de toasts -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 2000;">
+    <div id="successToast" class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="bi bi-check-circle me-2"></i>
+                <span id="successToastMessage"></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+    <div id="errorToast" class="toast align-items-center text-white bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <span id="errorToastMessage"></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+    <div id="warningToast" class="toast align-items-center text-white bg-warning border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="bi bi-info-circle me-2"></i>
+                <span id="warningToastMessage"></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Función helper para mostrar toasts
+    function showToast(type, message) {
+        const toastElement = document.getElementById(type + 'Toast');
+        const messageElement = document.getElementById(type + 'ToastMessage');
+        messageElement.textContent = message;
+
+        const toast = new bootstrap.Toast(toastElement, {
+            autohide: true,
+            delay: 3000
+        });
+        toast.show();
+    }
+
+    // Variables globales para el explorador FTP
+    let ftpExplorerData = {
+        host: '',
+        username: '',
+        password: '',
+        currentPath: '/',
+        targetInputId: '',
+        isEditMode: false
+    };
+
+    // Abrir explorador FTP desde modal de agregar
+    document.getElementById('btnExploreFtp')?.addEventListener('click', function() {
+        openFtpExplorer('ftpPath', false);
+    });
+
+    // Abrir explorador FTP desde modal de editar
+    document.getElementById('btnExploreEditFtp')?.addEventListener('click', function() {
+        openFtpExplorer('editFtpPath', true);
+    });
+
+    // Función para abrir el explorador FTP
+    function openFtpExplorer(targetInputId, isEditMode) {
+        // Obtener credenciales del modal correspondiente
+        const hostInput = isEditMode ? 'editFtpHost' : 'ftpHost';
+        const userInput = isEditMode ? 'editFtpUsername' : 'ftpUsername';
+        const passInput = isEditMode ? 'editFtpPassword' : 'ftpPassword';
+
+        const host = document.getElementById(hostInput).value;
+        const username = document.getElementById(userInput).value;
+        const password = document.getElementById(passInput).value;
+
+        // Validar que se hayan ingresado las credenciales
+        if (!host || !username || !password) {
+            showToast('warning', 'Por favor, ingresa el servidor, usuario y contraseña antes de explorar.');
+            return;
+        }
+
+        // Guardar datos
+        ftpExplorerData = {
+            host: host,
+            username: username,
+            password: password,
+            currentPath: '/',
+            targetInputId: targetInputId,
+            isEditMode: isEditMode
+        };
+
+        // Abrir modal del explorador
+        const explorerModal = new bootstrap.Modal(document.getElementById('ftpExplorerModal'));
+        explorerModal.show();
+
+        // Cargar directorio raíz
+        loadFtpDirectory('/');
+    }
+</script>

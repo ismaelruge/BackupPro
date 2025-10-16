@@ -1,0 +1,1040 @@
+﻿@{
+    ViewData["Title"] = "Google Drive Storage";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-10">
+            <!-- Card principal -->
+            <div class="card shadow-lg border-0 rounded-4">
+                <!-- Header -->
+                <div class="card-header bg-primary text-white border-0 rounded-top-4 py-4">
+                    <div class="text-center">
+                        <i class="bi bi-cloud-arrow-up fs-1 mb-3"></i>
+                        <h3 class="fw-bold mb-2">Tipos de Almacenamiento</h3>
+                        <p class="mb-0 opacity-75">Configura múltiples destinos donde se guardarán tus backups</p>
+                    </div>
+                </div>
+
+                <!-- Cuerpo con pestañas -->
+                <div class="card-body p-4">
+                    <!-- Nav Tabs -->
+                    <ul class="nav nav-pills nav-fill mb-4" id="storageTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link active" id="google-tab" role="tab" asp-area="" asp-controller="GoogleDriveStorage" asp-action="Index">
+                                <i class="bi bi-google me-2"></i>Google Drive
+                            </a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="onedrive-tab" role="tab" asp-area="" asp-controller="OneDriveStorage" asp-action="Index">
+                                <i class="bi bi-microsoft me-2"></i>OneDrive
+                            </a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="blob-tab" role="tab" asp-area="" asp-controller="BlobStorage" asp-action="Index">
+                                <i class="bi bi-cloud me-2"></i>Azure Blob
+                            </a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="ftp-tab" role="tab" asp-area="" asp-controller="FtpStorage" asp-action="Index">
+                                <i class="bi bi-hdd-network me-2"></i>FTP
+                            </a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="local-tab" role="tab" asp-area="" asp-controller="LocalStorage" asp-action="Index">
+                                <i class="bi bi-folder me-2"></i>Local
+                            </a>
+                        </li>
+                    </ul>
+
+                    <!-- Tab Content -->
+                    <div class="tab-content" id="storageTabContent">
+                        <!-- Google Drive -->
+                        <div class="tab-pane fade show active" id="google" role="tabpanel">
+                            <div class="text-center mb-4">
+                                <i class="bi bi-google text-primary" style="font-size: 3rem;"></i>
+                                <h4 class="mt-3">Google Drive</h4>
+                                <p class="text-muted">Configura múltiples cuentas y carpetas de Google Drive</p>
+                            </div>
+
+                            <!-- Lista de configuraciones -->
+                            <div class="mb-4">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h6 class="fw-semibold mb-0">
+                                        <i class="bi bi-gear-fill me-2 text-primary"></i>Configuraciones Activas
+                                    </h6>
+                                    <span class="badge bg-primary rounded-pill">2 configuradas</span>
+                                </div>
+
+                                <!-- Configuración 1 -->
+                                <div class="card mb-3 border-0 shadow-sm">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div class="flex-grow-1">
+                                                <div class="d-flex align-items-center mb-2">
+                                                    <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3">
+                                                        <i class="bi bi-person-circle text-primary fs-5"></i>
+                                                    </div>
+                                                    <div>
+                                                        <h6 class="mb-0 fw-semibold">
+                                                            <span class="text-primary">Backup Principal</span>
+                                                            <span class="text-muted fw-normal"> - usuario@gmail.com</span>
+                                                        </h6>
+                                                        <small class="text-muted">Conectado hace 2 días</small>
+                                                    </div>
+                                                </div>
+                                                <div class="ms-5 ps-2">
+                                                    <div class="mb-1">
+                                                        <i class="bi bi-folder me-2 text-muted"></i>
+                                                        <span class="text-muted">Ruta:</span>
+                                                        <code class="ms-1">/Backups/Empresa</code>
+                                                    </div>
+                                                    <span class="badge bg-success">
+                                                        <i class="bi bi-check-circle me-1"></i>Activo
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <button class="btn btn-sm btn-outline-primary rounded-pill me-2" data-bs-toggle="modal" data-bs-target="#editGoogleDriveModal" aria-label="Editar configuración">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger rounded-pill" data-bs-toggle="modal" data-bs-target="#deleteGoogleDriveModal" aria-label="Eliminar configuración">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Configuración 2 -->
+                                <div class="card mb-3 border-0 shadow-sm">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div class="flex-grow-1">
+                                                <div class="d-flex align-items-center mb-2">
+                                                    <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3">
+                                                        <i class="bi bi-person-circle text-primary fs-5"></i>
+                                                    </div>
+                                                    <div>
+                                                        <h6 class="mb-0 fw-semibold">
+                                                            <span class="text-primary">Respaldo Bases de Datos</span>
+                                                            <span class="text-muted fw-normal"> - empresa@gmail.com</span>
+                                                        </h6>
+                                                        <small class="text-muted">Conectado hace 1 semana</small>
+                                                    </div>
+                                                </div>
+                                                <div class="ms-5 ps-2">
+                                                    <div class="mb-1">
+                                                        <i class="bi bi-folder me-2 text-muted"></i>
+                                                        <span class="text-muted">Ruta:</span>
+                                                        <code class="ms-1">/Respaldos/DB</code>
+                                                    </div>
+                                                    <span class="badge bg-success">
+                                                        <i class="bi bi-check-circle me-1"></i>Activo
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <button class="btn btn-sm btn-outline-primary rounded-pill me-2" data-bs-toggle="modal" data-bs-target="#editGoogleDriveModal" aria-label="Editar configuración">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger rounded-pill" data-bs-toggle="modal" data-bs-target="#deleteGoogleDriveModal" aria-label="Eliminar configuración">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Botón agregar nueva configuración -->
+                            <div class="d-grid">
+                                <button type="button" class="btn btn-outline-primary btn-lg rounded-pill" data-bs-toggle="modal" data-bs-target="#addGoogleDriveModal">
+                                    <i class="bi bi-plus-circle me-2"></i>Agregar Nueva Configuración
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Información adicional -->
+            <div class="alert alert-info rounded-4 mt-4 shadow-sm" role="alert">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-info-circle-fill fs-3 me-3"></i>
+                    <div>
+                        <h6 class="mb-1 fw-semibold">Múltiples destinos</h6>
+                        <p class="mb-0">Puedes configurar múltiples destinos del mismo tipo. Los backups se copiarán a todos los destinos configurados como activos.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Agregar Google Drive -->
+<div class="modal fade" id="addGoogleDriveModal" tabindex="-1" aria-labelledby="addGoogleDriveModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white border-0">
+                <h5 class="modal-title" id="addGoogleDriveModalLabel">
+                    <i class="bi bi-google me-2"></i>Agregar Configuración de Google Drive
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="addGoogleDriveForm">
+                    <div class="mb-3">
+                        <label for="configName" class="form-label fw-semibold">
+                            <i class="bi bi-tag me-2 text-primary"></i>Nombre de Configuración
+                        </label>
+                        <input type="text" class="form-control" id="configName" placeholder="Ej: Backup Principal" required>
+                        <div class="form-text">Dale un nombre descriptivo a esta configuración</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="googleEmail" class="form-label fw-semibold">
+                            <i class="bi bi-envelope me-2 text-primary"></i>Correo de Google
+                        </label>
+                        <div class="input-group">
+                            <input type="email" class="form-control" id="googleEmail" placeholder="usuario@gmail.com" required readonly>
+                            <button class="btn btn-outline-primary" type="button" id="btnConnectGoogle">
+                                <i class="bi bi-google me-1"></i>Conectar
+                            </button>
+                        </div>
+                        <div class="form-text">Conéctate con tu cuenta de Google para acceder a Drive</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="folderPath" class="form-label fw-semibold">
+                            <i class="bi bi-folder me-2 text-primary"></i>Ruta de Carpeta
+                        </label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="folderPath" placeholder="/Backups/Empresa" required readonly>
+                            <button class="btn btn-outline-secondary" type="button" id="btnExploreDrive" disabled>
+                                <i class="bi bi-folder2-open me-1"></i>Explorar
+                            </button>
+                        </div>
+                        <div class="form-text">Ruta donde se guardarán los backups en Google Drive</div>
+                    </div>
+                    <div class="alert alert-info rounded-3 mb-0" role="alert">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <small>Se abrirá una ventana de autenticación de Google para autorizar el acceso</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0 bg-light">
+                <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>Cancelar
+                </button>
+                <button type="submit" form="addGoogleDriveForm" class="btn btn-primary rounded-pill">
+                    <i class="bi bi-google me-2"></i>Conectar con Google
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Editar Google Drive -->
+<div class="modal fade" id="editGoogleDriveModal" tabindex="-1" aria-labelledby="editGoogleDriveModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-warning text-dark border-0">
+                <h5 class="modal-title" id="editGoogleDriveModalLabel">
+                    <i class="bi bi-pencil-square me-2"></i>Editar Configuración de Google Drive
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="editGoogleDriveForm">
+                    <div class="mb-3">
+                        <label for="editConfigName" class="form-label fw-semibold">
+                            <i class="bi bi-tag me-2 text-warning"></i>Nombre de Configuración
+                        </label>
+                        <input type="text" class="form-control" id="editConfigName" value="Backup Principal" required>
+                        <div class="form-text">Dale un nombre descriptivo a esta configuración</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editGoogleEmail" class="form-label fw-semibold">
+                            <i class="bi bi-envelope me-2 text-warning"></i>Correo de Google
+                        </label>
+                        <div class="input-group">
+                            <input type="email" class="form-control" id="editGoogleEmail" value="usuario@gmail.com" readonly>
+                            <button class="btn btn-outline-warning" type="button" id="btnEditConnectGoogle">
+                                <i class="bi bi-google me-1"></i>Conectar
+                            </button>
+                        </div>
+                        <div class="form-text">Conéctate con tu cuenta de Google para acceder a Drive</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editFolderPath" class="form-label fw-semibold">
+                            <i class="bi bi-folder me-2 text-warning"></i>Ruta de Carpeta
+                        </label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="editFolderPath" value="/Backups/Empresa" required readonly>
+                            <button class="btn btn-outline-secondary" type="button" id="btnExploreEditDrive">
+                                <i class="bi bi-folder2-open me-1"></i>Explorar
+                            </button>
+                        </div>
+                        <div class="form-text">Ruta donde se guardarán los backups en Google Drive</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0 bg-light">
+                <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>Cancelar
+                </button>
+                <button type="submit" form="editGoogleDriveForm" class="btn btn-warning rounded-pill">
+                    <i class="bi bi-save me-2"></i>Guardar Cambios
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Eliminar Google Drive -->
+<div class="modal fade" id="deleteGoogleDriveModal" tabindex="-1" aria-labelledby="deleteGoogleDriveModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-danger text-white border-0">
+                <h5 class="modal-title" id="deleteGoogleDriveModalLabel">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Confirmar Eliminación
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="text-center mb-4">
+                    <div class="bg-danger bg-opacity-10 rounded-circle p-3 d-inline-flex mb-3">
+                        <i class="bi bi-trash text-danger" style="font-size: 3rem;"></i>
+                    </div>
+                    <h5 class="fw-semibold">¿Estás seguro de eliminar esta configuración?</h5>
+                </div>
+                <div class="bg-light rounded-3 p-3 mb-3">
+                    <div class="mb-2">
+                        <strong class="text-primary">Backup Principal</strong>
+                        <span class="text-muted"> - usuario@gmail.com</span>
+                    </div>
+                    <div class="text-muted">
+                        <small>
+                            <i class="bi bi-folder me-2"></i>
+                            Ruta: <code>/Backups/Empresa</code>
+                        </small>
+                    </div>
+                </div>
+                <div class="alert alert-danger rounded-3 mb-0" role="alert">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>Advertencia:</strong> Esta acción no se puede deshacer. Los backups existentes en Google Drive no serán eliminados, solo se removerá la configuración de este sistema.
+                </div>
+            </div>
+            <div class="modal-footer border-0 bg-light">
+                <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-danger rounded-pill">
+                    <i class="bi bi-trash me-2"></i>Sí, Eliminar Configuración
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Explorador Google Drive -->
+<div class="modal fade" id="driveExplorerModal" tabindex="-1" aria-labelledby="driveExplorerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white border-0">
+                <h5 class="modal-title" id="driveExplorerModalLabel">
+                    <i class="bi bi-google me-2"></i>Explorador de Google Drive
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-4">
+                <!-- Breadcrumb de navegación -->
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <nav aria-label="breadcrumb" class="flex-grow-1">
+                            <ol class="breadcrumb mb-0" id="driveBreadcrumb">
+                                <li class="breadcrumb-item active">
+                                    <i class="bi bi-google me-1"></i>
+                                    <span id="driveCurrentPath">Mi unidad</span>
+                                </li>
+                            </ol>
+                        </nav>
+                        <button type="button" class="btn btn-sm btn-success" id="btnCreateDriveFolder">
+                            <i class="bi bi-folder-plus me-1"></i>Nueva Carpeta
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Contenedor de carpetas -->
+                <div class="border rounded-3 bg-light" style="min-height: 400px; max-height: 400px; overflow-y: auto;">
+                    <!-- Loading -->
+                    <div id="driveFolderLoading" class="text-center py-5 d-none">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Cargando...</span>
+                        </div>
+                        <p class="mt-3 text-muted">Cargando carpetas de Google Drive...</p>
+                    </div>
+
+                    <!-- Error -->
+                    <div id="driveFolderError" class="alert alert-danger m-3 d-none" role="alert">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <span id="driveFolderErrorMessage"></span>
+                    </div>
+
+                    <!-- Lista de carpetas -->
+                    <div id="driveFolderList" class="list-group list-group-flush">
+                        <!-- Las carpetas se cargarán aquí -->
+                    </div>
+
+                    <!-- Empty state -->
+                    <div id="driveFolderEmpty" class="text-center py-5 d-none">
+                        <i class="bi bi-folder-x text-muted" style="font-size: 3rem;"></i>
+                        <p class="mt-3 text-muted">No hay subcarpetas en este directorio</p>
+                        <small class="text-muted">Puedes seleccionar esta ubicación para guardar tus backups</small>
+                    </div>
+                </div>
+
+                <!-- Ruta seleccionada -->
+                <div class="mt-3">
+                    <label class="form-label fw-semibold">
+                        <i class="bi bi-check-circle me-2 text-success"></i>Ruta seleccionada:
+                    </label>
+                    <input type="text" class="form-control" id="driveSelectedPath" readonly placeholder="/Mi unidad">
+                </div>
+            </div>
+            <div class="modal-footer border-0 bg-light">
+                <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary rounded-pill" id="btnSelectDrivePath">
+                    <i class="bi bi-check-circle me-2"></i>Seleccionar Ubicación
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Crear Carpeta Drive -->
+<div class="modal fade" id="createDriveFolderModal" tabindex="-1" aria-labelledby="createDriveFolderModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-success text-white border-0">
+                <h5 class="modal-title" id="createDriveFolderModalLabel">
+                    <i class="bi bi-folder-plus me-2"></i>Nueva Carpeta Drive
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-3">
+                    <label for="newDriveFolderName" class="form-label fw-semibold">
+                        <i class="bi bi-folder me-2 text-success"></i>Nombre de la carpeta
+                    </label>
+                    <input type="text" class="form-control" id="newDriveFolderName" placeholder="Nueva Carpeta" autofocus>
+                    <div class="form-text">Cualquier nombre válido para Google Drive</div>
+                </div>
+                <div class="alert alert-info rounded-3 mb-0" role="alert">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <small>La carpeta se creará en: <strong id="createDriveFolderLocation">/Mi unidad</strong></small>
+                </div>
+            </div>
+            <div class="modal-footer border-0 bg-light">
+                <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-success rounded-pill" id="btnConfirmCreateDriveFolder">
+                    <i class="bi bi-folder-plus me-2"></i>Crear Carpeta
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .nav-pills .nav-link {
+        border-radius: 50rem;
+        padding: 0.75rem 1.5rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+        .nav-pills .nav-link:hover {
+            background-color: rgba(13, 110, 253, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .nav-pills .nav-link.active {
+            background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+            box-shadow: 0 4px 6px rgba(13, 110, 253, 0.3);
+        }
+
+    .tab-pane {
+        animation: fadeIn 0.3s ease-in;
+    }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .rounded-circle {
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Estilos del explorador FTP */
+    .ftp-folder-item {
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+        .ftp-folder-item:hover {
+            background-color: rgba(13, 110, 253, 0.1);
+            transform: translateX(5px);
+        }
+
+        .ftp-folder-item.selected {
+            background-color: rgba(13, 110, 253, 0.15);
+            border-left: 3px solid #0d6efd;
+        }
+
+    .breadcrumb-item.breadcrumb-link {
+        cursor: pointer;
+        color: #0d6efd;
+    }
+
+        .breadcrumb-item.breadcrumb-link:hover {
+            text-decoration: underline;
+        }
+
+    /* Estilos del explorador Blob */
+    .blob-container-item,
+    .blob-folder-item {
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+        .blob-container-item:hover,
+        .blob-folder-item:hover {
+            background-color: rgba(13, 110, 253, 0.1);
+            transform: translateX(5px);
+        }
+
+        .blob-container-item.selected,
+        .blob-folder-item.selected {
+            background-color: rgba(13, 110, 253, 0.15);
+            border-left: 3px solid #0d6efd;
+        }
+
+    /* Estilos para modales de crear carpeta */
+    #createFtpFolderModal,
+    #createBlobFolderModal,
+    #createDriveFolderModal {
+        z-index: 1060 !important;
+    }
+
+        #createFtpFolderModal .modal-backdrop,
+        #createBlobFolderModal .modal-backdrop,
+        #createDriveFolderModal .modal-backdrop {
+            z-index: 1059 !important;
+        }
+
+    /* Estilos del explorador Google Drive */
+    .drive-folder-item {
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+        .drive-folder-item:hover {
+            background-color: rgba(13, 110, 253, 0.1);
+            transform: translateX(5px);
+        }
+
+        .drive-folder-item.selected {
+            background-color: rgba(13, 110, 253, 0.15);
+            border-left: 3px solid #0d6efd;
+        }
+</style>
+
+<!-- Contenedor de toasts -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 2000;">
+    <div id="successToast" class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="bi bi-check-circle me-2"></i>
+                <span id="successToastMessage"></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+    <div id="errorToast" class="toast align-items-center text-white bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <span id="errorToastMessage"></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+    <div id="warningToast" class="toast align-items-center text-white bg-warning border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="bi bi-info-circle me-2"></i>
+                <span id="warningToastMessage"></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Función helper para mostrar toasts
+    function showToast(type, message) {
+        const toastElement = document.getElementById(type + 'Toast');
+        const messageElement = document.getElementById(type + 'ToastMessage');
+        messageElement.textContent = message;
+
+        const toast = new bootstrap.Toast(toastElement, {
+            autohide: true,
+            delay: 3000
+        });
+        toast.show();
+    }
+
+
+    // ========== GOOGLE DRIVE ==========
+
+    // Variables globales para Google Drive
+    let driveExplorerData = {
+        accessToken: '',
+        currentParentId: '',
+        currentPath: '/Mi unidad',
+        folderStack: [], // Stack para navegación: [{id, name, path}, ...]
+        isEditMode: false
+    };
+
+    // Botón para conectar con Google
+    document.getElementById('btnConnectGoogle')?.addEventListener('click', function() {
+        // Abrir ventana popup para autenticación OAuth2
+        const width = 600;
+        const height = 700;
+        const left = (screen.width / 2) - (width / 2);
+        const top = (screen.height / 2) - (height / 2);
+
+        const authWindow = window.open(
+            '/GoogleDriveStorage/GoogleDriveAuth',
+            'GoogleDriveAuth',
+            `width=${width},height=${height},top=${top},left=${left},menubar=no,toolbar=no,location=no,status=no`
+        );
+
+        if (!authWindow) {
+            showToast('error', 'No se pudo abrir la ventana de autenticación. Verifica que los popups no estén bloqueados.');
+            return;
+        }
+
+        // Escuchar mensaje del callback (solo una vez por conexión)
+        const messageHandler = function(event) {
+            // Verificar que el mensaje viene de nuestra aplicación
+            if (event.origin !== window.location.origin) {
+                return;
+            }
+
+            if (event.data && typeof event.data === 'object') {
+                if (event.data.success) {
+                    // Autenticación exitosa
+                    const email = event.data.email;
+                    const accessToken = event.data.accessToken;
+
+                    // Actualizar UI
+                    document.getElementById('googleEmail').value = email;
+                    driveExplorerData.accessToken = accessToken;
+
+                    // Habilitar botón de explorar
+                    document.getElementById('btnExploreDrive').disabled = false;
+
+                    showToast('success', 'Conectado exitosamente con Google Drive');
+
+                    // Remover listener después de recibir el mensaje
+                    window.removeEventListener('message', messageHandler);
+                } else if (event.data.success === false) {
+                    showToast('error', 'Error de autenticación: ' + (event.data.message || 'Error desconocido'));
+
+                    // Remover listener después de recibir el mensaje
+                    window.removeEventListener('message', messageHandler);
+                }
+            }
+        };
+
+        window.addEventListener('message', messageHandler);
+
+        // Timeout por si el usuario cierra la ventana sin completar la autenticación
+        setTimeout(() => {
+            if (authWindow && !authWindow.closed) {
+                // La ventana sigue abierta después de 5 minutos, limpiar listener
+                window.removeEventListener('message', messageHandler);
+            }
+        }, 300000); // 5 minutos
+    });
+
+    // Botón para explorar Drive (modo agregar)
+    document.getElementById('btnExploreDrive')?.addEventListener('click', function() {
+        openDriveExplorer(false);
+    });
+
+    // Botón para explorar Drive (modo editar)
+    document.getElementById('btnExploreEditDrive')?.addEventListener('click', function() {
+        openDriveExplorer(true);
+    });
+
+    // Función para abrir el explorador de Drive
+    function openDriveExplorer(isEditMode) {
+        if (!driveExplorerData.accessToken) {
+            showToast('warning', 'Por favor, conéctate con Google Drive primero.');
+            return;
+        }
+
+        driveExplorerData.isEditMode = isEditMode;
+        driveExplorerData.currentParentId = '';
+        driveExplorerData.currentPath = '/Mi unidad';
+        driveExplorerData.folderStack = [];
+
+        // Resetear UI
+        document.getElementById('driveSelectedPath').value = '/Mi unidad';
+
+        // Abrir modal
+        const explorerModal = new bootstrap.Modal(document.getElementById('driveExplorerModal'));
+        explorerModal.show();
+
+        // Cargar carpetas raíz
+        loadDriveFolders('');
+    }
+
+    // Función para cargar carpetas de Drive
+    async function loadDriveFolders(parentId) {
+        const loading = document.getElementById('driveFolderLoading');
+        const error = document.getElementById('driveFolderError');
+        const list = document.getElementById('driveFolderList');
+        const empty = document.getElementById('driveFolderEmpty');
+
+        // Mostrar loading
+        loading.classList.remove('d-none');
+        error.classList.add('d-none');
+        list.innerHTML = '';
+        empty.classList.add('d-none');
+
+        try {
+            const response = await fetch('/GoogleDriveStorage/ListDriveFolders', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    accessToken: driveExplorerData.accessToken,
+                    parentId: parentId || ''
+                })
+            });
+
+            const data = await response.json();
+
+            loading.classList.add('d-none');
+
+            if (data.success) {
+                if (data.folders && data.folders.length > 0) {
+                    data.folders.forEach(folder => {
+                        const folderItem = createDriveFolderItem(folder);
+                        list.appendChild(folderItem);
+                    });
+                } else {
+                    empty.classList.remove('d-none');
+                }
+
+                // Actualizar path actual
+                driveExplorerData.currentParentId = parentId || '';
+            } else {
+                error.classList.remove('d-none');
+                document.getElementById('driveFolderErrorMessage').textContent = data.message;
+            }
+        } catch (err) {
+            loading.classList.add('d-none');
+            error.classList.remove('d-none');
+            document.getElementById('driveFolderErrorMessage').textContent = 'Error de conexión: ' + err.message;
+        }
+    }
+
+    // Función para crear elemento de carpeta Drive
+    function createDriveFolderItem(folder) {
+        const item = document.createElement('a');
+        item.href = '#';
+        item.className = 'list-group-item list-group-item-action drive-folder-item';
+        item.innerHTML = `
+            <div class="d-flex align-items-center">
+                <i class="bi bi-folder-fill text-primary me-3" style="font-size: 1.5rem;"></i>
+                <div class="flex-grow-1">
+                    <h6 class="mb-0">${folder.name}</h6>
+                    <small class="text-muted">Modificado: ${new Date(folder.modifiedTime).toLocaleString()}</small>
+                </div>
+                <i class="bi bi-chevron-right text-muted"></i>
+            </div>
+        `;
+
+        // Click simple: navegar dentro de la carpeta
+        item.addEventListener('click', function(e) {
+            e.preventDefault();
+            navigateToFolder(folder.id, folder.name);
+        });
+
+        return item;
+    }
+
+    // Función para navegar a una carpeta
+    function navigateToFolder(folderId, folderName) {
+        // Guardar carpeta actual en el stack
+        driveExplorerData.folderStack.push({
+            id: driveExplorerData.currentParentId,
+            name: driveExplorerData.currentPath.split('/').pop(),
+            path: driveExplorerData.currentPath
+        });
+
+        // Actualizar estado
+        driveExplorerData.currentParentId = folderId;
+        driveExplorerData.currentPath += '/' + folderName;
+
+        // Actualizar breadcrumb
+        updateDriveBreadcrumb();
+
+        // Actualizar ruta seleccionada
+        document.getElementById('driveSelectedPath').value = driveExplorerData.currentPath;
+
+        // Cargar subcarpetas
+        loadDriveFolders(folderId);
+    }
+
+    // Función para actualizar breadcrumb de Drive
+    function updateDriveBreadcrumb() {
+        const breadcrumb = document.getElementById('driveBreadcrumb');
+        breadcrumb.innerHTML = '';
+
+        const parts = driveExplorerData.currentPath.split('/').filter(p => p);
+
+        parts.forEach((part, index) => {
+            const item = document.createElement('li');
+
+            if (index === parts.length - 1) {
+                item.className = 'breadcrumb-item active';
+                item.textContent = part;
+            } else {
+                item.className = 'breadcrumb-item breadcrumb-link';
+                item.textContent = part;
+                item.style.cursor = 'pointer';
+
+                item.addEventListener('click', () => {
+                    // Navegar hacia atrás en el breadcrumb
+                    const targetIndex = index;
+                    const levelsBack = parts.length - 1 - targetIndex;
+
+                    // Retroceder en el stack
+                    for (let i = 0; i < levelsBack; i++) {
+                        if (driveExplorerData.folderStack.length > 0) {
+                            const prev = driveExplorerData.folderStack.pop();
+                            driveExplorerData.currentParentId = prev.id;
+                            driveExplorerData.currentPath = prev.path;
+                        }
+                    }
+
+                    updateDriveBreadcrumb();
+                    document.getElementById('driveSelectedPath').value = driveExplorerData.currentPath;
+                    loadDriveFolders(driveExplorerData.currentParentId);
+                });
+            }
+
+            if (index === 0) {
+                const icon = document.createElement('i');
+                icon.className = 'bi bi-google me-1';
+                item.prepend(icon);
+            }
+
+            breadcrumb.appendChild(item);
+        });
+    }
+
+    // Botón para seleccionar ruta de Drive
+    document.getElementById('btnSelectDrivePath')?.addEventListener('click', function() {
+        const selectedPath = document.getElementById('driveSelectedPath').value;
+
+        if (!selectedPath) {
+            showToast('warning', 'Por favor, selecciona una carpeta.');
+            return;
+        }
+
+        // Asignar al campo correspondiente
+        if (driveExplorerData.isEditMode) {
+            document.getElementById('editFolderPath').value = selectedPath;
+        } else {
+            document.getElementById('folderPath').value = selectedPath;
+        }
+
+        // Cerrar modal
+        const explorerModal = bootstrap.Modal.getInstance(document.getElementById('driveExplorerModal'));
+        explorerModal.hide();
+    });
+
+    // Botón para crear nueva carpeta en Drive - abrir modal
+    document.getElementById('btnCreateDriveFolder')?.addEventListener('click', function() {
+        // Mostrar la ubicación actual en el modal
+        document.getElementById('createDriveFolderLocation').textContent = driveExplorerData.currentPath;
+
+        // Limpiar el input
+        document.getElementById('newDriveFolderName').value = '';
+
+        // Abrir modal
+        const createFolderModal = new bootstrap.Modal(document.getElementById('createDriveFolderModal'));
+        createFolderModal.show();
+    });
+
+    // Confirmar creación de carpeta Drive
+    document.getElementById('btnConfirmCreateDriveFolder')?.addEventListener('click', async function() {
+        const folderName = document.getElementById('newDriveFolderName').value.trim();
+
+        if (!folderName) {
+            showToast('warning', 'Por favor, ingresa un nombre para la carpeta.');
+            return;
+        }
+
+        // Deshabilitar botón mientras se crea
+        const btn = this;
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Creando...';
+
+        try {
+            const response = await fetch('/GoogleDriveStorage/CreateDriveFolder', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    accessToken: driveExplorerData.accessToken,
+                    parentId: driveExplorerData.currentParentId,
+                    folderName: folderName
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Cerrar modal
+                const createFolderModal = bootstrap.Modal.getInstance(document.getElementById('createDriveFolderModal'));
+                createFolderModal.hide();
+
+                // Mostrar mensaje de éxito
+                showToast('success', 'Carpeta creada exitosamente en Google Drive');
+
+                // Recargar el directorio actual para mostrar la nueva carpeta
+                loadDriveFolders(driveExplorerData.currentParentId);
+            } else {
+                showToast('error', 'Error al crear carpeta: ' + data.message);
+            }
+        } catch (error) {
+            showToast('error', 'Error de conexión: ' + error.message);
+        } finally {
+            // Restaurar botón
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    });
+
+    // Permitir crear carpeta Drive con Enter en el input
+    document.getElementById('newDriveFolderName')?.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('btnConfirmCreateDriveFolder').click();
+        }
+    });
+
+    // ========== GOOGLE DRIVE AUTHENTICATION ==========
+
+    // Variable global para almacenar el access token de Google Drive
+    let googleDriveAccessToken = null;
+    let googleDriveEmail = null;
+
+    // Botón para conectar con Google Drive (modal agregar)
+    document.getElementById('btnConnectGoogle')?.addEventListener('click', function() {
+        authenticateWithGoogleDrive();
+    });
+
+    // Botón para conectar con Google Drive (modal editar)
+    document.getElementById('btnEditConnectGoogle')?.addEventListener('click', function() {
+        authenticateWithGoogleDrive(true);
+    });
+
+    // Función para autenticar con Google Drive
+    function authenticateWithGoogleDrive(isReconnect = false) {
+        // Abrir ventana de autenticación de Google
+        const authWindow = window.open(
+            '/GoogleDriveStorage/GoogleDriveAuth',
+            'GoogleDriveAuth',
+            'width=600,height=700,left=200,top=100'
+        );
+
+        // Escuchar mensaje de la ventana de autenticación
+        window.addEventListener('message', function handleAuthMessage(event) {
+            // Verificar que el mensaje viene de nuestro dominio
+            if (event.origin !== window.location.origin) {
+                return;
+            }
+
+            // Verificar que es el mensaje de autenticación de Google Drive
+            if (!event.data || typeof event.data.success === 'undefined') {
+                return;
+            }
+
+            // Remover el listener después de recibir el mensaje
+            window.removeEventListener('message', handleAuthMessage);
+
+            if (event.data.success) {
+                googleDriveAccessToken = event.data.accessToken;
+                googleDriveEmail = event.data.email;
+
+                // Actualizar también el driveExplorerData para que funcione el explorador
+                driveExplorerData.accessToken = event.data.accessToken;
+
+                if (isReconnect) {
+                    // Actualizar el email en el modal de editar
+                    document.getElementById('editGoogleEmail').value = googleDriveEmail;
+                    showToast('success', 'Reconexión exitosa con Google Drive: ' + googleDriveEmail);
+
+                    // Habilitar el botón de explorar
+                    document.getElementById('btnExploreEditDrive').disabled = false;
+                } else {
+                    // Actualizar el email en el modal de agregar
+                    document.getElementById('googleEmail').value = googleDriveEmail;
+                    showToast('success', 'Conexión exitosa con Google Drive: ' + googleDriveEmail);
+
+                    // Habilitar el botón de explorar
+                    document.getElementById('btnExploreDrive').disabled = false;
+                }
+            } else {
+                showToast('error', 'Error de autenticación: ' + (event.data.message || 'Error desconocido'));
+            }
+        });
+
+        // Verificar si la ventana fue cerrada sin completar la autenticación
+        const checkWindowClosed = setInterval(function() {
+            if (authWindow.closed) {
+                clearInterval(checkWindowClosed);
+                if (!googleDriveAccessToken) {
+                    showToast('warning', 'Autenticación cancelada');
+                }
+            }
+        }, 500);
+    }
+
+</script>

@@ -1,0 +1,1148 @@
+﻿@{
+    ViewData["Title"] = "Blob Storage";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-10">
+            <!-- Card principal -->
+            <div class="card shadow-lg border-0 rounded-4">
+                <!-- Header -->
+                <div class="card-header bg-primary text-white border-0 rounded-top-4 py-4">
+                    <div class="text-center">
+                        <i class="bi bi-cloud-arrow-up fs-1 mb-3"></i>
+                        <h3 class="fw-bold mb-2">Tipos de Almacenamiento</h3>
+                        <p class="mb-0 opacity-75">Configura múltiples destinos donde se guardarán tus backups</p>
+                    </div>
+                </div>
+
+                <!-- Cuerpo con pestañas -->
+                <div class="card-body p-4">
+                    <!-- Nav Tabs -->
+                    <ul class="nav nav-pills nav-fill mb-4" id="storageTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="google-tab" role="tab" asp-area="" asp-controller="GoogleDriveStorage" asp-action="Index">
+                                <i class="bi bi-google me-2"></i>Google Drive
+                            </a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="onedrive-tab" role="tab" asp-area="" asp-controller="OneDriveStorage" asp-action="Index">
+                                <i class="bi bi-microsoft me-2"></i>OneDrive
+                            </a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link active" id="blob-tab" role="tab" asp-area="" asp-controller="BlobStorage" asp-action="Index">
+                                <i class="bi bi-cloud me-2"></i>Azure Blob
+                            </a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="ftp-tab" role="tab" asp-area="" asp-controller="FtpStorage" asp-action="Index">
+                                <i class="bi bi-hdd-network me-2"></i>FTP
+                            </a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="local-tab" role="tab" asp-area="" asp-controller="LocalStorage" asp-action="Index">
+                                <i class="bi bi-folder me-2"></i>Local
+                            </a>
+                        </li>
+                    </ul>
+
+                    <!-- Tab Content -->
+                    <div class="tab-content" id="storageTabContent">
+                        
+                        <!-- Azure Blob Storage -->
+                        <div class="tab-pane fade show active" id="blob" role="tabpanel">
+                            <div class="text-center mb-4">
+                                <i class="bi bi-cloud text-primary" style="font-size: 3rem;"></i>
+                                <h4 class="mt-3">Azure Blob Storage</h4>
+                                <p class="text-muted">Configura múltiples contenedores de Azure Blob</p>
+                            </div>
+
+                            <!-- Lista de configuraciones -->
+                            <div class="mb-4">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h6 class="fw-semibold mb-0">
+                                        <i class="bi bi-gear-fill me-2 text-primary"></i>Configuraciones Activas
+                                    </h6>
+                                    <span class="badge bg-primary rounded-pill">1 configurada</span>
+                                </div>
+
+                                <!-- Configuración 1 -->
+                                <div class="card mb-3 border-0 shadow-sm">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div class="flex-grow-1">
+                                                <h6 class="mb-2 fw-semibold">
+                                                    <span class="text-primary">Azure Principal</span>
+                                                    <span class="text-muted fw-normal"> - backups-produccion</span>
+                                                </h6>
+                                                <div class="ms-4">
+                                                    <div class="mb-1">
+                                                        <i class="bi bi-link-45deg me-2 text-muted"></i>
+                                                        <small class="text-muted">Connection String: DefaultEndpoints...</small>
+                                                    </div>
+                                                    <div class="mb-1">
+                                                        <i class="bi bi-folder me-2 text-muted"></i>
+                                                        <span class="text-muted">Ruta:</span>
+                                                        <code class="ms-1">/backups/empresa</code>
+                                                    </div>
+                                                    <span class="badge bg-success mt-1">
+                                                        <i class="bi bi-check-circle me-1"></i>Activo
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <button class="btn btn-sm btn-outline-primary rounded-pill me-2" data-bs-toggle="modal" data-bs-target="#editBlobModal" aria-label="Editar configuración Blob">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger rounded-pill" data-bs-toggle="modal" data-bs-target="#deleteBlobModal" aria-label="Eliminar configuración Blob">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Botón agregar nueva configuración -->
+                            <div class="d-grid">
+                                <button type="button" class="btn btn-outline-primary btn-lg rounded-pill" data-bs-toggle="modal" data-bs-target="#addBlobModal">
+                                    <i class="bi bi-plus-circle me-2"></i>Agregar Nuevo Contenedor
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- Información adicional -->
+            <div class="alert alert-info rounded-4 mt-4 shadow-sm" role="alert">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-info-circle-fill fs-3 me-3"></i>
+                    <div>
+                        <h6 class="mb-1 fw-semibold">Múltiples destinos</h6>
+                        <p class="mb-0">Puedes configurar múltiples destinos del mismo tipo. Los backups se copiarán a todos los destinos configurados como activos.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Crear Carpeta Blob -->
+<div class="modal fade" id="createBlobFolderModal" tabindex="-1" aria-labelledby="createBlobFolderModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-success text-white border-0">
+                <h5 class="modal-title" id="createBlobFolderModalLabel">
+                    <i class="bi bi-folder-plus me-2"></i>Nueva Carpeta Blob
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-3">
+                    <label for="newBlobFolderName" class="form-label fw-semibold">
+                        <i class="bi bi-folder me-2 text-success"></i>Nombre de la carpeta
+                    </label>
+                    <input type="text" class="form-control" id="newBlobFolderName" placeholder="nueva_carpeta" autofocus>
+                    <div class="form-text">Solo letras, números, guiones y guiones bajos</div>
+                </div>
+                <div class="alert alert-info rounded-3 mb-0" role="alert">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <small>La carpeta se creará en: <strong><span id="createBlobFolderContainer"></span><span id="createBlobFolderLocation"></span></strong></small>
+                </div>
+            </div>
+            <div class="modal-footer border-0 bg-light">
+                <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-success rounded-pill" id="btnConfirmCreateBlobFolder">
+                    <i class="bi bi-folder-plus me-2"></i>Crear Carpeta
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Agregar Azure Blob -->
+<div class="modal fade" id="addBlobModal" tabindex="-1" aria-labelledby="addBlobModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white border-0">
+                <h5 class="modal-title" id="addBlobModalLabel">
+                    <i class="bi bi-cloud me-2"></i>Agregar Azure Blob Storage
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="addBlobForm">
+                    <div class="mb-3">
+                        <label for="blobConfigName" class="form-label fw-semibold">
+                            <i class="bi bi-tag me-2 text-primary"></i>Nombre de Configuración
+                        </label>
+                        <input type="text" class="form-control" id="blobConfigName" placeholder="Ej: Azure Principal" required>
+                        <div class="form-text">Dale un nombre descriptivo a esta configuración</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="blobConnectionString" class="form-label fw-semibold">
+                            <i class="bi bi-link-45deg me-2 text-primary"></i>Connection String
+                        </label>
+                        <textarea class="form-control" id="blobConnectionString" rows="3" placeholder="DefaultEndpointsProtocol=https;AccountName=..." required></textarea>
+                        <div class="form-text">Cadena de conexión de Azure Storage Account</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="blobContainer" class="form-label fw-semibold">
+                            <i class="bi bi-box me-2 text-primary"></i>Contenedor
+                        </label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="blobContainer" placeholder="nombre-contenedor" required readonly>
+                            <button class="btn btn-outline-secondary" type="button" id="btnExploreBlobContainer">
+                                <i class="bi bi-box-arrow-in-down me-1"></i>Seleccionar
+                            </button>
+                        </div>
+                        <div class="form-text">Nombre del contenedor en Azure Storage</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="blobPath" class="form-label fw-semibold">
+                            <i class="bi bi-folder me-2 text-primary"></i>Ruta
+                        </label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="blobPath" placeholder="folder/subfolder" readonly>
+                            <button class="btn btn-outline-secondary" type="button" id="btnExploreBlob" disabled>
+                                <i class="bi bi-folder2-open me-1"></i>Explorar
+                            </button>
+                        </div>
+                        <div class="form-text">Ruta dentro del contenedor (se debe seleccionar el contenedor primero)</div>
+                    </div>
+                    <div class="alert alert-warning rounded-3 mb-0" role="alert">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <small><strong>Nota:</strong> Asegúrate de tener los permisos necesarios en el contenedor de Azure.</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0 bg-light">
+                <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>Cancelar
+                </button>
+                <button type="submit" form="addBlobForm" class="btn btn-primary rounded-pill">
+                    <i class="bi bi-cloud me-2"></i>Conectar Azure Blob
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Editar Azure Blob -->
+<div class="modal fade" id="editBlobModal" tabindex="-1" aria-labelledby="editBlobModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-warning text-dark border-0">
+                <h5 class="modal-title" id="editBlobModalLabel">
+                    <i class="bi bi-pencil-square me-2"></i>Editar Azure Blob Storage
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="editBlobForm">
+                    <div class="mb-3">
+                        <label for="editBlobConfigName" class="form-label fw-semibold">
+                            <i class="bi bi-tag me-2 text-warning"></i>Nombre de Configuración
+                        </label>
+                        <input type="text" class="form-control" id="editBlobConfigName" value="Azure Principal" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editBlobConnectionString" class="form-label fw-semibold">
+                            <i class="bi bi-link-45deg me-2 text-warning"></i>Connection String
+                        </label>
+                        <textarea class="form-control" id="editBlobConnectionString" rows="3" required>DefaultEndpointsProtocol=https;AccountName=...</textarea>
+                        <div class="form-text">Cadena de conexión de Azure Storage Account</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editBlobContainer" class="form-label fw-semibold">
+                            <i class="bi bi-box me-2 text-warning"></i>Contenedor
+                        </label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="editBlobContainer" value="backups-produccion" required readonly>
+                            <button class="btn btn-outline-secondary" type="button" id="btnExploreEditBlobContainer">
+                                <i class="bi bi-box-arrow-in-down me-1"></i>Seleccionar
+                            </button>
+                        </div>
+                        <div class="form-text">Nombre del contenedor en Azure Storage</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editBlobPath" class="form-label fw-semibold">
+                            <i class="bi bi-folder me-2 text-warning"></i>Ruta
+                        </label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="editBlobPath" value="empresa" readonly>
+                            <button class="btn btn-outline-secondary" type="button" id="btnExploreEditBlob" disabled>
+                                <i class="bi bi-folder2-open me-1"></i>Explorar
+                            </button>
+                        </div>
+                        <div class="form-text">Ruta dentro del contenedor (se debe seleccionar el contenedor primero)</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0 bg-light">
+                <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>Cancelar
+                </button>
+                <button type="submit" form="editBlobForm" class="btn btn-warning rounded-pill">
+                    <i class="bi bi-save me-2"></i>Guardar Cambios
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Eliminar Azure Blob -->
+<div class="modal fade" id="deleteBlobModal" tabindex="-1" aria-labelledby="deleteBlobModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-danger text-white border-0">
+                <h5 class="modal-title" id="deleteBlobModalLabel">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Confirmar Eliminación
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="text-center mb-4">
+                    <div class="bg-danger bg-opacity-10 rounded-circle p-3 d-inline-flex mb-3">
+                        <i class="bi bi-trash text-danger" style="font-size: 3rem;"></i>
+                    </div>
+                    <h5 class="fw-semibold">¿Estás seguro de eliminar esta configuración?</h5>
+                </div>
+                <div class="bg-light rounded-3 p-3 mb-3">
+                    <div class="mb-2">
+                        <strong class="text-primary">Azure Principal</strong>
+                        <span class="text-muted"> - backups-produccion</span>
+                    </div>
+                    <div class="text-muted">
+                        <small>
+                            <i class="bi bi-folder me-2"></i>
+                            Ruta: <code>backups-produccion/empresa</code>
+                        </small>
+                    </div>
+                </div>
+                <div class="alert alert-danger rounded-3 mb-0" role="alert">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>Advertencia:</strong> Esta acción no se puede deshacer. Los backups existentes en Azure Blob Storage no serán eliminados, solo se removerá la configuración de este sistema.
+                </div>
+            </div>
+            <div class="modal-footer border-0 bg-light">
+                <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-danger rounded-pill">
+                    <i class="bi bi-trash me-2"></i>Sí, Eliminar Configuración
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Explorador Azure Blob -->
+<div class="modal fade" id="blobExplorerModal" tabindex="-1" aria-labelledby="blobExplorerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white border-0">
+                <h5 class="modal-title" id="blobExplorerModalLabel">
+                    <i class="bi bi-cloud me-2"></i>Explorador de Azure Blob Storage
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-4">
+                <!-- Paso 1: Seleccionar Contenedor -->
+                <div id="blobContainerStep">
+                    <h6 class="fw-semibold mb-3">
+                        <i class="bi bi-box me-2 text-primary"></i>Paso 1: Seleccionar Contenedor
+                    </h6>
+
+                    <!-- Loading -->
+                    <div id="blobContainerLoading" class="text-center py-5 d-none">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Cargando...</span>
+                        </div>
+                        <p class="mt-3 text-muted">Cargando contenedores...</p>
+                    </div>
+
+                    <!-- Error -->
+                    <div id="blobContainerError" class="alert alert-danger d-none" role="alert">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <span id="blobContainerErrorMessage"></span>
+                    </div>
+
+                    <!-- Lista de contenedores -->
+                    <div id="blobContainerList" class="border rounded-3 bg-light" style="max-height: 300px; overflow-y: auto;">
+                        <!-- Los contenedores se cargarán aquí -->
+                    </div>
+                </div>
+
+                <!-- Paso 2: Navegar por Carpetas -->
+                <div id="blobFolderStep" class="d-none">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="fw-semibold mb-0">
+                            <i class="bi bi-folder me-2 text-primary"></i>Paso 2: Seleccionar Carpeta
+                        </h6>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnBackToContainers">
+                            <i class="bi bi-arrow-left me-1"></i>Cambiar Contenedor
+                        </button>
+                    </div>
+
+                    <!-- Breadcrumb de navegación -->
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <nav aria-label="breadcrumb" class="flex-grow-1">
+                                <ol class="breadcrumb mb-0" id="blobBreadcrumb">
+                                    <li class="breadcrumb-item active">
+                                        <i class="bi bi-box me-1"></i>
+                                        <span id="blobCurrentContainer"></span>
+                                    </li>
+                                </ol>
+                            </nav>
+                            <button type="button" class="btn btn-sm btn-success" id="btnCreateBlobFolder">
+                                <i class="bi bi-folder-plus me-1"></i>Nueva Carpeta
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Contenedor de carpetas -->
+                    <div class="border rounded-3 bg-light" style="min-height: 300px; max-height: 300px; overflow-y: auto;">
+                        <!-- Loading -->
+                        <div id="blobFolderLoading" class="text-center py-5 d-none">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Cargando...</span>
+                            </div>
+                            <p class="mt-3 text-muted">Cargando carpetas...</p>
+                        </div>
+
+                        <!-- Error -->
+                        <div id="blobFolderError" class="alert alert-danger m-3 d-none" role="alert">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            <span id="blobFolderErrorMessage"></span>
+                        </div>
+
+                        <!-- Lista de carpetas -->
+                        <div id="blobFolderList" class="list-group list-group-flush">
+                            <!-- Las carpetas se cargarán aquí -->
+                        </div>
+
+                        <!-- Empty state -->
+                        <div id="blobFolderEmpty" class="text-center py-5 d-none">
+                            <i class="bi bi-folder-x text-muted" style="font-size: 3rem;"></i>
+                            <p class="mt-3 text-muted">No hay subcarpetas en este directorio</p>
+                            <small class="text-muted">Puedes seleccionar esta ubicación para guardar tus backups</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Selección actual -->
+                <div class="mt-3">
+                    <div class="row">
+                        <div class="col-md-6 mb-2 mb-md-0">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-box me-2 text-primary"></i>Contenedor seleccionado:
+                            </label>
+                            <input type="text" class="form-control" id="blobSelectedContainer" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-folder me-2 text-success"></i>Ruta seleccionada:
+                            </label>
+                            <input type="text" class="form-control" id="blobSelectedPath" readonly placeholder="/">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 bg-light">
+                <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary rounded-pill" id="btnSelectBlobPath">
+                    <i class="bi bi-check-circle me-2"></i>Seleccionar Ubicación
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .nav-pills .nav-link {
+        border-radius: 50rem;
+        padding: 0.75rem 1.5rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+        .nav-pills .nav-link:hover {
+            background-color: rgba(13, 110, 253, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .nav-pills .nav-link.active {
+            background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+            box-shadow: 0 4px 6px rgba(13, 110, 253, 0.3);
+        }
+
+    .tab-pane {
+        animation: fadeIn 0.3s ease-in;
+    }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .rounded-circle {
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Estilos del explorador FTP */
+    .ftp-folder-item {
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+        .ftp-folder-item:hover {
+            background-color: rgba(13, 110, 253, 0.1);
+            transform: translateX(5px);
+        }
+
+        .ftp-folder-item.selected {
+            background-color: rgba(13, 110, 253, 0.15);
+            border-left: 3px solid #0d6efd;
+        }
+
+    .breadcrumb-item.breadcrumb-link {
+        cursor: pointer;
+        color: #0d6efd;
+    }
+
+        .breadcrumb-item.breadcrumb-link:hover {
+            text-decoration: underline;
+        }
+
+    /* Estilos del explorador Blob */
+    .blob-container-item,
+    .blob-folder-item {
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+        .blob-container-item:hover,
+        .blob-folder-item:hover {
+            background-color: rgba(13, 110, 253, 0.1);
+            transform: translateX(5px);
+        }
+
+        .blob-container-item.selected,
+        .blob-folder-item.selected {
+            background-color: rgba(13, 110, 253, 0.15);
+            border-left: 3px solid #0d6efd;
+        }
+
+    /* Estilos para modales de crear carpeta */
+    #createFtpFolderModal,
+    #createBlobFolderModal,
+    #createDriveFolderModal {
+        z-index: 1060 !important;
+    }
+
+        #createFtpFolderModal .modal-backdrop,
+        #createBlobFolderModal .modal-backdrop,
+        #createDriveFolderModal .modal-backdrop {
+            z-index: 1059 !important;
+        }
+
+    /* Estilos del explorador Google Drive */
+    .drive-folder-item {
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+        .drive-folder-item:hover {
+            background-color: rgba(13, 110, 253, 0.1);
+            transform: translateX(5px);
+        }
+
+        .drive-folder-item.selected {
+            background-color: rgba(13, 110, 253, 0.15);
+            border-left: 3px solid #0d6efd;
+        }
+</style>
+
+<!-- Contenedor de toasts -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 2000;">
+    <div id="successToast" class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="bi bi-check-circle me-2"></i>
+                <span id="successToastMessage"></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+    <div id="errorToast" class="toast align-items-center text-white bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <span id="errorToastMessage"></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+    <div id="warningToast" class="toast align-items-center text-white bg-warning border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="bi bi-info-circle me-2"></i>
+                <span id="warningToastMessage"></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Función helper para mostrar toasts
+    function showToast(type, message) {
+        const toastElement = document.getElementById(type + 'Toast');
+        const messageElement = document.getElementById(type + 'ToastMessage');
+        messageElement.textContent = message;
+
+        const toast = new bootstrap.Toast(toastElement, {
+            autohide: true,
+            delay: 3000
+        });
+        toast.show();
+    }
+    
+    // ========== AZURE BLOB STORAGE EXPLORER ==========
+
+    // Variables globales para el explorador Blob
+    let blobExplorerData = {
+        connectionString: '',
+        selectedContainer: '',
+        currentPath: '',
+        isEditMode: false,
+        selectingContainerOnly: false
+    };
+
+    // Abrir explorador de contenedores desde modal de agregar
+    document.getElementById('btnExploreBlobContainer')?.addEventListener('click', function() {
+        openBlobExplorer(false, true);
+    });
+
+    // Abrir explorador de rutas desde modal de agregar
+    document.getElementById('btnExploreBlob')?.addEventListener('click', function() {
+        openBlobExplorer(false, false);
+    });
+
+    // Abrir explorador de contenedores desde modal de editar
+    document.getElementById('btnExploreEditBlobContainer')?.addEventListener('click', function() {
+        openBlobExplorer(true, true);
+    });
+
+    // Abrir explorador de rutas desde modal de editar
+    document.getElementById('btnExploreEditBlob')?.addEventListener('click', function() {
+        openBlobExplorer(true, false);
+    });
+
+    // Función para abrir el explorador Blob
+    function openBlobExplorer(isEditMode, selectingContainerOnly) {
+        const connStrInput = isEditMode ? 'editBlobConnectionString' : 'blobConnectionString';
+        const connectionString = document.getElementById(connStrInput).value;
+
+        if (!connectionString) {
+            showToast('warning', 'Por favor, ingresa el Connection String antes de explorar.');
+            return;
+        }
+
+        // Si estamos seleccionando rutas, verificar que haya un contenedor seleccionado
+        if (!selectingContainerOnly) {
+            const containerInput = isEditMode ? 'editBlobContainer' : 'blobContainer';
+            const container = document.getElementById(containerInput).value;
+
+            if (!container) {
+                showToast('warning', 'Por favor, selecciona un contenedor primero.');
+                return;
+            }
+
+            // Guardar datos con el contenedor ya seleccionado
+            blobExplorerData = {
+                connectionString: connectionString,
+                selectedContainer: container,
+                currentPath: '',
+                isEditMode: isEditMode,
+                selectingContainerOnly: false
+            };
+
+            // Ir directo al paso 2 (carpetas)
+            document.getElementById('blobContainerStep').classList.add('d-none');
+            document.getElementById('blobFolderStep').classList.remove('d-none');
+            document.getElementById('blobCurrentContainer').textContent = container;
+            document.getElementById('blobSelectedContainer').value = container;
+            document.getElementById('blobSelectedPath').value = '/';
+
+            // Abrir modal
+            const explorerModal = new bootstrap.Modal(document.getElementById('blobExplorerModal'));
+            explorerModal.show();
+
+            // Cargar carpetas del contenedor
+            loadBlobDirectories('');
+        } else {
+            // Seleccionando contenedor
+            blobExplorerData = {
+                connectionString: connectionString,
+                selectedContainer: '',
+                currentPath: '',
+                isEditMode: isEditMode,
+                selectingContainerOnly: true
+            };
+
+            // Resetear UI - mostrar paso 1 (contenedores)
+            document.getElementById('blobContainerStep').classList.remove('d-none');
+            document.getElementById('blobFolderStep').classList.add('d-none');
+            document.getElementById('blobSelectedContainer').value = '';
+            document.getElementById('blobSelectedPath').value = '';
+
+            // Abrir modal
+            const explorerModal = new bootstrap.Modal(document.getElementById('blobExplorerModal'));
+            explorerModal.show();
+
+            // Cargar contenedores
+            loadBlobContainers();
+        }
+    }
+
+    // Función para cargar contenedores
+    async function loadBlobContainers() {
+        showBlobContainerState('loading');
+
+        try {
+            const response = await fetch('/BlobStorage/ListBlobContainers', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    connectionString: blobExplorerData.connectionString
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                displayBlobContainers(data.containers);
+            } else {
+                showBlobContainerState('error', data.message);
+            }
+        } catch (error) {
+            showBlobContainerState('error', 'Error de conexión: ' + error.message);
+        }
+    }
+
+    // Función para mostrar estados del contenedor
+    function showBlobContainerState(state, message = '') {
+        const loading = document.getElementById('blobContainerLoading');
+        const error = document.getElementById('blobContainerError');
+        const list = document.getElementById('blobContainerList');
+
+        loading.classList.add('d-none');
+        error.classList.add('d-none');
+
+        switch(state) {
+            case 'loading':
+                loading.classList.remove('d-none');
+                list.innerHTML = '';
+                break;
+            case 'error':
+                error.classList.remove('d-none');
+                document.getElementById('blobContainerErrorMessage').textContent = message;
+                list.innerHTML = '';
+                break;
+            case 'success':
+                // Mostrar lista
+                break;
+        }
+    }
+
+    // Función para mostrar contenedores
+    function displayBlobContainers(containers) {
+        const list = document.getElementById('blobContainerList');
+        list.innerHTML = '';
+
+        if (containers.length === 0) {
+            list.innerHTML = '<div class="text-center py-4"><p class="text-muted">No hay contenedores disponibles</p></div>';
+            return;
+        }
+
+        showBlobContainerState('success');
+
+        const listGroup = document.createElement('div');
+        listGroup.className = 'list-group list-group-flush';
+
+        containers.forEach(container => {
+            const item = document.createElement('a');
+            item.href = '#';
+            item.className = 'list-group-item list-group-item-action blob-container-item';
+
+            item.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-box-fill me-3 text-primary fs-5"></i>
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold">${container.name}</div>
+                        <small class="text-muted">Última modificación: ${new Date(container.lastModified).toLocaleDateString()}</small>
+                    </div>
+                    <i class="bi bi-chevron-right text-muted"></i>
+                </div>
+            `;
+
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                selectContainer(container.name);
+            });
+
+            listGroup.appendChild(item);
+        });
+
+        list.appendChild(listGroup);
+    }
+
+    // Función para seleccionar contenedor
+    function selectContainer(containerName) {
+        blobExplorerData.selectedContainer = containerName;
+        blobExplorerData.currentPath = '';
+
+        // Actualizar campos separados
+        document.getElementById('blobSelectedContainer').value = containerName;
+        document.getElementById('blobSelectedPath').value = '/';
+
+        // Si solo estamos seleccionando contenedor, asignar y cerrar modal
+        if (blobExplorerData.selectingContainerOnly) {
+            // Asignar al campo correcto según el modo
+            if (blobExplorerData.isEditMode) {
+                document.getElementById('editBlobContainer').value = containerName;
+                // Habilitar botón de explorar ruta
+                document.getElementById('btnExploreEditBlob').disabled = false;
+            } else {
+                document.getElementById('blobContainer').value = containerName;
+                // Habilitar botón de explorar ruta
+                document.getElementById('btnExploreBlob').disabled = false;
+            }
+
+            // Cerrar modal
+            const explorerModal = bootstrap.Modal.getInstance(document.getElementById('blobExplorerModal'));
+            explorerModal.hide();
+        } else {
+            // Cambiar a paso 2 para seleccionar ruta
+            document.getElementById('blobContainerStep').classList.add('d-none');
+            document.getElementById('blobFolderStep').classList.remove('d-none');
+            document.getElementById('blobCurrentContainer').textContent = containerName;
+
+            // Cargar carpetas del contenedor
+            loadBlobDirectories('');
+        }
+    }
+
+    // Botón para volver a contenedores
+    document.getElementById('btnBackToContainers')?.addEventListener('click', function() {
+        document.getElementById('blobFolderStep').classList.add('d-none');
+        document.getElementById('blobContainerStep').classList.remove('d-none');
+        blobExplorerData.selectedContainer = '';
+        blobExplorerData.currentPath = '';
+    });
+
+    // Función para cargar directorios de Blob
+    async function loadBlobDirectories(path) {
+        blobExplorerData.currentPath = path;
+        showBlobFolderState('loading');
+
+        try {
+            const response = await fetch('/BlobStorage/ListBlobDirectories', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    connectionString: blobExplorerData.connectionString,
+                    containerName: blobExplorerData.selectedContainer,
+                    path: path
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                displayBlobDirectories(data.directories, data.currentPath);
+                updateBlobBreadcrumb(data.currentPath);
+            } else {
+                showBlobFolderState('error', data.message);
+            }
+        } catch (error) {
+            showBlobFolderState('error', 'Error de conexión: ' + error.message);
+        }
+    }
+
+    // Función para mostrar estados de carpetas
+    function showBlobFolderState(state, message = '') {
+        const loading = document.getElementById('blobFolderLoading');
+        const error = document.getElementById('blobFolderError');
+        const folderList = document.getElementById('blobFolderList');
+        const empty = document.getElementById('blobFolderEmpty');
+
+        loading.classList.add('d-none');
+        error.classList.add('d-none');
+        folderList.classList.add('d-none');
+        empty.classList.add('d-none');
+
+        switch(state) {
+            case 'loading':
+                loading.classList.remove('d-none');
+                break;
+            case 'error':
+                error.classList.remove('d-none');
+                document.getElementById('blobFolderErrorMessage').textContent = message;
+                break;
+            case 'empty':
+                empty.classList.remove('d-none');
+                folderList.classList.remove('d-none');
+                break;
+            case 'success':
+                folderList.classList.remove('d-none');
+                break;
+        }
+    }
+
+    // Función para mostrar directorios Blob
+    function displayBlobDirectories(directories, currentPath) {
+        const folderList = document.getElementById('blobFolderList');
+        folderList.innerHTML = '';
+
+        // Botón para volver atrás (si no estamos en raíz del contenedor)
+        if (currentPath) {
+            const parentPath = currentPath.substring(0, currentPath.lastIndexOf('/'));
+            const backItem = createBlobFolderItem('..', parentPath, true);
+            folderList.appendChild(backItem);
+        }
+
+        // Mostrar carpetas
+        if (directories.length === 0) {
+            showBlobFolderState('empty');
+            updateSelectedBlobPath(currentPath);
+        } else {
+            showBlobFolderState('success');
+            directories.forEach(dir => {
+                const item = createBlobFolderItem(dir.name, dir.fullPath, false);
+                folderList.appendChild(item);
+            });
+        }
+
+        updateSelectedBlobPath(currentPath);
+    }
+
+    // Función para crear elemento de carpeta Blob
+    function createBlobFolderItem(name, fullPath, isBack) {
+        const item = document.createElement('a');
+        item.href = '#';
+        item.className = 'list-group-item list-group-item-action blob-folder-item';
+
+        const icon = isBack ? 'bi-arrow-left-circle' : 'bi-folder-fill';
+        const text = isBack ? 'Volver atrás' : name;
+
+        item.innerHTML = `
+            <div class="d-flex align-items-center">
+                <i class="bi ${icon} me-3 text-primary fs-5"></i>
+                <div class="flex-grow-1">
+                    <div class="fw-semibold">${text}</div>
+                    ${!isBack ? `<small class="text-muted">${fullPath}</small>` : ''}
+                </div>
+                <i class="bi bi-chevron-right text-muted"></i>
+            </div>
+        `;
+
+        item.addEventListener('click', function(e) {
+            e.preventDefault();
+            loadBlobDirectories(fullPath);
+        });
+
+        item.addEventListener('dblclick', function(e) {
+            e.preventDefault();
+            loadBlobDirectories(fullPath);
+        });
+
+        // Marcar como seleccionado
+        item.addEventListener('click', function() {
+            document.querySelectorAll('.blob-folder-item').forEach(el => {
+                el.classList.remove('selected');
+            });
+            if (!isBack) {
+                this.classList.add('selected');
+                updateSelectedBlobPath(fullPath);
+            }
+        });
+
+        return item;
+    }
+
+    // Función para actualizar breadcrumb Blob
+    function updateBlobBreadcrumb(path) {
+        const breadcrumb = document.getElementById('blobBreadcrumb');
+        breadcrumb.innerHTML = '';
+
+        // Contenedor (raíz)
+        const containerItem = document.createElement('li');
+        containerItem.className = 'breadcrumb-item breadcrumb-link';
+        containerItem.innerHTML = `<i class="bi bi-box me-1"></i>${blobExplorerData.selectedContainer}`;
+        containerItem.addEventListener('click', () => loadBlobDirectories(''));
+        breadcrumb.appendChild(containerItem);
+
+        // Partes del path
+        if (path) {
+            const parts = path.split('/').filter(p => p);
+            let accumulatedPath = '';
+
+            parts.forEach((part, index) => {
+                accumulatedPath += (accumulatedPath ? '/' : '') + part;
+                const pathItem = document.createElement('li');
+
+                if (index === parts.length - 1) {
+                    pathItem.className = 'breadcrumb-item active';
+                    pathItem.textContent = part;
+                } else {
+                    pathItem.className = 'breadcrumb-item breadcrumb-link';
+                    pathItem.textContent = part;
+                    const pathToLoad = accumulatedPath;
+                    pathItem.addEventListener('click', () => loadBlobDirectories(pathToLoad));
+                }
+
+                breadcrumb.appendChild(pathItem);
+            });
+        }
+    }
+
+    // Función para actualizar la ruta seleccionada
+    function updateSelectedBlobPath(folderPath) {
+        document.getElementById('blobSelectedContainer').value = blobExplorerData.selectedContainer;
+        document.getElementById('blobSelectedPath').value = folderPath || '/';
+    }
+
+    // Botón para seleccionar ubicación
+    document.getElementById('btnSelectBlobPath')?.addEventListener('click', function() {
+        const selectedContainer = document.getElementById('blobSelectedContainer').value;
+        const selectedPath = document.getElementById('blobSelectedPath').value;
+
+        if (!selectedContainer) {
+            showToast('warning', 'Por favor, selecciona un contenedor.');
+            return;
+        }
+
+        // Determinar si estamos en modo agregar o editar
+        if (blobExplorerData.isEditMode) {
+            document.getElementById('editBlobContainer').value = selectedContainer;
+            document.getElementById('editBlobPath').value = selectedPath;
+        } else {
+            document.getElementById('blobContainer').value = selectedContainer;
+            document.getElementById('blobPath').value = selectedPath;
+        }
+
+        const explorerModal = bootstrap.Modal.getInstance(document.getElementById('blobExplorerModal'));
+        explorerModal.hide();
+    });
+
+    // Botón para crear nueva carpeta Blob - abrir modal
+    document.getElementById('btnCreateBlobFolder')?.addEventListener('click', function() {
+        // Mostrar la ubicación actual en el modal
+        const containerName = blobExplorerData.selectedContainer;
+        const currentPath = blobExplorerData.currentPath || '/';
+
+        document.getElementById('createBlobFolderContainer').textContent = containerName;
+        document.getElementById('createBlobFolderLocation').textContent = currentPath;
+
+        // Limpiar el input
+        document.getElementById('newBlobFolderName').value = '';
+
+        // Abrir modal
+        const createFolderModal = new bootstrap.Modal(document.getElementById('createBlobFolderModal'));
+        createFolderModal.show();
+    });
+
+    // Confirmar creación de carpeta Blob
+    document.getElementById('btnConfirmCreateBlobFolder')?.addEventListener('click', async function() {
+        const folderName = document.getElementById('newBlobFolderName').value.trim();
+
+        if (!folderName) {
+            showToast('warning', 'Por favor, ingresa un nombre para la carpeta.');
+            return;
+        }
+
+        // Validar nombre de carpeta
+        if (!/^[a-zA-Z0-9_-]+$/.test(folderName)) {
+            showToast('warning', 'El nombre de la carpeta solo puede contener letras, números, guiones y guiones bajos.');
+            return;
+        }
+
+        // Deshabilitar botón mientras se crea
+        const btn = this;
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Creando...';
+
+        try {
+            const response = await fetch('/BlobStorage/CreateBlobDirectory', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    connectionString: blobExplorerData.connectionString,
+                    containerName: blobExplorerData.selectedContainer,
+                    currentPath: blobExplorerData.currentPath,
+                    newFolderName: folderName
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Cerrar modal
+                const createFolderModal = bootstrap.Modal.getInstance(document.getElementById('createBlobFolderModal'));
+                createFolderModal.hide();
+
+                // Mostrar mensaje de éxito
+                showToast('success', 'Carpeta creada exitosamente');
+
+                // Recargar el directorio actual para mostrar la nueva carpeta
+                loadBlobDirectories(blobExplorerData.currentPath);
+            } else {
+                showToast('error', 'Error al crear carpeta: ' + data.message);
+            }
+        } catch (error) {
+            showToast('error', 'Error de conexión: ' + error.message);
+        } finally {
+            // Restaurar botón
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    });
+
+    // Permitir crear carpeta Blob con Enter en el input
+    document.getElementById('newBlobFolderName')?.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('btnConfirmCreateBlobFolder').click();
+        }
+    });
+    
+</script>
