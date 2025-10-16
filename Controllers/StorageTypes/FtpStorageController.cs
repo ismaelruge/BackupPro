@@ -15,12 +15,10 @@ namespace BackupPro.Controllers.StorageTypes
     public class FtpStorageController : Controller
     {
         private readonly ApplicationDbContext _context;
-        private readonly IConfiguration _configuration;
 
-        public FtpStorageController(ApplicationDbContext context, IConfiguration configuration)
+        public FtpStorageController(ApplicationDbContext context)
         {
             _context = context;
-            _configuration = configuration;
         }
 
         #region Métodos CRUD

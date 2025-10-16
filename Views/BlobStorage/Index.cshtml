@@ -1,4 +1,5 @@
-﻿@{
+﻿@model IEnumerable<BackupPro.Models.AzureBlobStorage>
+@{
     ViewData["Title"] = "Blob Storage";
 }
 
@@ -64,44 +65,61 @@
                                     <h6 class="fw-semibold mb-0">
                                         <i class="bi bi-gear-fill me-2 text-primary"></i>Configuraciones Activas
                                     </h6>
-                                    <span class="badge bg-primary rounded-pill">1 configurada</span>
+                                    <span class="badge bg-primary rounded-pill">@Model.Count() configuradas</span>
                                 </div>
 
-                                <!-- Configuración 1 -->
-                                <div class="card mb-3 border-0 shadow-sm">
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between align-items-start">
-                                            <div class="flex-grow-1">
-                                                <h6 class="mb-2 fw-semibold">
-                                                    <span class="text-primary">Azure Principal</span>
-                                                    <span class="text-muted fw-normal"> - backups-produccion</span>
-                                                </h6>
-                                                <div class="ms-4">
-                                                    <div class="mb-1">
-                                                        <i class="bi bi-link-45deg me-2 text-muted"></i>
-                                                        <small class="text-muted">Connection String: DefaultEndpoints...</small>
+                                @if (!Model.Any())
+                                {
+                                    <div class="alert alert-info" role="alert">
+                                        <i class="bi bi-info-circle me-2"></i>
+                                        No hay configuraciones de Azure Blob Storage registradas. Haz clic en "Agregar Nuevo Contenedor" para comenzar.
+                                    </div>
+                                }
+                                else
+                                {
+                                    @foreach (var config in Model)
+                                    {
+                                        <!-- Configuración -->
+                                        <div class="card mb-3 border-0 shadow-sm">
+                                            <div class="card-body">
+                                                <div class="d-flex justify-content-between align-items-start">
+                                                    <div class="flex-grow-1">
+                                                        <h6 class="mb-2 fw-semibold">
+                                                            <span class="text-primary">@config.ConfigurationName</span>
+                                                            <span class="text-muted fw-normal"> - @config.ContainerName</span>
+                                                        </h6>
+                                                        <div class="ms-4">
+                                                            <div class="mb-1">
+                                                                <i class="bi bi-link-45deg me-2 text-muted"></i>
+                                                                <small class="text-muted">Cuenta: @config.AccountName</small>
+                                                            </div>
+                                                            <div class="mb-1">
+                                                                <i class="bi bi-folder me-2 text-muted"></i>
+                                                                <span class="text-muted">Ruta:</span>
+                                                                <code class="ms-1">@(string.IsNullOrEmpty(config.BlobPrefix) ? "/" : config.BlobPrefix)</code>
+                                                            </div>
+                                                            <span class="badge bg-success mt-1">
+                                                                <i class="bi bi-check-circle me-1"></i>Activo
+                                                            </span>
+                                                        </div>
                                                     </div>
-                                                    <div class="mb-1">
-                                                        <i class="bi bi-folder me-2 text-muted"></i>
-                                                        <span class="text-muted">Ruta:</span>
-                                                        <code class="ms-1">/backups/empresa</code>
+                                                    <div>
+                                                        <button class="btn btn-sm btn-outline-primary rounded-pill me-2"
+                                                                onclick="openEditModal(@config.Id)"
+                                                                aria-label="Editar configuración Blob">
+                                                            <i class="bi bi-pencil"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-danger rounded-pill"
+                                                                onclick="openDeleteModal(@config.Id, '@config.ConfigurationName', '@config.ContainerName', '@(string.IsNullOrEmpty(config.BlobPrefix) ? "/" : config.BlobPrefix)')"
+                                                                aria-label="Eliminar configuración Blob">
+                                                            <i class="bi bi-trash"></i>
+                                                        </button>
                                                     </div>
-                                                    <span class="badge bg-success mt-1">
-                                                        <i class="bi bi-check-circle me-1"></i>Activo
-                                                    </span>
                                                 </div>
                                             </div>
-                                            <div>
-                                                <button class="btn btn-sm btn-outline-primary rounded-pill me-2" data-bs-toggle="modal" data-bs-target="#editBlobModal" aria-label="Editar configuración Blob">
-                                                    <i class="bi bi-pencil"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-outline-danger rounded-pill" data-bs-toggle="modal" data-bs-target="#deleteBlobModal" aria-label="Eliminar configuración Blob">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
-                                            </div>
                                         </div>
-                                    </div>
-                                </div>
+                                    }
+                                }
                             </div>
 
                             <!-- Botón agregar nueva configuración -->
@@ -185,6 +203,13 @@
                         <div class="form-text">Dale un nombre descriptivo a esta configuración</div>
                     </div>
                     <div class="mb-3">
+                        <label for="blobAccountName" class="form-label fw-semibold">
+                            <i class="bi bi-person-circle me-2 text-primary"></i>Nombre de la Cuenta
+                        </label>
+                        <input type="text" class="form-control" id="blobAccountName" placeholder="myazureaccount" required>
+                        <div class="form-text">Nombre de la cuenta de Azure Storage</div>
+                    </div>
+                    <div class="mb-3">
                         <label for="blobConnectionString" class="form-label fw-semibold">
                             <i class="bi bi-link-45deg me-2 text-primary"></i>Connection String
                         </label>
@@ -245,25 +270,34 @@
             </div>
             <div class="modal-body p-4">
                 <form id="editBlobForm">
+                    <input type="hidden" id="editBlobId">
+                    <input type="hidden" id="editBlobCurrentConnectionString">
                     <div class="mb-3">
                         <label for="editBlobConfigName" class="form-label fw-semibold">
                             <i class="bi bi-tag me-2 text-warning"></i>Nombre de Configuración
                         </label>
-                        <input type="text" class="form-control" id="editBlobConfigName" value="Azure Principal" required>
+                        <input type="text" class="form-control" id="editBlobConfigName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editBlobAccountName" class="form-label fw-semibold">
+                            <i class="bi bi-person-circle me-2 text-warning"></i>Nombre de la Cuenta
+                        </label>
+                        <input type="text" class="form-control" id="editBlobAccountName" required>
+                        <div class="form-text">Nombre de la cuenta de Azure Storage</div>
                     </div>
                     <div class="mb-3">
                         <label for="editBlobConnectionString" class="form-label fw-semibold">
                             <i class="bi bi-link-45deg me-2 text-warning"></i>Connection String
                         </label>
-                        <textarea class="form-control" id="editBlobConnectionString" rows="3" required>DefaultEndpointsProtocol=https;AccountName=...</textarea>
-                        <div class="form-text">Cadena de conexión de Azure Storage Account</div>
+                        <textarea class="form-control" id="editBlobConnectionString" rows="3" placeholder="Dejar vacío para mantener la actual" ></textarea>
+                        <div class="form-text">Dejar vacío para mantener la conexión actual</div>
                     </div>
                     <div class="mb-3">
                         <label for="editBlobContainer" class="form-label fw-semibold">
                             <i class="bi bi-box me-2 text-warning"></i>Contenedor
                         </label>
                         <div class="input-group">
-                            <input type="text" class="form-control" id="editBlobContainer" value="backups-produccion" required readonly>
+                            <input type="text" class="form-control" id="editBlobContainer" required readonly>
                             <button class="btn btn-outline-secondary" type="button" id="btnExploreEditBlobContainer">
                                 <i class="bi bi-box-arrow-in-down me-1"></i>Seleccionar
                             </button>
@@ -275,7 +309,7 @@
                             <i class="bi bi-folder me-2 text-warning"></i>Ruta
                         </label>
                         <div class="input-group">
-                            <input type="text" class="form-control" id="editBlobPath" value="empresa" readonly>
+                            <input type="text" class="form-control" id="editBlobPath" readonly>
                             <button class="btn btn-outline-secondary" type="button" id="btnExploreEditBlob" disabled>
                                 <i class="bi bi-folder2-open me-1"></i>Explorar
                             </button>
@@ -315,13 +349,13 @@
                 </div>
                 <div class="bg-light rounded-3 p-3 mb-3">
                     <div class="mb-2">
-                        <strong class="text-primary">Azure Principal</strong>
-                        <span class="text-muted"> - backups-produccion</span>
+                        <strong class="text-primary" id="deleteBlobConfigName"></strong>
+                        <span class="text-muted"> - <span id="deleteBlobContainer"></span></span>
                     </div>
                     <div class="text-muted">
                         <small>
                             <i class="bi bi-folder me-2"></i>
-                            Ruta: <code>backups-produccion/empresa</code>
+                            Ruta: <code id="deleteBlobPath"></code>
                         </small>
                     </div>
                 </div>
@@ -334,7 +368,7 @@
                 <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">
                     <i class="bi bi-x-circle me-2"></i>Cancelar
                 </button>
-                <button type="button" class="btn btn-danger rounded-pill">
+                <button type="button" class="btn btn-danger rounded-pill" id="btnConfirmDeleteBlob">
                     <i class="bi bi-trash me-2"></i>Sí, Eliminar Configuración
                 </button>
             </div>
@@ -662,7 +696,12 @@
     // Función para abrir el explorador Blob
     function openBlobExplorer(isEditMode, selectingContainerOnly) {
         const connStrInput = isEditMode ? 'editBlobConnectionString' : 'blobConnectionString';
-        const connectionString = document.getElementById(connStrInput).value;
+        let connectionString = document.getElementById(connStrInput).value;
+
+        // Si estamos en modo edición y no hay connection string visible, usar la actual
+        if (isEditMode && !connectionString) {
+            connectionString = document.getElementById('editBlobCurrentConnectionString').value;
+        }
 
         if (!connectionString) {
             showToast('warning', 'Por favor, ingresa el Connection String antes de explorar.');
@@ -1144,5 +1183,200 @@
             document.getElementById('btnConfirmCreateBlobFolder').click();
         }
     });
-    
+
+    // ========== CRUD OPERATIONS ==========
+
+    // Variables globales para eliminar
+    let deleteBlobId = null;
+
+    // Agregar nueva configuración de Blob Storage
+    document.getElementById('addBlobForm')?.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const configName = document.getElementById('blobConfigName').value.trim();
+        const accountName = document.getElementById('blobAccountName').value.trim();
+        const connectionString = document.getElementById('blobConnectionString').value.trim();
+        const container = document.getElementById('blobContainer').value.trim();
+        const path = document.getElementById('blobPath').value.trim();
+
+        if (!configName || !accountName || !connectionString || !container) {
+            showToast('warning', 'Por favor, completa todos los campos requeridos.');
+            return;
+        }
+
+        try {
+            const response = await fetch('/BlobStorage/Create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
+                },
+                body: JSON.stringify({
+                    ConfigurationName: configName,
+                    AccountName: accountName,
+                    ConnectionString: connectionString,
+                    ContainerName: container,
+                    BlobPrefix: path === '/' ? '' : path
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showToast('success', data.message || 'Configuración creada exitosamente.');
+
+                // Cerrar modal
+                const addModal = bootstrap.Modal.getInstance(document.getElementById('addBlobModal'));
+                addModal.hide();
+
+                // Limpiar formulario
+                document.getElementById('addBlobForm').reset();
+                document.getElementById('btnExploreBlob').disabled = true;
+
+                // Recargar página para mostrar la nueva configuración
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast('error', data.message || 'Error al crear la configuración.');
+            }
+        } catch (error) {
+            showToast('error', 'Error de conexión: ' + error.message);
+        }
+    });
+
+    // Abrir modal de edición
+    async function openEditModal(id) {
+        try {
+            const response = await fetch(`/BlobStorage/GetById?id=${id}`);
+            const data = await response.json();
+
+            if (data.success) {
+                const config = data.data;
+
+                // Cargar datos en el formulario
+                document.getElementById('editBlobId').value = config.id;
+                document.getElementById('editBlobConfigName').value = config.configurationName;
+                document.getElementById('editBlobAccountName').value = config.accountName;
+                document.getElementById('editBlobCurrentConnectionString').value = config.connectionString;
+                document.getElementById('editBlobConnectionString').value = ''; // Dejar vacío por seguridad
+                document.getElementById('editBlobContainer').value = config.containerName;
+                document.getElementById('editBlobPath').value = config.blobPrefix || '/';
+
+                // Habilitar botón de explorar si hay contenedor
+                if (config.containerName) {
+                    document.getElementById('btnExploreEditBlob').disabled = false;
+                }
+
+                // Abrir modal
+                const editModal = new bootstrap.Modal(document.getElementById('editBlobModal'));
+                editModal.show();
+            } else {
+                showToast('error', 'Error al cargar la configuración.');
+            }
+        } catch (error) {
+            showToast('error', 'Error de conexión: ' + error.message);
+        }
+    }
+
+    // Actualizar configuración de Blob Storage
+    document.getElementById('editBlobForm')?.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const id = document.getElementById('editBlobId').value;
+        const configName = document.getElementById('editBlobConfigName').value.trim();
+        const accountName = document.getElementById('editBlobAccountName').value.trim();
+        let connectionString = document.getElementById('editBlobConnectionString').value.trim();
+        const container = document.getElementById('editBlobContainer').value.trim();
+        const path = document.getElementById('editBlobPath').value.trim();
+
+        // Si no se ingresó una nueva conexión, usar la actual
+        if (!connectionString) {
+            connectionString = document.getElementById('editBlobCurrentConnectionString').value;
+        }
+
+        if (!configName || !accountName || !connectionString || !container) {
+            showToast('warning', 'Por favor, completa todos los campos requeridos.');
+            return;
+        }
+
+        try {
+            const response = await fetch('/BlobStorage/Edit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
+                },
+                body: JSON.stringify({
+                    Id: parseInt(id),
+                    ConfigurationName: configName,
+                    AccountName: accountName,
+                    ConnectionString: connectionString,
+                    ContainerName: container,
+                    BlobPrefix: path === '/' ? '' : path
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showToast('success', data.message || 'Configuración actualizada exitosamente.');
+
+                // Cerrar modal
+                const editModal = bootstrap.Modal.getInstance(document.getElementById('editBlobModal'));
+                editModal.hide();
+
+                // Recargar página
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast('error', data.message || 'Error al actualizar la configuración.');
+            }
+        } catch (error) {
+            showToast('error', 'Error de conexión: ' + error.message);
+        }
+    });
+
+    // Abrir modal de eliminación
+    function openDeleteModal(id, name, container, path) {
+        deleteBlobId = id;
+        document.getElementById('deleteBlobConfigName').textContent = name;
+        document.getElementById('deleteBlobContainer').textContent = container;
+        document.getElementById('deleteBlobPath').textContent = path;
+
+        const deleteModal = new bootstrap.Modal(document.getElementById('deleteBlobModal'));
+        deleteModal.show();
+    }
+
+    // Confirmar eliminación
+    document.getElementById('btnConfirmDeleteBlob')?.addEventListener('click', async function() {
+        if (!deleteBlobId) {
+            showToast('error', 'ID de configuración no válido.');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/BlobStorage/Delete?id=${deleteBlobId}`, {
+                method: 'POST',
+                headers: {
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showToast('success', data.message || 'Configuración eliminada exitosamente.');
+
+                // Cerrar modal
+                const deleteModal = bootstrap.Modal.getInstance(document.getElementById('deleteBlobModal'));
+                deleteModal.hide();
+
+                // Recargar página
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast('error', data.message || 'Error al eliminar la configuración.');
+            }
+        } catch (error) {
+            showToast('error', 'Error de conexión: ' + error.message);
+        }
+    });
+
 </script>
