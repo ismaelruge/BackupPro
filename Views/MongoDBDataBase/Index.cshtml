@@ -1,13 +1,35 @@
 @model IEnumerable<BackupPro.Models.MongoDBDataBase>
 @{
     ViewData["Title"] = "Tipos de Bases de Datos";
+}
 
-    // Datos de ejemplo para MongoDB
-    var mongoExamples = new List<dynamic>
-    {
-        new { Id = 1, ConfigurationName = "MongoDB Principal", Host = "mongo.company.com", Port = 27017, DatabaseName = "users_db", Username = "root", CreatedAt = DateTime.Now.AddDays(-20), SslEnabled = true, AuthenticationDatabase = "admin", ReplicaSet = "rs0" },
-        new { Id = 2, ConfigurationName = "MongoDB Cache", Host = "localhost", Port = 27017, DatabaseName = "cache_db", Username = (string?)null, CreatedAt = DateTime.Now.AddDays(-7), SslEnabled = false, AuthenticationDatabase = "admin", ReplicaSet = (string?)null }
-    };
+<!-- Mensajes de éxito y error -->
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+        <div class="d-flex align-items-center">
+            <i class="bi bi-check-circle-fill fs-4 me-3"></i>
+            <div>
+                <strong>¡Éxito!</strong>
+                <p class="mb-0">@TempData["Success"]</p>
+            </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+        <div class="d-flex align-items-center">
+            <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
+            <div>
+                <strong>Error</strong>
+                <p class="mb-0">@TempData["Error"]</p>
+            </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
 }
 
 <div class="container mt-5">
@@ -66,10 +88,12 @@
                                     <h6 class="fw-semibold mb-0">
                                         <i class="bi bi-gear-fill me-2 text-primary"></i>Configuraciones Activas
                                     </h6>
-                                    <span class="badge bg-primary rounded-pill">@mongoExamples.Count configuradas</span>
+                                    <span class="badge bg-primary rounded-pill">@Model.Count() configuradas</span>
                                 </div>
 
-                                @foreach (var db in mongoExamples)
+                                @if (Model.Any())
+                                {
+                                    @foreach (var db in Model)
                                 {
                                     <div class="card mb-3 border-0 shadow-sm">
                                         <div class="card-body">
@@ -101,22 +125,11 @@
                                                                 <code class="ms-1">@db.Username</code>
                                                             </div>
                                                         }
-                                                        <div class="mb-1">
-                                                            <i class="bi bi-shield me-2 text-muted"></i>
-                                                            <span class="text-muted">Auth DB:</span>
-                                                            <code class="ms-1">@db.AuthenticationDatabase</code>
-                                                        </div>
                                                         <div class="mb-2">
                                                             @if (db.SslEnabled)
                                                             {
                                                                 <span class="badge bg-info me-2">
                                                                     <i class="bi bi-lock-fill me-1"></i>SSL Habilitado
-                                                                </span>
-                                                            }
-                                                            @if (!string.IsNullOrEmpty(db.ReplicaSet))
-                                                            {
-                                                                <span class="badge bg-warning text-dark me-2">
-                                                                    <i class="bi bi-diagram-3 me-1"></i>Replica Set: @db.ReplicaSet
                                                                 </span>
                                                             }
                                                         </div>
@@ -127,10 +140,23 @@
                                                 </div>
                                                 <div>
                                                     <button class="btn btn-sm btn-outline-primary rounded-pill me-2"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="#editMongoModal"
+                                                            data-id="@db.Id"
+                                                            data-name="@db.ConfigurationName"
+                                                            data-host="@db.Host"
+                                                            data-port="@db.Port"
+                                                            data-database="@db.DatabaseName"
+                                                            data-username="@db.Username"
+                                                            data-ssl="@db.SslEnabled"
                                                             aria-label="Editar configuración">
                                                         <i class="bi bi-pencil"></i>
                                                     </button>
                                                     <button class="btn btn-sm btn-outline-danger rounded-pill"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="#deleteMongoModal"
+                                                            data-id="@db.Id"
+                                                            data-name="@db.ConfigurationName"
                                                             aria-label="Eliminar configuración">
                                                         <i class="bi bi-trash"></i>
                                                     </button>
@@ -138,12 +164,23 @@
                                             </div>
                                         </div>
                                     </div>
+                                    }
+                                }
+                                else
+                                {
+                                    <div class="alert alert-info d-flex align-items-center" role="alert">
+                                        <i class="bi bi-info-circle-fill fs-4 me-3"></i>
+                                        <div>
+                                            <h6 class="mb-1">No hay configuraciones</h6>
+                                            <p class="mb-0 small">Aún no has configurado ninguna conexión a MongoDB. Haz clic en el botón de abajo para agregar tu primera configuración.</p>
+                                        </div>
+                                    </div>
                                 }
                             </div>
 
                             <!-- Botón agregar nueva configuración -->
                             <div class="d-grid">
-                                <button type="button" class="btn btn-outline-primary btn-lg rounded-pill">
+                                <button type="button" class="btn btn-outline-primary btn-lg rounded-pill" data-bs-toggle="modal" data-bs-target="#addMongoModal">
                                     <i class="bi bi-plus-circle me-2"></i>Agregar Nueva Configuración
                                 </button>
                             </div>
@@ -162,6 +199,289 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Agregar MongoDB -->
+<div class="modal fade" id="addMongoModal" tabindex="-1" aria-labelledby="addMongoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white border-0">
+                <h5 class="modal-title" id="addMongoModalLabel">
+                    <i class="bi bi-box me-2"></i>Nueva Configuración MongoDB
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="addMongoForm" asp-action="Create" method="post">
+                <div class="modal-body p-4">
+                    <!-- Alerta de errores -->
+                    <div id="add_mongo_error_alert" class="alert alert-danger alert-dismissible fade" role="alert" style="display: none;">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <span id="add_mongo_error_message"></span>
+                        <button type="button" class="btn-close" onclick="hideAlert('add_mongo_error_alert')"></button>
+                    </div>
+
+                    <!-- Alerta de validación de conexión -->
+                    <div id="add_mongo_validating_alert" class="alert alert-info" role="alert" style="display: none;">
+                        <div class="d-flex align-items-center">
+                            <div class="spinner-border spinner-border-sm me-2" role="status">
+                                <span class="visually-hidden">Validando...</span>
+                            </div>
+                            <span>Validando conexión a la base de datos...</span>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <!-- Nombre de Configuración -->
+                        <div class="col-12">
+                            <label for="add_mongo_configurationName" class="form-label fw-semibold">
+                                <i class="bi bi-tag me-1 text-primary"></i>Nombre de Configuración
+                            </label>
+                            <input type="text" class="form-control" id="add_mongo_configurationName" name="ConfigurationName"
+                                   placeholder="Ej: MongoDB Producción, MongoDB Analytics..." required>
+                            <small class="text-muted">Nombre descriptivo para identificar esta configuración</small>
+                        </div>
+
+                        <!-- Host y Puerto -->
+                        <div class="col-md-8">
+                            <label for="add_mongo_host" class="form-label fw-semibold">
+                                <i class="bi bi-hdd-network me-1 text-primary"></i>Servidor/Host
+                            </label>
+                            <input type="text" class="form-control" id="add_mongo_host" name="Host"
+                                   placeholder="localhost o dirección IP" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="add_mongo_port" class="form-label fw-semibold">
+                                <i class="bi bi-plug me-1 text-primary"></i>Puerto
+                            </label>
+                            <input type="number" class="form-control" id="add_mongo_port" name="Port"
+                                   value="27017" required>
+                        </div>
+
+                        <!-- Nombre de Base de Datos -->
+                        <div class="col-12">
+                            <label for="add_mongo_databaseName" class="form-label fw-semibold">
+                                <i class="bi bi-database me-1 text-primary"></i>Nombre de Base de Datos
+                            </label>
+                            <input type="text" class="form-control" id="add_mongo_databaseName" name="DatabaseName"
+                                   placeholder="Nombre de la base de datos" required>
+                        </div>
+
+                        <!-- Usuario y Contraseña -->
+                        <div class="col-md-6">
+                            <label for="add_mongo_username" class="form-label fw-semibold">
+                                <i class="bi bi-person me-1 text-primary"></i>Usuario
+                            </label>
+                            <input type="text" class="form-control" id="add_mongo_username" name="Username"
+                                   placeholder="Usuario (opcional)">
+                            <small class="text-muted">Dejar vacío si no requiere autenticación</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="add_mongo_password" class="form-label fw-semibold">
+                                <i class="bi bi-key me-1 text-primary"></i>Contraseña
+                            </label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="add_mongo_password" name="Password"
+                                       placeholder="Contraseña (opcional)">
+                                <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordMongo('add_mongo_password')">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Opciones de Seguridad -->
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-shield-lock me-1 text-primary"></i>Opciones de Seguridad
+                            </label>
+                            <div class="card bg-light border-0">
+                                <div class="card-body">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="add_mongo_sslEnabled"
+                                               name="SslEnabled" value="true">
+                                        <label class="form-check-label" for="add_mongo_sslEnabled">
+                                            <strong>Habilitar SSL/TLS</strong>
+                                            <br><small class="text-muted">Conexión segura encriptada</small>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i>Cancelar
+                    </button>
+                    <button type="submit" id="add_mongo_submit_btn" class="btn btn-primary rounded-pill px-4">
+                        <i class="bi bi-check-circle me-2"></i>Guardar Configuración
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Editar MongoDB -->
+<div class="modal fade" id="editMongoModal" tabindex="-1" aria-labelledby="editMongoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-warning text-dark border-0">
+                <h5 class="modal-title" id="editMongoModalLabel">
+                    <i class="bi bi-pencil-square me-2"></i>Editar Configuración MongoDB
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editMongoForm" asp-action="Edit" method="post">
+                <input type="hidden" id="edit_mongo_id" name="Id">
+                <div class="modal-body p-4">
+                    <!-- Alerta de errores -->
+                    <div id="edit_mongo_error_alert" class="alert alert-danger alert-dismissible fade" role="alert" style="display: none;">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <span id="edit_mongo_error_message"></span>
+                        <button type="button" class="btn-close" onclick="hideAlert('edit_mongo_error_alert')"></button>
+                    </div>
+
+                    <!-- Alerta de validación de conexión -->
+                    <div id="edit_mongo_validating_alert" class="alert alert-info" role="alert" style="display: none;">
+                        <div class="d-flex align-items-center">
+                            <div class="spinner-border spinner-border-sm me-2" role="status">
+                                <span class="visually-hidden">Validando...</span>
+                            </div>
+                            <span>Validando conexión a la base de datos...</span>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <!-- Nombre de Configuración -->
+                        <div class="col-12">
+                            <label for="edit_mongo_configurationName" class="form-label fw-semibold">
+                                <i class="bi bi-tag me-1 text-warning"></i>Nombre de Configuración
+                            </label>
+                            <input type="text" class="form-control" id="edit_mongo_configurationName" name="ConfigurationName"
+                                   placeholder="Ej: MongoDB Producción, MongoDB Analytics..." required>
+                            <small class="text-muted">Nombre descriptivo para identificar esta configuración</small>
+                        </div>
+
+                        <!-- Host y Puerto -->
+                        <div class="col-md-8">
+                            <label for="edit_mongo_host" class="form-label fw-semibold">
+                                <i class="bi bi-hdd-network me-1 text-warning"></i>Servidor/Host
+                            </label>
+                            <input type="text" class="form-control" id="edit_mongo_host" name="Host"
+                                   placeholder="localhost o dirección IP" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="edit_mongo_port" class="form-label fw-semibold">
+                                <i class="bi bi-plug me-1 text-warning"></i>Puerto
+                            </label>
+                            <input type="number" class="form-control" id="edit_mongo_port" name="Port"
+                                   value="27017" required>
+                        </div>
+
+                        <!-- Nombre de Base de Datos -->
+                        <div class="col-12">
+                            <label for="edit_mongo_databaseName" class="form-label fw-semibold">
+                                <i class="bi bi-database me-1 text-warning"></i>Nombre de Base de Datos
+                            </label>
+                            <input type="text" class="form-control" id="edit_mongo_databaseName" name="DatabaseName"
+                                   placeholder="Nombre de la base de datos" required>
+                        </div>
+
+                        <!-- Usuario y Contraseña -->
+                        <div class="col-md-6">
+                            <label for="edit_mongo_username" class="form-label fw-semibold">
+                                <i class="bi bi-person me-1 text-warning"></i>Usuario
+                            </label>
+                            <input type="text" class="form-control" id="edit_mongo_username" name="Username"
+                                   placeholder="Usuario (opcional)">
+                            <small class="text-muted">Dejar vacío si no requiere autenticación</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="edit_mongo_password" class="form-label fw-semibold">
+                                <i class="bi bi-key me-1 text-warning"></i>Contraseña
+                            </label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="edit_mongo_password" name="Password"
+                                       placeholder="Dejar vacío para mantener la actual">
+                                <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordMongo('edit_mongo_password')">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                            <small class="text-muted">Dejar vacío si no desea cambiar la contraseña</small>
+                        </div>
+
+                        <!-- Opciones de Seguridad -->
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-shield-lock me-1 text-warning"></i>Opciones de Seguridad
+                            </label>
+                            <div class="card bg-light border-0">
+                                <div class="card-body">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="edit_mongo_sslEnabled"
+                                               name="SslEnabled" value="true">
+                                        <label class="form-check-label" for="edit_mongo_sslEnabled">
+                                            <strong>Habilitar SSL/TLS</strong>
+                                            <br><small class="text-muted">Conexión segura encriptada</small>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i>Cancelar
+                    </button>
+                    <button type="submit" id="edit_mongo_submit_btn" class="btn btn-warning text-dark rounded-pill px-4">
+                        <i class="bi bi-check-circle me-2"></i>Actualizar Configuración
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Eliminar MongoDB -->
+<div class="modal fade" id="deleteMongoModal" tabindex="-1" aria-labelledby="deleteMongoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-danger text-white border-0">
+                <h5 class="modal-title" id="deleteMongoModalLabel">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Confirmar Eliminación
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form asp-action="Delete" method="post">
+                <input type="hidden" id="delete_mongo_id" name="id">
+                <div class="modal-body p-4">
+                    <div class="text-center mb-4">
+                        <i class="bi bi-exclamation-circle text-danger" style="font-size: 4rem;"></i>
+                    </div>
+                    <h6 class="text-center mb-3">¿Está seguro que desea eliminar esta configuración?</h6>
+                    <div class="alert alert-warning d-flex align-items-center" role="alert">
+                        <i class="bi bi-info-circle-fill me-2 flex-shrink-0"></i>
+                        <div>
+                            <strong id="delete_mongo_configName"></strong>
+                            <p class="mb-0 small">Esta acción no se puede deshacer.</p>
+                        </div>
+                    </div>
+                    <p class="text-muted small text-center mb-0">
+                        Los backups programados que usen esta configuración dejarán de funcionar.
+                    </p>
+                </div>
+                <div class="modal-footer border-0 bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i>Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-danger rounded-pill px-4">
+                        <i class="bi bi-trash me-2"></i>Eliminar
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -208,3 +528,157 @@
         justify-content: center;
     }
 </style>
+
+<script>
+    // Función para mostrar/ocultar contraseña
+    function togglePasswordMongo(inputId) {
+        const input = document.getElementById(inputId);
+        const icon = event.currentTarget.querySelector('i');
+
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('bi-eye');
+            icon.classList.add('bi-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('bi-eye-slash');
+            icon.classList.add('bi-eye');
+        }
+    }
+
+    // Función para ocultar alertas
+    function hideAlert(alertId) {
+        const alert = document.getElementById(alertId);
+        if (alert) {
+            alert.style.display = 'none';
+            alert.classList.remove('show');
+        }
+    }
+
+    // Función para mostrar alerta
+    function showAlert(alertId, messageId, message) {
+        const alert = document.getElementById(alertId);
+        const messageSpan = document.getElementById(messageId);
+        if (alert && messageSpan) {
+            messageSpan.textContent = message;
+            alert.style.display = 'block';
+            alert.classList.add('show');
+        }
+    }
+
+    // Cargar datos en el modal de edición
+    document.getElementById('editMongoModal')?.addEventListener('show.bs.modal', function (event) {
+        const button = event.relatedTarget;
+
+        document.getElementById('edit_mongo_id').value = button.getAttribute('data-id');
+        document.getElementById('edit_mongo_configurationName').value = button.getAttribute('data-name');
+        document.getElementById('edit_mongo_host').value = button.getAttribute('data-host');
+        document.getElementById('edit_mongo_port').value = button.getAttribute('data-port');
+        document.getElementById('edit_mongo_databaseName').value = button.getAttribute('data-database');
+        document.getElementById('edit_mongo_username').value = button.getAttribute('data-username') || '';
+
+        const sslEnabled = button.getAttribute('data-ssl') === 'True';
+        document.getElementById('edit_mongo_sslEnabled').checked = sslEnabled;
+    });
+
+    // Cargar datos en el modal de eliminación
+    document.getElementById('deleteMongoModal')?.addEventListener('show.bs.modal', function (event) {
+        const button = event.relatedTarget;
+
+        document.getElementById('delete_mongo_id').value = button.getAttribute('data-id');
+        document.getElementById('delete_mongo_configName').textContent = button.getAttribute('data-name');
+    });
+
+    // Manejo del formulario de agregar con AJAX
+    document.getElementById('addMongoForm')?.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        // Ocultar errores previos
+        hideAlert('add_mongo_error_alert');
+
+        // Mostrar indicador de validación
+        document.getElementById('add_mongo_validating_alert').style.display = 'block';
+        document.getElementById('add_mongo_submit_btn').disabled = true;
+
+        const formData = new FormData(this);
+
+        fetch(this.action, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            },
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Ocultar indicador de validación
+            document.getElementById('add_mongo_validating_alert').style.display = 'none';
+            document.getElementById('add_mongo_submit_btn').disabled = false;
+
+            if (data.success) {
+                // Cerrar modal y recargar página
+                bootstrap.Modal.getInstance(document.getElementById('addMongoModal')).hide();
+                location.reload();
+            } else {
+                // Mostrar error en el modal
+                showAlert('add_mongo_error_alert', 'add_mongo_error_message', data.message);
+            }
+        })
+        .catch(error => {
+            document.getElementById('add_mongo_validating_alert').style.display = 'none';
+            document.getElementById('add_mongo_submit_btn').disabled = false;
+            showAlert('add_mongo_error_alert', 'add_mongo_error_message', 'Error de conexión: ' + error.message);
+        });
+    });
+
+    // Manejo del formulario de editar con AJAX
+    document.getElementById('editMongoForm')?.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        // Ocultar errores previos
+        hideAlert('edit_mongo_error_alert');
+
+        // Mostrar indicador de validación
+        document.getElementById('edit_mongo_validating_alert').style.display = 'block';
+        document.getElementById('edit_mongo_submit_btn').disabled = true;
+
+        const formData = new FormData(this);
+
+        fetch(this.action, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            },
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Ocultar indicador de validación
+            document.getElementById('edit_mongo_validating_alert').style.display = 'none';
+            document.getElementById('edit_mongo_submit_btn').disabled = false;
+
+            if (data.success) {
+                // Cerrar modal y recargar página
+                bootstrap.Modal.getInstance(document.getElementById('editMongoModal')).hide();
+                location.reload();
+            } else {
+                // Mostrar error en el modal
+                showAlert('edit_mongo_error_alert', 'edit_mongo_error_message', data.message);
+            }
+        })
+        .catch(error => {
+            document.getElementById('edit_mongo_validating_alert').style.display = 'none';
+            document.getElementById('edit_mongo_submit_btn').disabled = false;
+            showAlert('edit_mongo_error_alert', 'edit_mongo_error_message', 'Error de conexión: ' + error.message);
+        });
+    });
+
+    // Limpiar formulario cuando se cierra el modal de agregar
+    document.getElementById('addMongoModal')?.addEventListener('hidden.bs.modal', function() {
+        document.getElementById('addMongoForm').reset();
+        hideAlert('add_mongo_error_alert');
+        document.getElementById('add_mongo_validating_alert').style.display = 'none';
+    });
+</script>

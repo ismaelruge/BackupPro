@@ -28,13 +28,7 @@ namespace BackupPro.Models
         [MaxLength(500)]
         public string? Password { get; set; }
 
-        [MaxLength(100)]
-        public string? AuthenticationDatabase { get; set; } = "admin";
-
         public bool SslEnabled { get; set; } = false;
-
-        [MaxLength(1000)]
-        public string? ReplicaSet { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
