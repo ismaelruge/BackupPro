@@ -24,5 +24,11 @@ namespace BackupPro.Data
         public DbSet<AzureBlobStorage> AzureBlobStorages { get; set; }
         public DbSet<FtpStorage> FtpStorages { get; set; }
         public DbSet<LocalStorage> LocalStorages { get; set; }
+
+        // Database Configurations
+        public DbSet<SqlServerDataBase> SqlServerDataBases { get; set; }
+        public DbSet<PostgresSqlDataBase> PostgresSqlDataBases { get; set; }
+        public DbSet<MySqlDataBase> MySqlDataBases { get; set; }
+        public DbSet<MongoDBDataBase> MongoDBDataBases { get; set; }
     }
 }

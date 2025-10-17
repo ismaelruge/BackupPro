@@ -1,12 +1,12 @@
-@model IEnumerable<BackupPro.Models.MongoDBDataBase>
+@model IEnumerable<BackupPro.Models.MySqlDataBase>
 @{
     ViewData["Title"] = "Tipos de Bases de Datos";
 
-    // Datos de ejemplo para MongoDB
-    var mongoExamples = new List<dynamic>
+    // Datos de ejemplo para MySQL
+    var mysqlExamples = new List<dynamic>
     {
-        new { Id = 1, ConfigurationName = "MongoDB Principal", Host = "mongo.company.com", Port = 27017, DatabaseName = "users_db", Username = "root", CreatedAt = DateTime.Now.AddDays(-20), SslEnabled = true, AuthenticationDatabase = "admin", ReplicaSet = "rs0" },
-        new { Id = 2, ConfigurationName = "MongoDB Cache", Host = "localhost", Port = 27017, DatabaseName = "cache_db", Username = (string?)null, CreatedAt = DateTime.Now.AddDays(-7), SslEnabled = false, AuthenticationDatabase = "admin", ReplicaSet = (string?)null }
+        new { Id = 1, ConfigurationName = "MySQL Producción", Host = "mysql.company.com", Port = 3306, DatabaseName = "ecommerce_db", Username = "admin", CreatedAt = DateTime.Now.AddDays(-15), SslMode = true, Charset = "utf8mb4" },
+        new { Id = 2, ConfigurationName = "MySQL Analytics", Host = "192.168.1.50", Port = 3306, DatabaseName = "analytics", Username = "analyst_user", CreatedAt = DateTime.Now.AddDays(-3), SslMode = false, Charset = "utf8mb4" }
     };
 }
 
@@ -34,7 +34,7 @@
                             </a>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <a class="nav-link" id="mysql-tab" role="tab" asp-area="" asp-controller="MySqlDataBase" asp-action="Index">
+                            <a class="nav-link active" id="mysql-tab" role="tab" asp-area="" asp-controller="MySqlDataBase" asp-action="Index">
                                 <i class="bi bi-database-fill-gear me-2"></i>MySQL
                             </a>
                         </li>
@@ -44,7 +44,7 @@
                             </a>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <a class="nav-link active" id="mongodb-tab" role="tab" asp-area="" asp-controller="MongoDBDataBase" asp-action="Index">
+                            <a class="nav-link" id="mongodb-tab" role="tab" asp-area="" asp-controller="MongoDBDataBase" asp-action="Index">
                                 <i class="bi bi-box me-2"></i>MongoDB
                             </a>
                         </li>
@@ -52,12 +52,12 @@
 
                     <!-- Tab Content -->
                     <div class="tab-content" id="databaseTabContent">
-                        <!-- MongoDB -->
-                        <div class="tab-pane fade show active" id="mongodb" role="tabpanel">
+                        <!-- MySQL -->
+                        <div class="tab-pane fade show active" id="mysql" role="tabpanel">
                             <div class="text-center mb-4">
-                                <i class="bi bi-box text-primary" style="font-size: 3rem;"></i>
-                                <h4 class="mt-3">MongoDB</h4>
-                                <p class="text-muted">Configura múltiples conexiones a bases de datos MongoDB</p>
+                                <i class="bi bi-database-fill-gear text-primary" style="font-size: 3rem;"></i>
+                                <h4 class="mt-3">MySQL</h4>
+                                <p class="text-muted">Configura múltiples conexiones a bases de datos MySQL</p>
                             </div>
 
                             <!-- Lista de configuraciones -->
@@ -66,10 +66,10 @@
                                     <h6 class="fw-semibold mb-0">
                                         <i class="bi bi-gear-fill me-2 text-primary"></i>Configuraciones Activas
                                     </h6>
-                                    <span class="badge bg-primary rounded-pill">@mongoExamples.Count configuradas</span>
+                                    <span class="badge bg-primary rounded-pill">@mysqlExamples.Count configuradas</span>
                                 </div>
 
-                                @foreach (var db in mongoExamples)
+                                @foreach (var db in mysqlExamples)
                                 {
                                     <div class="card mb-3 border-0 shadow-sm">
                                         <div class="card-body">
@@ -77,7 +77,7 @@
                                                 <div class="flex-grow-1">
                                                     <div class="d-flex align-items-center mb-2">
                                                         <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3">
-                                                            <i class="bi bi-box text-primary fs-5"></i>
+                                                            <i class="bi bi-database-fill-gear text-primary fs-5"></i>
                                                         </div>
                                                         <div>
                                                             <h6 class="mb-0 fw-semibold">
@@ -93,30 +93,21 @@
                                                             <span class="text-muted">Servidor:</span>
                                                             <code class="ms-1">@db.Host:@db.Port</code>
                                                         </div>
-                                                        @if (!string.IsNullOrEmpty(db.Username))
-                                                        {
-                                                            <div class="mb-1">
-                                                                <i class="bi bi-person me-2 text-muted"></i>
-                                                                <span class="text-muted">Usuario:</span>
-                                                                <code class="ms-1">@db.Username</code>
-                                                            </div>
-                                                        }
                                                         <div class="mb-1">
-                                                            <i class="bi bi-shield me-2 text-muted"></i>
-                                                            <span class="text-muted">Auth DB:</span>
-                                                            <code class="ms-1">@db.AuthenticationDatabase</code>
+                                                            <i class="bi bi-person me-2 text-muted"></i>
+                                                            <span class="text-muted">Usuario:</span>
+                                                            <code class="ms-1">@db.Username</code>
+                                                        </div>
+                                                        <div class="mb-1">
+                                                            <i class="bi bi-file-earmark-code me-2 text-muted"></i>
+                                                            <span class="text-muted">Charset:</span>
+                                                            <code class="ms-1">@db.Charset</code>
                                                         </div>
                                                         <div class="mb-2">
-                                                            @if (db.SslEnabled)
+                                                            @if (db.SslMode)
                                                             {
                                                                 <span class="badge bg-info me-2">
                                                                     <i class="bi bi-lock-fill me-1"></i>SSL Habilitado
-                                                                </span>
-                                                            }
-                                                            @if (!string.IsNullOrEmpty(db.ReplicaSet))
-                                                            {
-                                                                <span class="badge bg-warning text-dark me-2">
-                                                                    <i class="bi bi-diagram-3 me-1"></i>Replica Set: @db.ReplicaSet
                                                                 </span>
                                                             }
                                                         </div>

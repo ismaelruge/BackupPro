@@ -1,5 +1,733 @@
-﻿@*
-    For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-*@
+@model IEnumerable<BackupPro.Models.SqlServerDataBase>
 @{
+    ViewData["Title"] = "Tipos de Bases de Datos";
 }
+
+<!-- Mensajes de éxito y error -->
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+        <div class="d-flex align-items-center">
+            <i class="bi bi-check-circle-fill fs-4 me-3"></i>
+            <div>
+                <strong>¡Éxito!</strong>
+                <p class="mb-0">@TempData["Success"]</p>
+            </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+        <div class="d-flex align-items-center">
+            <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
+            <div>
+                <strong>Error</strong>
+                <p class="mb-0">@TempData["Error"]</p>
+            </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-10">
+            <!-- Card principal -->
+            <div class="card shadow-lg border-0 rounded-4">
+                <!-- Header -->
+                <div class="card-header bg-primary text-white border-0 rounded-top-4 py-4">
+                    <div class="text-center">
+                        <i class="bi bi-database fs-1 mb-3"></i>
+                        <h3 class="fw-bold mb-2">Tipos de Bases de Datos</h3>
+                        <p class="mb-0 opacity-75">Configura múltiples fuentes de bases de datos para tus backups</p>
+                    </div>
+                </div>
+
+                <!-- Cuerpo con pestañas -->
+                <div class="card-body p-4">
+                    <!-- Nav Tabs -->
+                    <ul class="nav nav-pills nav-fill mb-4" id="databaseTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link active" id="sqlserver-tab" role="tab" asp-area="" asp-controller="SqlServerDataBase" asp-action="Index">
+                                <i class="bi bi-server me-2"></i>SQL Server
+                            </a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="mysql-tab" role="tab" asp-area="" asp-controller="MySqlDataBase" asp-action="Index">
+                                <i class="bi bi-database-fill-gear me-2"></i>MySQL
+                            </a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="postgresql-tab" role="tab" asp-area="" asp-controller="PostgresSqlDataBase" asp-action="Index">
+                                <i class="bi bi-database me-2"></i>PostgreSQL
+                            </a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="mongodb-tab" role="tab" asp-area="" asp-controller="MongoDBDataBase" asp-action="Index">
+                                <i class="bi bi-box me-2"></i>MongoDB
+                            </a>
+                        </li>
+                    </ul>
+
+                    <!-- Tab Content -->
+                    <div class="tab-content" id="databaseTabContent">
+                        <!-- SQL Server -->
+                        <div class="tab-pane fade show active" id="sqlserver" role="tabpanel">
+                            <div class="text-center mb-4">
+                                <i class="bi bi-server text-primary" style="font-size: 3rem;"></i>
+                                <h4 class="mt-3">SQL Server</h4>
+                                <p class="text-muted">Configura múltiples conexiones a bases de datos SQL Server</p>
+                            </div>
+
+                            <!-- Lista de configuraciones -->
+                            <div class="mb-4">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h6 class="fw-semibold mb-0">
+                                        <i class="bi bi-gear-fill me-2 text-primary"></i>Configuraciones Activas
+                                    </h6>
+                                    <span class="badge bg-primary rounded-pill">@Model.Count() configuradas</span>
+                                </div>
+
+                                @if (Model.Any())
+                                {
+                                    @foreach (var db in Model)
+                                {
+                                    <div class="card mb-3 border-0 shadow-sm">
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between align-items-start">
+                                                <div class="flex-grow-1">
+                                                    <div class="d-flex align-items-center mb-2">
+                                                        <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3">
+                                                            <i class="bi bi-server text-primary fs-5"></i>
+                                                        </div>
+                                                        <div>
+                                                            <h6 class="mb-0 fw-semibold">
+                                                                <span class="text-primary">@db.ConfigurationName</span>
+                                                                <span class="text-muted fw-normal"> - @db.DatabaseName</span>
+                                                            </h6>
+                                                            <small class="text-muted">Creado: @db.CreatedAt.ToString("dd/MM/yyyy HH:mm")</small>
+                                                        </div>
+                                                    </div>
+                                                    <div class="ms-5 ps-2">
+                                                        <div class="mb-1">
+                                                            <i class="bi bi-hdd-network me-2 text-muted"></i>
+                                                            <span class="text-muted">Servidor:</span>
+                                                            <code class="ms-1">@db.Host:@db.Port</code>
+                                                        </div>
+                                                        <div class="mb-1">
+                                                            <i class="bi bi-person me-2 text-muted"></i>
+                                                            <span class="text-muted">Usuario:</span>
+                                                            <code class="ms-1">@db.Username</code>
+                                                        </div>
+                                                        <div class="mb-2">
+                                                            @if (db.IntegratedSecurity)
+                                                            {
+                                                                <span class="badge bg-info me-2">
+                                                                    <i class="bi bi-shield-lock me-1"></i>Windows Auth
+                                                                </span>
+                                                            }
+                                                            @if (db.TrustServerCertificate)
+                                                            {
+                                                                <span class="badge bg-warning text-dark">
+                                                                    <i class="bi bi-shield-check me-1"></i>Trust Certificate
+                                                                </span>
+                                                            }
+                                                        </div>
+                                                        <span class="badge bg-success">
+                                                            <i class="bi bi-check-circle me-1"></i>Activo
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <button class="btn btn-sm btn-outline-primary rounded-pill me-2"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="#editSqlServerModal"
+                                                            data-id="@db.Id"
+                                                            data-name="@db.ConfigurationName"
+                                                            data-host="@db.Host"
+                                                            data-port="@db.Port"
+                                                            data-database="@db.DatabaseName"
+                                                            data-username="@db.Username"
+                                                            data-integrated="@db.IntegratedSecurity"
+                                                            data-trust="@db.TrustServerCertificate"
+                                                            aria-label="Editar configuración">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-danger rounded-pill"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="#deleteSqlServerModal"
+                                                            data-id="@db.Id"
+                                                            data-name="@db.ConfigurationName"
+                                                            aria-label="Eliminar configuración">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    }
+                                }
+                                else
+                                {
+                                    <div class="alert alert-info d-flex align-items-center" role="alert">
+                                        <i class="bi bi-info-circle-fill fs-4 me-3"></i>
+                                        <div>
+                                            <h6 class="mb-1">No hay configuraciones</h6>
+                                            <p class="mb-0 small">Aún no has configurado ninguna conexión a SQL Server. Haz clic en el botón de abajo para agregar tu primera configuración.</p>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+
+                            <!-- Botón agregar nueva configuración -->
+                            <div class="d-grid">
+                                <button type="button" class="btn btn-outline-primary btn-lg rounded-pill" data-bs-toggle="modal" data-bs-target="#addSqlServerModal">
+                                    <i class="bi bi-plus-circle me-2"></i>Agregar Nueva Configuración
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Información adicional -->
+            <div class="alert alert-info rounded-4 mt-4 shadow-sm" role="alert">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-info-circle-fill fs-3 me-3"></i>
+                    <div>
+                        <h6 class="mb-1 fw-semibold">Múltiples fuentes</h6>
+                        <p class="mb-0">Puedes configurar múltiples bases de datos del mismo tipo. Los backups se realizarán de todas las configuraciones activas.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Agregar SQL Server -->
+<div class="modal fade" id="addSqlServerModal" tabindex="-1" aria-labelledby="addSqlServerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white border-0">
+                <h5 class="modal-title" id="addSqlServerModalLabel">
+                    <i class="bi bi-server me-2"></i>Nueva Configuración SQL Server
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="addSqlServerForm" asp-action="Create" method="post">
+                <div class="modal-body p-4">
+                    <!-- Alerta de errores -->
+                    <div id="add_error_alert" class="alert alert-danger alert-dismissible fade" role="alert" style="display: none;">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <span id="add_error_message"></span>
+                        <button type="button" class="btn-close" onclick="hideAlert('add_error_alert')"></button>
+                    </div>
+
+                    <!-- Alerta de validación de conexión -->
+                    <div id="add_validating_alert" class="alert alert-info" role="alert" style="display: none;">
+                        <div class="d-flex align-items-center">
+                            <div class="spinner-border spinner-border-sm me-2" role="status">
+                                <span class="visually-hidden">Validando...</span>
+                            </div>
+                            <span>Validando conexión a la base de datos...</span>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <!-- Nombre de Configuración -->
+                        <div class="col-12">
+                            <label for="add_configurationName" class="form-label fw-semibold">
+                                <i class="bi bi-tag me-1 text-primary"></i>Nombre de Configuración
+                            </label>
+                            <input type="text" class="form-control" id="add_configurationName" name="ConfigurationName"
+                                   placeholder="Ej: BD Principal, BD Producción..." required>
+                            <small class="text-muted">Nombre descriptivo para identificar esta configuración</small>
+                        </div>
+
+                        <!-- Host y Puerto -->
+                        <div class="col-md-8">
+                            <label for="add_host" class="form-label fw-semibold">
+                                <i class="bi bi-hdd-network me-1 text-primary"></i>Servidor/Host
+                            </label>
+                            <input type="text" class="form-control" id="add_host" name="Host"
+                                   placeholder="localhost o dirección IP" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="add_port" class="form-label fw-semibold">
+                                <i class="bi bi-plug me-1 text-primary"></i>Puerto
+                            </label>
+                            <input type="number" class="form-control" id="add_port" name="Port"
+                                   value="1433" required>
+                        </div>
+
+                        <!-- Nombre de Base de Datos -->
+                        <div class="col-12">
+                            <label for="add_databaseName" class="form-label fw-semibold">
+                                <i class="bi bi-database me-1 text-primary"></i>Nombre de Base de Datos
+                            </label>
+                            <input type="text" class="form-control" id="add_databaseName" name="DatabaseName"
+                                   placeholder="Nombre de la base de datos" required>
+                        </div>
+
+                        <!-- Usuario y Contraseña -->
+                        <div class="col-md-6">
+                            <label for="add_username" class="form-label fw-semibold">
+                                <i class="bi bi-person me-1 text-primary"></i>Usuario
+                            </label>
+                            <input type="text" class="form-control" id="add_username" name="Username"
+                                   placeholder="Usuario de la base de datos" value="">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="add_password" class="form-label fw-semibold">
+                                <i class="bi bi-key me-1 text-primary"></i>Contraseña
+                            </label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="add_password" name="Password"
+                                       placeholder="Contraseña" value="">
+                                <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('add_password')">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Opciones de Seguridad -->
+                        <div class="col-12">
+                            <div class="card bg-light border-0">
+                                <div class="card-body">
+                                    <h6 class="fw-semibold mb-3">
+                                        <i class="bi bi-shield-lock me-2 text-primary"></i>Opciones de Seguridad
+                                    </h6>
+                                    <div class="form-check form-switch mb-2">
+                                        <input class="form-check-input" type="checkbox" id="add_integratedSecurity"
+                                               name="IntegratedSecurity" value="true" onchange="toggleAuthFields('add')">
+                                        <label class="form-check-label" for="add_integratedSecurity">
+                                            <strong>Seguridad Integrada de Windows</strong>
+                                            <br><small class="text-muted">Usar autenticación de Windows en lugar de usuario/contraseña</small>
+                                        </label>
+                                    </div>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="add_trustServerCertificate"
+                                               name="TrustServerCertificate" value="true">
+                                        <label class="form-check-label" for="add_trustServerCertificate">
+                                            <strong>Confiar en Certificado del Servidor</strong>
+                                            <br><small class="text-muted">Omitir validación del certificado SSL (no recomendado en producción)</small>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i>Cancelar
+                    </button>
+                    <button type="submit" id="add_submit_btn" class="btn btn-primary rounded-pill px-4">
+                        <i class="bi bi-check-circle me-2"></i>Guardar Configuración
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Editar SQL Server -->
+<div class="modal fade" id="editSqlServerModal" tabindex="-1" aria-labelledby="editSqlServerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-warning text-dark border-0">
+                <h5 class="modal-title" id="editSqlServerModalLabel">
+                    <i class="bi bi-pencil-square me-2"></i>Editar Configuración SQL Server
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editSqlServerForm" asp-action="Edit" method="post">
+                <input type="hidden" id="edit_id" name="Id">
+                <div class="modal-body p-4">
+                    <!-- Alerta de errores -->
+                    <div id="edit_error_alert" class="alert alert-danger alert-dismissible fade" role="alert" style="display: none;">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <span id="edit_error_message"></span>
+                        <button type="button" class="btn-close" onclick="hideAlert('edit_error_alert')"></button>
+                    </div>
+
+                    <!-- Alerta de validación de conexión -->
+                    <div id="edit_validating_alert" class="alert alert-info" role="alert" style="display: none;">
+                        <div class="d-flex align-items-center">
+                            <div class="spinner-border spinner-border-sm me-2" role="status">
+                                <span class="visually-hidden">Validando...</span>
+                            </div>
+                            <span>Validando conexión a la base de datos...</span>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <!-- Nombre de Configuración -->
+                        <div class="col-12">
+                            <label for="edit_configurationName" class="form-label fw-semibold">
+                                <i class="bi bi-tag me-1 text-warning"></i>Nombre de Configuración
+                            </label>
+                            <input type="text" class="form-control" id="edit_configurationName" name="ConfigurationName"
+                                   placeholder="Ej: BD Principal, BD Producción..." required>
+                            <small class="text-muted">Nombre descriptivo para identificar esta configuración</small>
+                        </div>
+
+                        <!-- Host y Puerto -->
+                        <div class="col-md-8">
+                            <label for="edit_host" class="form-label fw-semibold">
+                                <i class="bi bi-hdd-network me-1 text-warning"></i>Servidor/Host
+                            </label>
+                            <input type="text" class="form-control" id="edit_host" name="Host"
+                                   placeholder="localhost o dirección IP" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="edit_port" class="form-label fw-semibold">
+                                <i class="bi bi-plug me-1 text-warning"></i>Puerto
+                            </label>
+                            <input type="number" class="form-control" id="edit_port" name="Port"
+                                   value="1433" required>
+                        </div>
+
+                        <!-- Nombre de Base de Datos -->
+                        <div class="col-12">
+                            <label for="edit_databaseName" class="form-label fw-semibold">
+                                <i class="bi bi-database me-1 text-warning"></i>Nombre de Base de Datos
+                            </label>
+                            <input type="text" class="form-control" id="edit_databaseName" name="DatabaseName"
+                                   placeholder="Nombre de la base de datos" required>
+                        </div>
+
+                        <!-- Usuario y Contraseña -->
+                        <div class="col-md-6">
+                            <label for="edit_username" class="form-label fw-semibold">
+                                <i class="bi bi-person me-1 text-warning"></i>Usuario
+                            </label>
+                            <input type="text" class="form-control" id="edit_username" name="Username"
+                                   placeholder="Usuario de la base de datos">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="edit_password" class="form-label fw-semibold">
+                                <i class="bi bi-key me-1 text-warning"></i>Contraseña
+                            </label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="edit_password" name="Password"
+                                       placeholder="Dejar vacío para mantener la actual">
+                                <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('edit_password')">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                            <small class="text-muted">Dejar vacío si no desea cambiar la contraseña</small>
+                        </div>
+
+                        <!-- Opciones de Seguridad -->
+                        <div class="col-12">
+                            <div class="card bg-light border-0">
+                                <div class="card-body">
+                                    <h6 class="fw-semibold mb-3">
+                                        <i class="bi bi-shield-lock me-2 text-warning"></i>Opciones de Seguridad
+                                    </h6>
+                                    <div class="form-check form-switch mb-2">
+                                        <input class="form-check-input" type="checkbox" id="edit_integratedSecurity"
+                                               name="IntegratedSecurity" value="true" onchange="toggleAuthFields('edit')">
+                                        <label class="form-check-label" for="edit_integratedSecurity">
+                                            <strong>Seguridad Integrada de Windows</strong>
+                                            <br><small class="text-muted">Usar autenticación de Windows en lugar de usuario/contraseña</small>
+                                        </label>
+                                    </div>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="edit_trustServerCertificate"
+                                               name="TrustServerCertificate" value="true">
+                                        <label class="form-check-label" for="edit_trustServerCertificate">
+                                            <strong>Confiar en Certificado del Servidor</strong>
+                                            <br><small class="text-muted">Omitir validación del certificado SSL (no recomendado en producción)</small>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i>Cancelar
+                    </button>
+                    <button type="submit" id="edit_submit_btn" class="btn btn-warning text-dark rounded-pill px-4">
+                        <i class="bi bi-check-circle me-2"></i>Actualizar Configuración
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Eliminar SQL Server -->
+<div class="modal fade" id="deleteSqlServerModal" tabindex="-1" aria-labelledby="deleteSqlServerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-danger text-white border-0">
+                <h5 class="modal-title" id="deleteSqlServerModalLabel">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Confirmar Eliminación
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form asp-action="Delete" method="post">
+                <input type="hidden" id="delete_id" name="id">
+                <div class="modal-body p-4">
+                    <div class="text-center mb-4">
+                        <i class="bi bi-exclamation-circle text-danger" style="font-size: 4rem;"></i>
+                    </div>
+                    <h6 class="text-center mb-3">¿Está seguro que desea eliminar esta configuración?</h6>
+                    <div class="alert alert-warning d-flex align-items-center" role="alert">
+                        <i class="bi bi-info-circle-fill me-2 flex-shrink-0"></i>
+                        <div>
+                            <strong id="delete_configName"></strong>
+                            <p class="mb-0 small">Esta acción no se puede deshacer.</p>
+                        </div>
+                    </div>
+                    <p class="text-muted small text-center mb-0">
+                        Los backups programados que usen esta configuración dejarán de funcionar.
+                    </p>
+                </div>
+                <div class="modal-footer border-0 bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i>Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-danger rounded-pill px-4">
+                        <i class="bi bi-trash me-2"></i>Eliminar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    .nav-pills .nav-link {
+        border-radius: 50rem;
+        padding: 0.75rem 1.5rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+        .nav-pills .nav-link:hover {
+            background-color: rgba(13, 110, 253, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .nav-pills .nav-link.active {
+            background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+            box-shadow: 0 4px 6px rgba(13, 110, 253, 0.3);
+        }
+
+    .tab-pane {
+        animation: fadeIn 0.3s ease-in;
+    }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .rounded-circle {
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+</style>
+
+<script>
+    // Función para mostrar/ocultar contraseña
+    function togglePassword(inputId) {
+        const input = document.getElementById(inputId);
+        const icon = event.currentTarget.querySelector('i');
+
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('bi-eye');
+            icon.classList.add('bi-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('bi-eye-slash');
+            icon.classList.add('bi-eye');
+        }
+    }
+
+    // Función para habilitar/deshabilitar campos de autenticación
+    function toggleAuthFields(prefix) {
+        const integratedSecurity = document.getElementById(prefix + '_integratedSecurity');
+        const usernameField = document.getElementById(prefix + '_username');
+        const passwordField = document.getElementById(prefix + '_password');
+
+        if (integratedSecurity.checked) {
+            // En lugar de deshabilitar, solo marcar visualmente y limpiar
+            usernameField.classList.add('bg-light');
+            passwordField.classList.add('bg-light');
+            usernameField.value = '';
+            passwordField.value = '';
+            usernameField.placeholder = 'No requerido (Windows Auth)';
+            passwordField.placeholder = 'No requerido (Windows Auth)';
+        } else {
+            usernameField.classList.remove('bg-light');
+            passwordField.classList.remove('bg-light');
+            usernameField.placeholder = 'Usuario de la base de datos';
+            passwordField.placeholder = 'Contraseña';
+        }
+    }
+
+    // Cargar datos en el modal de edición
+    document.getElementById('editSqlServerModal').addEventListener('show.bs.modal', function (event) {
+        const button = event.relatedTarget;
+
+        document.getElementById('edit_id').value = button.getAttribute('data-id');
+        document.getElementById('edit_configurationName').value = button.getAttribute('data-name');
+        document.getElementById('edit_host').value = button.getAttribute('data-host');
+        document.getElementById('edit_port').value = button.getAttribute('data-port');
+        document.getElementById('edit_databaseName').value = button.getAttribute('data-database');
+        document.getElementById('edit_username').value = button.getAttribute('data-username');
+
+        const integratedSecurity = button.getAttribute('data-integrated') === 'True';
+        const trustCertificate = button.getAttribute('data-trust') === 'True';
+
+        document.getElementById('edit_integratedSecurity').checked = integratedSecurity;
+        document.getElementById('edit_trustServerCertificate').checked = trustCertificate;
+
+        toggleAuthFields('edit');
+    });
+
+    // Cargar datos en el modal de eliminación
+    document.getElementById('deleteSqlServerModal').addEventListener('show.bs.modal', function (event) {
+        const button = event.relatedTarget;
+
+        document.getElementById('delete_id').value = button.getAttribute('data-id');
+        document.getElementById('delete_configName').textContent = button.getAttribute('data-name');
+    });
+
+    // Inicializar el estado de los campos de autenticación en el modal de agregar
+    document.addEventListener('DOMContentLoaded', function() {
+        toggleAuthFields('add');
+    });
+
+    // Función para ocultar alertas
+    function hideAlert(alertId) {
+        const alert = document.getElementById(alertId);
+        alert.style.display = 'none';
+        alert.classList.remove('show');
+    }
+
+    // Función para mostrar alerta
+    function showAlert(alertId, message) {
+        const alert = document.getElementById(alertId);
+        const messageSpan = alert.querySelector('span');
+        if (messageSpan) {
+            messageSpan.textContent = message;
+        }
+        alert.style.display = 'block';
+        alert.classList.add('show');
+    }
+
+    // Manejo del formulario de agregar con AJAX
+    document.getElementById('addSqlServerForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        // Ocultar errores previos
+        hideAlert('add_error_alert');
+
+        // Mostrar indicador de validación
+        document.getElementById('add_validating_alert').style.display = 'block';
+        document.getElementById('add_submit_btn').disabled = true;
+
+        const formData = new FormData(this);
+
+        fetch(this.action, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            },
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Ocultar indicador de validación
+            document.getElementById('add_validating_alert').style.display = 'none';
+            document.getElementById('add_submit_btn').disabled = false;
+
+            if (data.success) {
+                // Cerrar modal y recargar página
+                bootstrap.Modal.getInstance(document.getElementById('addSqlServerModal')).hide();
+                location.reload();
+            } else {
+                // Mostrar error en el modal
+                showAlert('add_error_alert', data.message);
+            }
+        })
+        .catch(error => {
+            document.getElementById('add_validating_alert').style.display = 'none';
+            document.getElementById('add_submit_btn').disabled = false;
+            showAlert('add_error_alert', 'Error de conexión: ' + error.message);
+        });
+    });
+
+    // Manejo del formulario de editar con AJAX
+    document.getElementById('editSqlServerForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        // Ocultar errores previos
+        hideAlert('edit_error_alert');
+
+        // Mostrar indicador de validación
+        document.getElementById('edit_validating_alert').style.display = 'block';
+        document.getElementById('edit_submit_btn').disabled = true;
+
+        const formData = new FormData(this);
+
+        fetch(this.action, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            },
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Ocultar indicador de validación
+            document.getElementById('edit_validating_alert').style.display = 'none';
+            document.getElementById('edit_submit_btn').disabled = false;
+
+            if (data.success) {
+                // Cerrar modal y recargar página
+                bootstrap.Modal.getInstance(document.getElementById('editSqlServerModal')).hide();
+                location.reload();
+            } else {
+                // Mostrar error en el modal
+                showAlert('edit_error_alert', data.message);
+            }
+        })
+        .catch(error => {
+            document.getElementById('edit_validating_alert').style.display = 'none';
+            document.getElementById('edit_submit_btn').disabled = false;
+            showAlert('edit_error_alert', 'Error de conexión: ' + error.message);
+        });
+    });
+
+    // Limpiar formulario cuando se cierra el modal de agregar
+    document.getElementById('addSqlServerModal').addEventListener('hidden.bs.modal', function() {
+        document.getElementById('addSqlServerForm').reset();
+        hideAlert('add_error_alert');
+        hideAlert('add_validating_alert');
+        toggleAuthFields('add');
+    });
+</script>

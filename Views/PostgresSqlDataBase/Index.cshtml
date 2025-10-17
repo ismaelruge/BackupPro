@@ -1,5 +1,201 @@
-﻿@*
-    For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-*@
+@model IEnumerable<BackupPro.Models.PostgresSqlDataBase>
 @{
+    ViewData["Title"] = "Tipos de Bases de Datos";
+
+    // Datos de ejemplo para PostgreSQL
+    var postgresExamples = new List<dynamic>
+    {
+        new { Id = 1, ConfigurationName = "PostgreSQL Principal", Host = "postgres.company.com", Port = 5432, DatabaseName = "production_db", Username = "postgres", CreatedAt = DateTime.Now.AddDays(-12), SslMode = true, SearchPath = "public" },
+        new { Id = 2, ConfigurationName = "PostgreSQL QA", Host = "qa-postgres.local", Port = 5432, DatabaseName = "qa_testing", Username = "qa_user", CreatedAt = DateTime.Now.AddDays(-8), SslMode = false, SearchPath = "testing,public" }
+    };
 }
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-10">
+            <!-- Card principal -->
+            <div class="card shadow-lg border-0 rounded-4">
+                <!-- Header -->
+                <div class="card-header bg-primary text-white border-0 rounded-top-4 py-4">
+                    <div class="text-center">
+                        <i class="bi bi-database fs-1 mb-3"></i>
+                        <h3 class="fw-bold mb-2">Tipos de Bases de Datos</h3>
+                        <p class="mb-0 opacity-75">Configura múltiples fuentes de bases de datos para tus backups</p>
+                    </div>
+                </div>
+
+                <!-- Cuerpo con pestañas -->
+                <div class="card-body p-4">
+                    <!-- Nav Tabs -->
+                    <ul class="nav nav-pills nav-fill mb-4" id="databaseTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="sqlserver-tab" role="tab" asp-area="" asp-controller="SqlServerDataBase" asp-action="Index">
+                                <i class="bi bi-server me-2"></i>SQL Server
+                            </a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="mysql-tab" role="tab" asp-area="" asp-controller="MySqlDataBase" asp-action="Index">
+                                <i class="bi bi-database-fill-gear me-2"></i>MySQL
+                            </a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link active" id="postgresql-tab" role="tab" asp-area="" asp-controller="PostgresSqlDataBase" asp-action="Index">
+                                <i class="bi bi-database me-2"></i>PostgreSQL
+                            </a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="mongodb-tab" role="tab" asp-area="" asp-controller="MongoDBDataBase" asp-action="Index">
+                                <i class="bi bi-box me-2"></i>MongoDB
+                            </a>
+                        </li>
+                    </ul>
+
+                    <!-- Tab Content -->
+                    <div class="tab-content" id="databaseTabContent">
+                        <!-- PostgreSQL -->
+                        <div class="tab-pane fade show active" id="postgresql" role="tabpanel">
+                            <div class="text-center mb-4">
+                                <i class="bi bi-database text-primary" style="font-size: 3rem;"></i>
+                                <h4 class="mt-3">PostgreSQL</h4>
+                                <p class="text-muted">Configura múltiples conexiones a bases de datos PostgreSQL</p>
+                            </div>
+
+                            <!-- Lista de configuraciones -->
+                            <div class="mb-4">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h6 class="fw-semibold mb-0">
+                                        <i class="bi bi-gear-fill me-2 text-primary"></i>Configuraciones Activas
+                                    </h6>
+                                    <span class="badge bg-primary rounded-pill">@postgresExamples.Count configuradas</span>
+                                </div>
+
+                                @foreach (var db in postgresExamples)
+                                {
+                                    <div class="card mb-3 border-0 shadow-sm">
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between align-items-start">
+                                                <div class="flex-grow-1">
+                                                    <div class="d-flex align-items-center mb-2">
+                                                        <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3">
+                                                            <i class="bi bi-database text-primary fs-5"></i>
+                                                        </div>
+                                                        <div>
+                                                            <h6 class="mb-0 fw-semibold">
+                                                                <span class="text-primary">@db.ConfigurationName</span>
+                                                                <span class="text-muted fw-normal"> - @db.DatabaseName</span>
+                                                            </h6>
+                                                            <small class="text-muted">Creado: @db.CreatedAt.ToString("dd/MM/yyyy HH:mm")</small>
+                                                        </div>
+                                                    </div>
+                                                    <div class="ms-5 ps-2">
+                                                        <div class="mb-1">
+                                                            <i class="bi bi-hdd-network me-2 text-muted"></i>
+                                                            <span class="text-muted">Servidor:</span>
+                                                            <code class="ms-1">@db.Host:@db.Port</code>
+                                                        </div>
+                                                        <div class="mb-1">
+                                                            <i class="bi bi-person me-2 text-muted"></i>
+                                                            <span class="text-muted">Usuario:</span>
+                                                            <code class="ms-1">@db.Username</code>
+                                                        </div>
+                                                        <div class="mb-1">
+                                                            <i class="bi bi-signpost me-2 text-muted"></i>
+                                                            <span class="text-muted">Search Path:</span>
+                                                            <code class="ms-1">@db.SearchPath</code>
+                                                        </div>
+                                                        <div class="mb-2">
+                                                            @if (db.SslMode)
+                                                            {
+                                                                <span class="badge bg-info me-2">
+                                                                    <i class="bi bi-lock-fill me-1"></i>SSL Habilitado
+                                                                </span>
+                                                            }
+                                                        </div>
+                                                        <span class="badge bg-success">
+                                                            <i class="bi bi-check-circle me-1"></i>Activo
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <button class="btn btn-sm btn-outline-primary rounded-pill me-2"
+                                                            aria-label="Editar configuración">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-danger rounded-pill"
+                                                            aria-label="Eliminar configuración">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+
+                            <!-- Botón agregar nueva configuración -->
+                            <div class="d-grid">
+                                <button type="button" class="btn btn-outline-primary btn-lg rounded-pill">
+                                    <i class="bi bi-plus-circle me-2"></i>Agregar Nueva Configuración
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Información adicional -->
+            <div class="alert alert-info rounded-4 mt-4 shadow-sm" role="alert">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-info-circle-fill fs-3 me-3"></i>
+                    <div>
+                        <h6 class="mb-1 fw-semibold">Múltiples fuentes</h6>
+                        <p class="mb-0">Puedes configurar múltiples bases de datos del mismo tipo. Los backups se realizarán de todas las configuraciones activas.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .nav-pills .nav-link {
+        border-radius: 50rem;
+        padding: 0.75rem 1.5rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+        .nav-pills .nav-link:hover {
+            background-color: rgba(13, 110, 253, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .nav-pills .nav-link.active {
+            background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+            box-shadow: 0 4px 6px rgba(13, 110, 253, 0.3);
+        }
+
+    .tab-pane {
+        animation: fadeIn 0.3s ease-in;
+    }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .rounded-circle {
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+</style>

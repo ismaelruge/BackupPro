@@ -180,7 +180,7 @@ namespace BackupPro.Controllers
             }
 
             await _signInManager.SignInAsync(newUser, isPersistent: true);
-            return RedirectToAction("Index", "DatabaseSource");
+            return RedirectToAction("Index", "Home");
         }
     }
 }

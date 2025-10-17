@@ -13,7 +13,8 @@
       "Bash(taskkill:*)",
       "Bash(find:*)",
       "Bash(dotnet build:*)",
-      "Bash(powershell -Command \"Stop-Process -Name BackupPro -Force\")"
+      "Bash(powershell -Command \"Stop-Process -Name BackupPro -Force\")",
+      "Bash(powershell:*)"
     ],
     "deny": [],
     "ask": []
