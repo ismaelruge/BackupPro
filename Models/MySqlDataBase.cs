@@ -32,9 +32,6 @@ namespace BackupPro.Models
 
         public bool SslMode { get; set; } = false;
 
-        [MaxLength(50)]
-        public string? Charset { get; set; } = "utf8mb4";
-
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
         [MaxLength(200)]

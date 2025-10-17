@@ -14,7 +14,8 @@
       "Bash(find:*)",
       "Bash(dotnet build:*)",
       "Bash(powershell -Command \"Stop-Process -Name BackupPro -Force\")",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "Bash(dotnet add package:*)"
     ],
     "deny": [],
     "ask": []
