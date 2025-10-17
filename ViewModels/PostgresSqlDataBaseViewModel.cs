@@ -34,11 +34,10 @@ namespace BackupPro.ViewModels
         [MaxLength(200)]
         public string Username { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "La contraseña es obligatoria")]
         [Display(Name = "Contraseña")]
         [DataType(DataType.Password)]
         [MaxLength(500)]
-        public string Password { get; set; } = string.Empty;
+        public string? Password { get; set; }
 
         [Display(Name = "Modo SSL")]
         public bool SslMode { get; set; } = false;

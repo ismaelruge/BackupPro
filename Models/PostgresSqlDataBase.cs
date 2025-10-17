@@ -32,9 +32,6 @@ namespace BackupPro.Models
 
         public bool SslMode { get; set; } = false;
 
-        [MaxLength(100)]
-        public string? SearchPath { get; set; } = "public";
-
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
         [MaxLength(200)]
