@@ -474,6 +474,82 @@ namespace BackupPro.Controllers.StorageTypes
             }
         }
 
+        // ========== TOKEN REFRESH ==========
+
+        /// <summary>
+        /// Renueva el access token usando el refresh token
+        /// </summary>
+        private async Task<bool> RefreshAccessToken(GoogleDriveStorage googleDriveStorage)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(googleDriveStorage.RefreshToken))
+                {
+                    return false;
+                }
+
+                var tokenRequest = new Dictionary<string, string>
+                {
+                    {"refresh_token", googleDriveStorage.RefreshToken},
+                    {"client_id", _googleOAuthSettings.ClientId!},
+                    {"client_secret", _googleOAuthSettings.ClientSecret!},
+                    {"grant_type", "refresh_token"}
+                };
+
+                using var httpClient = new HttpClient();
+                var tokenResponse = await httpClient.PostAsync("https://oauth2.googleapis.com/token",
+                    new FormUrlEncodedContent(tokenRequest));
+
+                if (!tokenResponse.IsSuccessStatusCode)
+                {
+                    return false;
+                }
+
+                var tokenJson = await tokenResponse.Content.ReadAsStringAsync();
+                var tokenData = System.Text.Json.JsonDocument.Parse(tokenJson);
+                var newAccessToken = tokenData.RootElement.GetProperty("access_token").GetString();
+
+                // Actualizar el token en la base de datos
+                googleDriveStorage.AccessToken = newAccessToken;
+
+                // Google generalmente no devuelve un nuevo refresh_token en la renovación
+                // El refresh_token original sigue siendo válido
+
+                googleDriveStorage.TokenExpiresAt = DateTime.Now.AddHours(1);
+                googleDriveStorage.LastModifiedAt = DateTime.Now;
+
+                _context.GoogleDriveStorages.Update(googleDriveStorage);
+                await _context.SaveChangesAsync();
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Verifica si el token está expirado y lo renueva si es necesario
+        /// </summary>
+        private async Task<bool> EnsureValidToken(GoogleDriveStorage googleDriveStorage)
+        {
+            // Si no hay token, no se puede renovar
+            if (string.IsNullOrEmpty(googleDriveStorage.AccessToken))
+            {
+                return false;
+            }
+
+            // Si el token no ha expirado, está válido
+            if (googleDriveStorage.TokenExpiresAt.HasValue && googleDriveStorage.TokenExpiresAt.Value > DateTime.Now.AddMinutes(5))
+            {
+                return true;
+            }
+
+            // Token expirado o próximo a expirar, intentar renovar
+            return await RefreshAccessToken(googleDriveStorage);
+        }
+
         // ========== BACKUP OPERATIONS ==========
 
         /// <summary>
@@ -500,8 +576,8 @@ namespace BackupPro.Controllers.StorageTypes
                     return (false, string.Empty, 0, "Configuración de Google Drive no encontrada");
                 }
 
-                // Verificar que tenga un token válido
-                if (string.IsNullOrEmpty(googleDriveStorage.AccessToken))
+                // Verificar y renovar token si es necesario
+                if (!await EnsureValidToken(googleDriveStorage))
                 {
                     return (false, string.Empty, 0, "No hay un token de acceso válido para Google Drive. Por favor, autentícate primero.");
                 }

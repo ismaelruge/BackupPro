@@ -479,6 +479,85 @@ namespace BackupPro.Controllers.StorageTypes
             }
         }
 
+        // ========== TOKEN REFRESH ==========
+
+        /// <summary>
+        /// Renueva el access token usando el refresh token
+        /// </summary>
+        private async Task<bool> RefreshAccessToken(OneDriveStorage oneDriveStorage)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(oneDriveStorage.RefreshToken))
+                {
+                    return false;
+                }
+
+                var tokenRequest = new Dictionary<string, string>
+                {
+                    {"refresh_token", oneDriveStorage.RefreshToken},
+                    {"client_id", _oneDriveSettings.ClientId!},
+                    {"client_secret", _oneDriveSettings.ClientSecret!},
+                    {"grant_type", "refresh_token"}
+                };
+
+                using var httpClient = new HttpClient();
+                var tokenResponse = await httpClient.PostAsync("https://login.microsoftonline.com/common/oauth2/v2.0/token",
+                    new FormUrlEncodedContent(tokenRequest));
+
+                if (!tokenResponse.IsSuccessStatusCode)
+                {
+                    return false;
+                }
+
+                var tokenJson = await tokenResponse.Content.ReadAsStringAsync();
+                var tokenData = System.Text.Json.JsonDocument.Parse(tokenJson);
+                var newAccessToken = tokenData.RootElement.GetProperty("access_token").GetString();
+
+                // Actualizar el token en la base de datos
+                oneDriveStorage.AccessToken = newAccessToken;
+
+                // Actualizar refresh token si viene uno nuevo
+                if (tokenData.RootElement.TryGetProperty("refresh_token", out var newRefreshToken))
+                {
+                    oneDriveStorage.RefreshToken = newRefreshToken.GetString();
+                }
+
+                oneDriveStorage.TokenExpiresAt = DateTime.Now.AddHours(1);
+                oneDriveStorage.LastModifiedAt = DateTime.Now;
+
+                _context.OneDriveStorages.Update(oneDriveStorage);
+                await _context.SaveChangesAsync();
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Verifica si el token está expirado y lo renueva si es necesario
+        /// </summary>
+        private async Task<bool> EnsureValidToken(OneDriveStorage oneDriveStorage)
+        {
+            // Si no hay token, no se puede renovar
+            if (string.IsNullOrEmpty(oneDriveStorage.AccessToken))
+            {
+                return false;
+            }
+
+            // Si el token no ha expirado, está válido
+            if (oneDriveStorage.TokenExpiresAt.HasValue && oneDriveStorage.TokenExpiresAt.Value > DateTime.Now.AddMinutes(5))
+            {
+                return true;
+            }
+
+            // Token expirado o próximo a expirar, intentar renovar
+            return await RefreshAccessToken(oneDriveStorage);
+        }
+
         // ========== BACKUP OPERATIONS ==========
 
         /// <summary>
@@ -505,8 +584,8 @@ namespace BackupPro.Controllers.StorageTypes
                     return (false, string.Empty, 0, "Configuración de OneDrive no encontrada");
                 }
 
-                // Verificar que tenga un token válido
-                if (string.IsNullOrEmpty(oneDriveStorage.AccessToken))
+                // Verificar y renovar token si es necesario
+                if (!await EnsureValidToken(oneDriveStorage))
                 {
                     return (false, string.Empty, 0, "No hay un token de acceso válido para OneDrive. Por favor, autentícate primero.");
                 }
