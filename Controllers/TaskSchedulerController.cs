@@ -14,15 +14,18 @@ namespace BackupPro.Controllers
         private readonly ApplicationDbContext _context;
         private readonly DataBasesTypes.SqlServerDataBaseController _sqlServerController;
         private readonly StorageTypes.LocalStorageController _localStorageController;
+        private readonly StorageTypes.FtpStorageController _ftpStorageController;
 
         public TaskSchedulerController(
             ApplicationDbContext context,
             DataBasesTypes.SqlServerDataBaseController sqlServerController,
-            StorageTypes.LocalStorageController localStorageController)
+            StorageTypes.LocalStorageController localStorageController,
+            StorageTypes.FtpStorageController ftpStorageController)
         {
             _context = context;
             _sqlServerController = sqlServerController;
             _localStorageController = localStorageController;
+            _ftpStorageController = ftpStorageController;
         }
 
         public async Task<IActionResult> Index()
@@ -571,6 +574,10 @@ namespace BackupPro.Controllers
             {
                 return await ExecuteBackupSqlServerLocal(task.DatabaseId, task.StorageId);
             }
+            else if (task.DatabaseType == "SqlServer" && task.StorageType == "Ftp")
+            {
+                return await ExecuteBackupSqlServerFtp(task.DatabaseId, task.StorageId);
+            }
             // Otras combinaciones que aún no están implementadas
             else if (task.DatabaseType == "SqlServer")
             {
@@ -632,6 +639,52 @@ namespace BackupPro.Controllers
             catch (Exception ex)
             {
                 throw new Exception($"Error al ejecutar backup: {ex.Message}", ex);
+            }
+            finally
+            {
+                // Liberar el MemoryStream
+                backupStream?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Ejecuta backup de SQL Server a almacenamiento FTP
+        /// </summary>
+        private async Task<string> ExecuteBackupSqlServerFtp(int sqlServerDatabaseId, int ftpStorageId)
+        {
+            MemoryStream? backupStream = null;
+
+            try
+            {
+                // Paso 1: Crear el backup en SQL Server y obtener el MemoryStream
+                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _sqlServerController.CreateBackup(sqlServerDatabaseId);
+
+                if (!backupSuccess || backupStream2 == null)
+                {
+                    throw new Exception(backupError);
+                }
+
+                backupStream = backupStream2;
+
+                // Paso 2: Guardar el backup en almacenamiento FTP
+                var (saveSuccess, filePath, fileSize, saveError) = await _ftpStorageController.SaveBackup(
+                    ftpStorageId,
+                    backupStream,
+                    fileName,
+                    databaseName,
+                    sqlServerDatabaseId
+                );
+
+                if (!saveSuccess)
+                {
+                    throw new Exception(saveError);
+                }
+
+                return $"Backup creado exitosamente en FTP: {fileName} ({FormatBytes(fileSize)})";
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error al ejecutar backup FTP: {ex.Message}", ex);
             }
             finally
             {

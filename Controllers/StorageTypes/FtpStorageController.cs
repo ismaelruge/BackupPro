@@ -5,6 +5,7 @@ using BackupPro.Data;
 using BackupPro.Models;
 using BackupPro.ViewModels;
 using Microsoft.EntityFrameworkCore;
+using System.IO.Compression;
 
 namespace BackupPro.Controllers.StorageTypes
 {
@@ -300,6 +301,162 @@ namespace BackupPro.Controllers.StorageTypes
             {
                 return Json(new { success = false, message = $"Error de conexión: {ex.Message}" });
             }
+        }
+
+        #endregion
+
+        #region Métodos de Backup
+
+        /// <summary>
+        /// Guarda un backup (MemoryStream) en el almacenamiento FTP
+        /// </summary>
+        /// <param name="ftpStorageId">ID de la configuración de almacenamiento FTP</param>
+        /// <param name="backupStream">Stream del backup</param>
+        /// <param name="fileName">Nombre del archivo</param>
+        /// <param name="databaseName">Nombre de la base de datos</param>
+        /// <param name="databaseId">ID de la base de datos de origen</param>
+        /// <returns>Tuple con el resultado de la operación</returns>
+        public async Task<(bool success, string filePath, long fileSize, string errorMessage)> SaveBackup(int ftpStorageId, MemoryStream backupStream, string fileName, string databaseName, int databaseId)
+        {
+            var startTime = DateTime.Now;
+            string remoteFilePath = string.Empty;
+            string localTempPath = string.Empty;
+
+            try
+            {
+                // Obtener configuración de almacenamiento FTP
+                var ftpStorage = await _context.FtpStorages.FindAsync(ftpStorageId);
+                if (ftpStorage == null)
+                {
+                    return (false, string.Empty, 0, "Configuración de almacenamiento FTP no encontrada");
+                }
+
+                // Cambiar extensión a .zip
+                string zipFileName = Path.ChangeExtension(fileName, ".zip");
+                remoteFilePath = $"{ftpStorage.RemotePath.TrimEnd('/')}/{zipFileName}";
+
+                // Crear archivo temporal local comprimido
+                localTempPath = Path.Combine(Path.GetTempPath(), zipFileName);
+
+                // Comprimir el backup en un archivo .zip temporal
+                using (var fileStream = new FileStream(localTempPath, FileMode.Create, FileAccess.Write))
+                using (var zipArchive = new ZipArchive(fileStream, ZipArchiveMode.Create, false))
+                {
+                    var entry = zipArchive.CreateEntry(fileName, CompressionLevel.Optimal);
+
+                    using (var entryStream = entry.Open())
+                    {
+                        backupStream.Position = 0; // Asegurar que el stream está al inicio
+                        await backupStream.CopyToAsync(entryStream);
+                    }
+                }
+
+                // Conectar al servidor FTP y subir el archivo
+                var client = new AsyncFtpClient(ftpStorage.Host, ftpStorage.Username, ftpStorage.Password, ftpStorage.Port);
+
+                try
+                {
+                    await client.Connect();
+
+                    // Subir el archivo comprimido
+                    var uploadResult = await client.UploadFile(localTempPath, remoteFilePath, FtpRemoteExists.Overwrite, true);
+
+                    if (uploadResult != FtpStatus.Success)
+                    {
+                        return (false, string.Empty, 0, $"Error al subir archivo al FTP: {uploadResult}");
+                    }
+
+                    // Obtener el tamaño del archivo remoto
+                    var remoteFileSize = await client.GetFileSize(remoteFilePath);
+
+                    await client.Disconnect();
+
+                    var duration = DateTime.Now - startTime;
+
+                    // Registrar en el histórico
+                    var backupHistory = new BackupHistory
+                    {
+                        DatabaseSourceId = databaseId,
+                        DatabaseName = databaseName,
+                        Date = startTime,
+                        Status = "Exitoso",
+                        Message = $"Backup guardado exitosamente en FTP. Tamaño: {FormatBytes(remoteFileSize)}. Duración: {duration.TotalSeconds:F2} segundos.",
+                        BackupPath = remoteFilePath
+                    };
+
+                    _context.BackupHistories.Add(backupHistory);
+                    await _context.SaveChangesAsync();
+
+                    // Eliminar archivo temporal local
+                    try
+                    {
+                        if (System.IO.File.Exists(localTempPath))
+                        {
+                            System.IO.File.Delete(localTempPath);
+                        }
+                    }
+                    catch { /* Ignorar errores al eliminar */ }
+
+                    return (true, remoteFilePath, remoteFileSize, string.Empty);
+                }
+                finally
+                {
+                    client?.Dispose();
+                }
+            }
+            catch (Exception ex)
+            {
+                // Error general
+                var errorMessage = $"Error al guardar backup en FTP: {ex.Message}";
+
+                // Eliminar archivo temporal local si existe
+                try
+                {
+                    if (!string.IsNullOrEmpty(localTempPath) && System.IO.File.Exists(localTempPath))
+                    {
+                        System.IO.File.Delete(localTempPath);
+                    }
+                }
+                catch { /* Ignorar errores al eliminar */ }
+
+                // Registrar error en el histórico
+                try
+                {
+                    var backupHistory = new BackupHistory
+                    {
+                        DatabaseSourceId = databaseId,
+                        DatabaseName = databaseName,
+                        Date = startTime,
+                        Status = "Error",
+                        Message = errorMessage,
+                        BackupPath = remoteFilePath ?? "N/A"
+                    };
+
+                    _context.BackupHistories.Add(backupHistory);
+                    await _context.SaveChangesAsync();
+                }
+                catch { /* Ignorar errores al registrar */ }
+
+                return (false, string.Empty, 0, errorMessage);
+            }
+        }
+
+        /// <summary>
+        /// Formatea bytes a una representación legible (KB, MB, GB)
+        /// </summary>
+        private string FormatBytes(long bytes)
+        {
+            string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+            double len = bytes;
+            int order = 0;
+
+            while (len >= 1024 && order < sizes.Length - 1)
+            {
+                order++;
+                len = len / 1024;
+            }
+
+            return $"{len:0.##} {sizes[order]}";
         }
 
         #endregion
