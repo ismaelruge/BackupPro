@@ -99,6 +99,10 @@ namespace BackupPro
             //builder.Services.AddHostedService<BackupUploadBackgroundService>();
             //builder.Services.AddHostedService<BackupPeriodicService>();
 
+            // Registrar controladores para inyección de dependencias
+            builder.Services.AddScoped<BackupPro.Controllers.DataBasesTypes.SqlServerDataBaseController>();
+            builder.Services.AddScoped<BackupPro.Controllers.StorageTypes.LocalStorageController>();
+
             // Agregar soporte para sesiones
             builder.Services.AddDistributedMemoryCache();
             builder.Services.AddSession(options =>

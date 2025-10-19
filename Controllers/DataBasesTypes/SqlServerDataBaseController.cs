@@ -6,6 +6,8 @@ using BackupPro.ViewModels;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.SqlClient;
 using System.Linq;
+using System.Security.AccessControl;
+using System.Security.Principal;
 
 namespace BackupPro.Controllers.DataBasesTypes
 {
@@ -399,6 +401,202 @@ namespace BackupPro.Controllers.DataBasesTypes
             catch (Exception ex)
             {
                 return Json(new { success = false, message = $"Error al obtener configuración: {ex.Message}" });
+            }
+        }
+
+        // ========== BACKUP OPERATIONS ==========
+
+        /// <summary>
+        /// Configura permisos de escritura completos en la carpeta
+        /// </summary>
+        private bool EnsureFolderWritePermissions(string folderPath)
+        {
+            try
+            {
+                var directoryInfo = new DirectoryInfo(folderPath);
+                var directorySecurity = directoryInfo.GetAccessControl();
+
+                // Lista de cuentas a las que daremos permisos
+                string[] accounts = new[]
+                {
+                    "Everyone",
+                    @"NT Service\MSSQLSERVER",
+                    @"NT Service\SQLEXPRESS",
+                    @"NT AUTHORITY\NETWORK SERVICE",
+                    @"NT AUTHORITY\SYSTEM",
+                    @"BUILTIN\Users",
+                    @"BUILTIN\Administrators"
+                };
+
+                foreach (var account in accounts)
+                {
+                    try
+                    {
+                        var fileSystemRule = new FileSystemAccessRule(
+                            account,
+                            FileSystemRights.FullControl,
+                            InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                            PropagationFlags.None,
+                            AccessControlType.Allow);
+
+                        directorySecurity.AddAccessRule(fileSystemRule);
+                    }
+                    catch
+                    {
+                        // Ignorar si la cuenta no existe
+                        continue;
+                    }
+                }
+
+                // Deshabilitar herencia y copiar permisos heredados
+                directorySecurity.SetAccessRuleProtection(false, true);
+
+                directoryInfo.SetAccessControl(directorySecurity);
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Crea un backup de SQL Server y lo retorna como MemoryStream
+        /// </summary>
+        /// <param name="sqlServerDatabaseId">ID de la configuración de SQL Server</param>
+        /// <returns>Tuple con el MemoryStream del backup y metadatos</returns>
+        public async Task<(bool success, MemoryStream? backupStream, string fileName, string databaseName, string errorMessage)> CreateBackup(int sqlServerDatabaseId)
+        {
+            string tempBackupPath = string.Empty;
+
+            try
+            {
+                // Obtener configuración de SQL Server
+                var sqlServerConfig = await _context.SqlServerDataBases.FindAsync(sqlServerDatabaseId);
+                if (sqlServerConfig == null)
+                {
+                    return (false, null, string.Empty, string.Empty, "Configuración de SQL Server no encontrada");
+                }
+
+                // Generar nombre de archivo de backup con timestamp
+                string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                string fileName = $"{sqlServerConfig.DatabaseName}_backup_{timestamp}.bak";
+
+                // Buscar el disco con más espacio disponible
+                var drives = DriveInfo.GetDrives()
+                    .Where(d => d.IsReady && d.DriveType == DriveType.Fixed)
+                    .OrderByDescending(d => d.AvailableFreeSpace)
+                    .ToList();
+
+                if (drives.Count == 0)
+                {
+                    return (false, null, string.Empty, string.Empty, "No se encontraron discos disponibles para crear el backup temporal");
+                }
+
+                // Usar el disco con más espacio disponible
+                string tempFolder = Path.Combine(drives[0].Name, "Temp");
+
+                if (!Directory.Exists(tempFolder))
+                {
+                    Directory.CreateDirectory(tempFolder);
+                }
+
+                // Configurar permisos de escritura en la carpeta
+                EnsureFolderWritePermissions(tempFolder);
+
+                tempBackupPath = Path.Combine(tempFolder, fileName);
+
+                // Construir cadena de conexión
+                string connectionString;
+                if (sqlServerConfig.IntegratedSecurity)
+                {
+                    connectionString = $"Server={sqlServerConfig.Host},{sqlServerConfig.Port};Database={sqlServerConfig.DatabaseName};Integrated Security=True;TrustServerCertificate={sqlServerConfig.TrustServerCertificate};";
+                }
+                else
+                {
+                    connectionString = $"Server={sqlServerConfig.Host},{sqlServerConfig.Port};Database={sqlServerConfig.DatabaseName};User Id={sqlServerConfig.Username};Password={sqlServerConfig.Password};TrustServerCertificate={sqlServerConfig.TrustServerCertificate};";
+                }
+
+                // Ejecutar backup a archivo temporal
+                using (var connection = new SqlConnection(connectionString))
+                {
+                    await connection.OpenAsync();
+
+                    // Comando para realizar el backup
+                    string backupCommand = $@"
+                        BACKUP DATABASE [{sqlServerConfig.DatabaseName}]
+                        TO DISK = @backupPath
+                        WITH FORMAT,
+                             INIT,
+                             NAME = @backupName,
+                             STATS = 10";
+
+                    using (var command = new SqlCommand(backupCommand, connection))
+                    {
+                        command.CommandTimeout = 300; // 5 minutos de timeout
+                        command.Parameters.AddWithValue("@backupPath", tempBackupPath);
+                        command.Parameters.AddWithValue("@backupName", $"{sqlServerConfig.DatabaseName} Backup {timestamp}");
+
+                        await command.ExecuteNonQueryAsync();
+                    }
+                }
+
+                // Verificar que el archivo se creó correctamente
+                if (!System.IO.File.Exists(tempBackupPath))
+                {
+                    return (false, null, string.Empty, string.Empty, "El archivo de backup no se creó correctamente");
+                }
+
+                // Leer el archivo a MemoryStream
+                var memoryStream = new MemoryStream();
+                using (var fileStream = new FileStream(tempBackupPath, FileMode.Open, FileAccess.Read))
+                {
+                    await fileStream.CopyToAsync(memoryStream);
+                }
+
+                // Posicionar el stream al inicio
+                memoryStream.Position = 0;
+
+                // Eliminar archivo temporal
+                try
+                {
+                    System.IO.File.Delete(tempBackupPath);
+                }
+                catch
+                {
+                    // Ignorar errores al eliminar archivo temporal
+                }
+
+                return (true, memoryStream, fileName, sqlServerConfig.DatabaseName, string.Empty);
+            }
+            catch (SqlException sqlEx)
+            {
+                // Limpiar archivo temporal si existe
+                if (!string.IsNullOrEmpty(tempBackupPath) && System.IO.File.Exists(tempBackupPath))
+                {
+                    try
+                    {
+                        System.IO.File.Delete(tempBackupPath);
+                    }
+                    catch { /* Ignorar errores al eliminar */ }
+                }
+
+                return (false, null, string.Empty, string.Empty, $"Error de SQL Server: {sqlEx.Message}");
+            }
+            catch (Exception ex)
+            {
+                // Limpiar archivo temporal si existe
+                if (!string.IsNullOrEmpty(tempBackupPath) && System.IO.File.Exists(tempBackupPath))
+                {
+                    try
+                    {
+                        System.IO.File.Delete(tempBackupPath);
+                    }
+                    catch { /* Ignorar errores al eliminar */ }
+                }
+
+                return (false, null, string.Empty, string.Empty, $"Error al crear backup: {ex.Message}");
             }
         }
     }

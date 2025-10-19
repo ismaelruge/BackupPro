@@ -12,10 +12,17 @@ namespace BackupPro.Controllers
     public class TaskSchedulerController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly DataBasesTypes.SqlServerDataBaseController _sqlServerController;
+        private readonly StorageTypes.LocalStorageController _localStorageController;
 
-        public TaskSchedulerController(ApplicationDbContext context)
+        public TaskSchedulerController(
+            ApplicationDbContext context,
+            DataBasesTypes.SqlServerDataBaseController sqlServerController,
+            StorageTypes.LocalStorageController localStorageController)
         {
             _context = context;
+            _sqlServerController = sqlServerController;
+            _localStorageController = localStorageController;
         }
 
         public async Task<IActionResult> Index()
@@ -555,6 +562,103 @@ namespace BackupPro.Controllers
         }
 
         /// <summary>
+        /// Ejecuta el backup según el tipo de base de datos y almacenamiento
+        /// </summary>
+        private async Task<string> ExecuteBackupByType(Models.TaskScheduler task)
+        {
+            // Validar combinación de base de datos y almacenamiento
+            if (task.DatabaseType == "SqlServer" && task.StorageType == "Local")
+            {
+                return await ExecuteBackupSqlServerLocal(task.DatabaseId, task.StorageId);
+            }
+            // Otras combinaciones que aún no están implementadas
+            else if (task.DatabaseType == "SqlServer")
+            {
+                return $"Backup de SQL Server a {task.StorageType} aún no implementado.";
+            }
+            else if (task.DatabaseType == "MySQL")
+            {
+                return $"Backup de MySQL a {task.StorageType} aún no implementado.";
+            }
+            else if (task.DatabaseType == "PostgreSQL")
+            {
+                return $"Backup de PostgreSQL a {task.StorageType} aún no implementado.";
+            }
+            else if (task.DatabaseType == "MongoDB")
+            {
+                return $"Backup de MongoDB a {task.StorageType} aún no implementado.";
+            }
+            else
+            {
+                return $"Combinación no soportada: {task.DatabaseType} a {task.StorageType}";
+            }
+        }
+
+        /// <summary>
+        /// Ejecuta backup de SQL Server a almacenamiento local
+        /// </summary>
+        private async Task<string> ExecuteBackupSqlServerLocal(int sqlServerDatabaseId, int localStorageId)
+        {
+            MemoryStream? backupStream = null;
+
+            try
+            {
+                // Paso 1: Crear el backup en SQL Server y obtener el MemoryStream
+                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _sqlServerController.CreateBackup(sqlServerDatabaseId);
+
+                if (!backupSuccess || backupStream2 == null)
+                {
+                    throw new Exception(backupError);
+                }
+
+                backupStream = backupStream2;
+
+                // Paso 2: Guardar el backup en almacenamiento local
+                var (saveSuccess, filePath, fileSize, saveError) = await _localStorageController.SaveBackup(
+                    localStorageId,
+                    backupStream,
+                    fileName,
+                    databaseName,
+                    sqlServerDatabaseId
+                );
+
+                if (!saveSuccess)
+                {
+                    throw new Exception(saveError);
+                }
+
+                return $"Backup creado exitosamente: {fileName} ({FormatBytes(fileSize)})";
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error al ejecutar backup: {ex.Message}", ex);
+            }
+            finally
+            {
+                // Liberar el MemoryStream
+                backupStream?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Formatea bytes a una representación legible (KB, MB, GB)
+        /// </summary>
+        private string FormatBytes(long bytes)
+        {
+            string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+            double len = bytes;
+            int order = 0;
+
+            while (len >= 1024 && order < sizes.Length - 1)
+            {
+                order++;
+                len = len / 1024;
+            }
+
+            return $"{len:0.##} {sizes[order]}";
+        }
+
+        /// <summary>
         /// Ejecuta una tarea específica de manera manual
         /// </summary>
         [HttpPost]
@@ -569,8 +673,10 @@ namespace BackupPro.Controllers
                     return Json(new { success = false, message = "Tarea no encontrada." });
                 }
 
-                // TODO: Implementar lógica de ejecución de backup
-                // Por ahora solo actualizamos las fechas
+                // Ejecutar backup según el tipo de base de datos y almacenamiento
+                string backupResult = await ExecuteBackupByType(task);
+
+                // Actualizar fechas de la tarea
                 task.LastRunAt = DateTime.Now;
                 task.NextRunAt = CalculateNextRun(task.FrequencyType, task.FrequencyValue, task.LastRunAt);
                 task.LastModifiedAt = DateTime.Now;
@@ -578,7 +684,7 @@ namespace BackupPro.Controllers
                 _context.TaskSchedulers.Update(task);
                 await _context.SaveChangesAsync();
 
-                return Json(new { success = true, message = "Tarea ejecutada exitosamente." });
+                return Json(new { success = true, message = backupResult });
             }
             catch (Exception ex)
             {
@@ -602,18 +708,40 @@ namespace BackupPro.Controllers
                     return Json(new { success = false, message = "No hay tareas activas para ejecutar." });
                 }
 
+                int successCount = 0;
+                int errorCount = 0;
+                var results = new List<string>();
+
                 foreach (var task in activeTasks)
                 {
-                    // TODO: Implementar lógica de ejecución de backup
-                    // Por ahora solo actualizamos las fechas
-                    task.LastRunAt = DateTime.Now;
-                    task.NextRunAt = CalculateNextRun(task.FrequencyType, task.FrequencyValue, task.LastRunAt);
-                    task.LastModifiedAt = DateTime.Now;
+                    try
+                    {
+                        // Ejecutar backup según el tipo de base de datos y almacenamiento
+                        string backupResult = await ExecuteBackupByType(task);
+
+                        // Actualizar fechas de la tarea
+                        task.LastRunAt = DateTime.Now;
+                        task.NextRunAt = CalculateNextRun(task.FrequencyType, task.FrequencyValue, task.LastRunAt);
+                        task.LastModifiedAt = DateTime.Now;
+
+                        successCount++;
+                        results.Add($"{task.TaskName}: {backupResult}");
+                    }
+                    catch (Exception ex)
+                    {
+                        errorCount++;
+                        results.Add($"{task.TaskName}: Error - {ex.Message}");
+                    }
                 }
 
                 await _context.SaveChangesAsync();
 
-                return Json(new { success = true, message = $"{activeTasks.Count} tarea(s) ejecutada(s) exitosamente." });
+                return Json(new
+                {
+                    success = errorCount == 0,
+                    message = $"{successCount} tarea(s) ejecutada(s) exitosamente. {errorCount} error(es).",
+                    details = results
+                });
             }
             catch (Exception ex)
             {
