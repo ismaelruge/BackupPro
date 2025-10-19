@@ -1,0 +1,624 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using BackupPro.Data;
+using BackupPro.Models;
+using BackupPro.ViewModels;
+using Microsoft.EntityFrameworkCore;
+using System.Linq;
+
+namespace BackupPro.Controllers
+{
+    [Authorize]
+    public class TaskSchedulerController : Controller
+    {
+        private readonly ApplicationDbContext _context;
+
+        public TaskSchedulerController(ApplicationDbContext context)
+        {
+            _context = context;
+        }
+
+        public async Task<IActionResult> Index()
+        {
+            var tasks = await _context.TaskSchedulers.ToListAsync();
+
+            var viewModels = new List<TaskSchedulerIndexViewModel>();
+
+            foreach (var task in tasks)
+            {
+                var viewModel = new TaskSchedulerIndexViewModel
+                {
+                    Id = task.Id,
+                    TaskName = task.TaskName,
+                    DatabaseType = task.DatabaseType,
+                    DatabaseId = task.DatabaseId,
+                    DatabaseName = await GetDatabaseName(task.DatabaseType, task.DatabaseId),
+                    StorageType = task.StorageType,
+                    StorageId = task.StorageId,
+                    StorageName = await GetStorageName(task.StorageType, task.StorageId),
+                    FrequencyType = task.FrequencyType,
+                    FrequencyValue = task.FrequencyValue,
+                    IsActive = task.IsActive,
+                    LastRunAt = task.LastRunAt,
+                    NextRunAt = task.NextRunAt,
+                    CreatedAt = task.CreatedAt
+                };
+
+                viewModels.Add(viewModel);
+            }
+
+            return View(viewModels);
+        }
+
+        // ========== HELPER METHODS ==========
+
+        /// <summary>
+        /// Calcula la próxima fecha de ejecución basada en la frecuencia
+        /// </summary>
+        private DateTime CalculateNextRun(string frequencyType, int frequencyValue, DateTime? lastRun = null)
+        {
+            var baseTime = lastRun ?? DateTime.Now;
+
+            return frequencyType.ToLower() switch
+            {
+                "minutes" => baseTime.AddMinutes(frequencyValue),
+                "hours" => baseTime.AddHours(frequencyValue),
+                "days" => baseTime.AddDays(frequencyValue),
+                _ => baseTime.AddHours(1) // Default: 1 hour
+            };
+        }
+
+        /// <summary>
+        /// Obtiene el nombre de la configuración de base de datos
+        /// </summary>
+        private async Task<string> GetDatabaseName(string databaseType, int databaseId)
+        {
+            return databaseType switch
+            {
+                "SqlServer" => (await _context.SqlServerDataBases.FindAsync(databaseId))?.ConfigurationName ?? "N/A",
+                "PostgreSQL" => (await _context.PostgresSqlDataBases.FindAsync(databaseId))?.ConfigurationName ?? "N/A",
+                "MySQL" => (await _context.MySqlDataBases.FindAsync(databaseId))?.ConfigurationName ?? "N/A",
+                "MongoDB" => (await _context.MongoDBDataBases.FindAsync(databaseId))?.ConfigurationName ?? "N/A",
+                _ => "N/A"
+            };
+        }
+
+        /// <summary>
+        /// Obtiene el nombre de la configuración de almacenamiento
+        /// </summary>
+        private async Task<string> GetStorageName(string storageType, int storageId)
+        {
+            return storageType switch
+            {
+                "GoogleDrive" => (await _context.GoogleDriveStorages.FindAsync(storageId))?.ConfigurationName ?? "N/A",
+                "OneDrive" => (await _context.OneDriveStorages.FindAsync(storageId))?.ConfigurationName ?? "N/A",
+                "AzureBlob" => (await _context.AzureBlobStorages.FindAsync(storageId))?.ConfigurationName ?? "N/A",
+                "Ftp" => (await _context.FtpStorages.FindAsync(storageId))?.ConfigurationName ?? "N/A",
+                "Local" => (await _context.LocalStorages.FindAsync(storageId))?.ConfigurationName ?? "N/A",
+                _ => "N/A"
+            };
+        }
+
+        // ========== AJAX ENDPOINTS ==========
+
+        /// <summary>
+        /// Obtiene la lista de bases de datos según el tipo seleccionado
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetDatabasesByType(string type)
+        {
+            try
+            {
+                object databases = type switch
+                {
+                    "SqlServer" => await _context.SqlServerDataBases
+                        .Select(d => new { id = d.Id, name = d.ConfigurationName })
+                        .ToListAsync(),
+                    "PostgreSQL" => await _context.PostgresSqlDataBases
+                        .Select(d => new { id = d.Id, name = d.ConfigurationName })
+                        .ToListAsync(),
+                    "MySQL" => await _context.MySqlDataBases
+                        .Select(d => new { id = d.Id, name = d.ConfigurationName })
+                        .ToListAsync(),
+                    "MongoDB" => await _context.MongoDBDataBases
+                        .Select(d => new { id = d.Id, name = d.ConfigurationName })
+                        .ToListAsync(),
+                    _ => new List<object>()
+                };
+
+                return Json(new { success = true, data = databases });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error al obtener bases de datos: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
+        /// Obtiene la lista de almacenamientos según el tipo seleccionado
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetStoragesByType(string type)
+        {
+            try
+            {
+                object storages = type switch
+                {
+                    "GoogleDrive" => await _context.GoogleDriveStorages
+                        .Select(s => new { id = s.Id, name = s.ConfigurationName })
+                        .ToListAsync(),
+                    "OneDrive" => await _context.OneDriveStorages
+                        .Select(s => new { id = s.Id, name = s.ConfigurationName })
+                        .ToListAsync(),
+                    "AzureBlob" => await _context.AzureBlobStorages
+                        .Select(s => new { id = s.Id, name = s.ConfigurationName })
+                        .ToListAsync(),
+                    "Ftp" => await _context.FtpStorages
+                        .Select(s => new { id = s.Id, name = s.ConfigurationName })
+                        .ToListAsync(),
+                    "Local" => await _context.LocalStorages
+                        .Select(s => new { id = s.Id, name = s.ConfigurationName })
+                        .ToListAsync(),
+                    _ => new List<object>()
+                };
+
+                return Json(new { success = true, data = storages });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error al obtener almacenamientos: {ex.Message}" });
+            }
+        }
+
+        // ========== CRUD OPERATIONS ==========
+
+        /// <summary>
+        /// Crea una nueva tarea programada
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Create(TaskSchedulerViewModel model)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    var errors = ModelState.Values
+                        .SelectMany(v => v.Errors)
+                        .Select(e => e.ErrorMessage)
+                        .ToList();
+
+                    var errorMessage = "Errores de validación: " + string.Join(", ", errors);
+
+                    if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || Request.Headers["Accept"].ToString().Contains("application/json"))
+                    {
+                        return Json(new { success = false, message = errorMessage });
+                    }
+
+                    TempData["Error"] = errorMessage;
+                    return RedirectToAction(nameof(Index));
+                }
+
+                // Verificar si ya existe una tarea con el mismo nombre
+                bool exists = await _context.TaskSchedulers.AnyAsync(t => t.TaskName == model.TaskName);
+
+                if (exists)
+                {
+                    var errorMessage = "Ya existe una tarea con este nombre.";
+
+                    if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || Request.Headers["Accept"].ToString().Contains("application/json"))
+                    {
+                        return Json(new { success = false, message = errorMessage });
+                    }
+
+                    TempData["Error"] = errorMessage;
+                    return RedirectToAction(nameof(Index));
+                }
+
+                // Verificar que la base de datos existe
+                bool databaseExists = model.DatabaseType switch
+                {
+                    "SqlServer" => await _context.SqlServerDataBases.AnyAsync(d => d.Id == model.DatabaseId),
+                    "PostgreSQL" => await _context.PostgresSqlDataBases.AnyAsync(d => d.Id == model.DatabaseId),
+                    "MySQL" => await _context.MySqlDataBases.AnyAsync(d => d.Id == model.DatabaseId),
+                    "MongoDB" => await _context.MongoDBDataBases.AnyAsync(d => d.Id == model.DatabaseId),
+                    _ => false
+                };
+
+                if (!databaseExists)
+                {
+                    var errorMessage = "La base de datos seleccionada no existe.";
+
+                    if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || Request.Headers["Accept"].ToString().Contains("application/json"))
+                    {
+                        return Json(new { success = false, message = errorMessage });
+                    }
+
+                    TempData["Error"] = errorMessage;
+                    return RedirectToAction(nameof(Index));
+                }
+
+                // Verificar que el almacenamiento existe
+                bool storageExists = model.StorageType switch
+                {
+                    "GoogleDrive" => await _context.GoogleDriveStorages.AnyAsync(s => s.Id == model.StorageId),
+                    "OneDrive" => await _context.OneDriveStorages.AnyAsync(s => s.Id == model.StorageId),
+                    "AzureBlob" => await _context.AzureBlobStorages.AnyAsync(s => s.Id == model.StorageId),
+                    "Ftp" => await _context.FtpStorages.AnyAsync(s => s.Id == model.StorageId),
+                    "Local" => await _context.LocalStorages.AnyAsync(s => s.Id == model.StorageId),
+                    _ => false
+                };
+
+                if (!storageExists)
+                {
+                    var errorMessage = "El almacenamiento seleccionado no existe.";
+
+                    if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || Request.Headers["Accept"].ToString().Contains("application/json"))
+                    {
+                        return Json(new { success = false, message = errorMessage });
+                    }
+
+                    TempData["Error"] = errorMessage;
+                    return RedirectToAction(nameof(Index));
+                }
+
+                var task = new Models.TaskScheduler
+                {
+                    TaskName = model.TaskName,
+                    DatabaseType = model.DatabaseType,
+                    DatabaseId = model.DatabaseId,
+                    StorageType = model.StorageType,
+                    StorageId = model.StorageId,
+                    FrequencyType = model.FrequencyType,
+                    FrequencyValue = model.FrequencyValue,
+                    IsActive = model.IsActive,
+                    NextRunAt = CalculateNextRun(model.FrequencyType, model.FrequencyValue),
+                    CreatedAt = DateTime.Now,
+                    CreatedBy = User.Identity?.Name
+                };
+
+                _context.TaskSchedulers.Add(task);
+                await _context.SaveChangesAsync();
+
+                var successMessage = "Tarea programada creada exitosamente.";
+
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || Request.Headers["Accept"].ToString().Contains("application/json"))
+                {
+                    return Json(new { success = true, message = successMessage });
+                }
+
+                TempData["Success"] = successMessage;
+                return RedirectToAction(nameof(Index));
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = $"Error al crear tarea: {ex.Message}";
+
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || Request.Headers["Accept"].ToString().Contains("application/json"))
+                {
+                    return Json(new { success = false, message = errorMessage });
+                }
+
+                TempData["Error"] = errorMessage;
+                return RedirectToAction(nameof(Index));
+            }
+        }
+
+        /// <summary>
+        /// Actualiza una tarea programada existente
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(TaskSchedulerViewModel model)
+        {
+            try
+            {
+                if (!model.Id.HasValue)
+                {
+                    var errorMessage = "ID de tarea no especificado.";
+
+                    if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || Request.Headers["Accept"].ToString().Contains("application/json"))
+                    {
+                        return Json(new { success = false, message = errorMessage });
+                    }
+
+                    TempData["Error"] = errorMessage;
+                    return RedirectToAction(nameof(Index));
+                }
+
+                var task = await _context.TaskSchedulers.FindAsync(model.Id.Value);
+                if (task == null)
+                {
+                    var errorMessage = "Tarea no encontrada.";
+
+                    if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || Request.Headers["Accept"].ToString().Contains("application/json"))
+                    {
+                        return Json(new { success = false, message = errorMessage });
+                    }
+
+                    TempData["Error"] = errorMessage;
+                    return RedirectToAction(nameof(Index));
+                }
+
+                if (!ModelState.IsValid)
+                {
+                    var errors = ModelState.Values
+                        .SelectMany(v => v.Errors)
+                        .Select(e => e.ErrorMessage)
+                        .ToList();
+
+                    var errorMessage = "Errores de validación: " + string.Join(", ", errors);
+
+                    if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || Request.Headers["Accept"].ToString().Contains("application/json"))
+                    {
+                        return Json(new { success = false, message = errorMessage });
+                    }
+
+                    TempData["Error"] = errorMessage;
+                    return RedirectToAction(nameof(Index));
+                }
+
+                // Verificar si otro registro tiene el mismo nombre
+                bool exists = await _context.TaskSchedulers.AnyAsync(t => t.TaskName == model.TaskName && t.Id != model.Id);
+                if (exists)
+                {
+                    var errorMessage = "Ya existe otra tarea con este nombre.";
+
+                    if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || Request.Headers["Accept"].ToString().Contains("application/json"))
+                    {
+                        return Json(new { success = false, message = errorMessage });
+                    }
+
+                    TempData["Error"] = errorMessage;
+                    return RedirectToAction(nameof(Index));
+                }
+
+                // Verificar que la base de datos existe
+                bool databaseExists = model.DatabaseType switch
+                {
+                    "SqlServer" => await _context.SqlServerDataBases.AnyAsync(d => d.Id == model.DatabaseId),
+                    "PostgreSQL" => await _context.PostgresSqlDataBases.AnyAsync(d => d.Id == model.DatabaseId),
+                    "MySQL" => await _context.MySqlDataBases.AnyAsync(d => d.Id == model.DatabaseId),
+                    "MongoDB" => await _context.MongoDBDataBases.AnyAsync(d => d.Id == model.DatabaseId),
+                    _ => false
+                };
+
+                if (!databaseExists)
+                {
+                    var errorMessage = "La base de datos seleccionada no existe.";
+
+                    if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || Request.Headers["Accept"].ToString().Contains("application/json"))
+                    {
+                        return Json(new { success = false, message = errorMessage });
+                    }
+
+                    TempData["Error"] = errorMessage;
+                    return RedirectToAction(nameof(Index));
+                }
+
+                // Verificar que el almacenamiento existe
+                bool storageExists = model.StorageType switch
+                {
+                    "GoogleDrive" => await _context.GoogleDriveStorages.AnyAsync(s => s.Id == model.StorageId),
+                    "OneDrive" => await _context.OneDriveStorages.AnyAsync(s => s.Id == model.StorageId),
+                    "AzureBlob" => await _context.AzureBlobStorages.AnyAsync(s => s.Id == model.StorageId),
+                    "Ftp" => await _context.FtpStorages.AnyAsync(s => s.Id == model.StorageId),
+                    "Local" => await _context.LocalStorages.AnyAsync(s => s.Id == model.StorageId),
+                    _ => false
+                };
+
+                if (!storageExists)
+                {
+                    var errorMessage = "El almacenamiento seleccionado no existe.";
+
+                    if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || Request.Headers["Accept"].ToString().Contains("application/json"))
+                    {
+                        return Json(new { success = false, message = errorMessage });
+                    }
+
+                    TempData["Error"] = errorMessage;
+                    return RedirectToAction(nameof(Index));
+                }
+
+                task.TaskName = model.TaskName;
+                task.DatabaseType = model.DatabaseType;
+                task.DatabaseId = model.DatabaseId;
+                task.StorageType = model.StorageType;
+                task.StorageId = model.StorageId;
+                task.FrequencyType = model.FrequencyType;
+                task.FrequencyValue = model.FrequencyValue;
+                task.IsActive = model.IsActive;
+
+                // Recalcular NextRunAt si cambió la frecuencia
+                task.NextRunAt = CalculateNextRun(model.FrequencyType, model.FrequencyValue, task.LastRunAt);
+                task.LastModifiedAt = DateTime.Now;
+
+                _context.TaskSchedulers.Update(task);
+                await _context.SaveChangesAsync();
+
+                var successMessage = "Tarea actualizada exitosamente.";
+
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || Request.Headers["Accept"].ToString().Contains("application/json"))
+                {
+                    return Json(new { success = true, message = successMessage });
+                }
+
+                TempData["Success"] = successMessage;
+                return RedirectToAction(nameof(Index));
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = $"Error al actualizar tarea: {ex.Message}";
+
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || Request.Headers["Accept"].ToString().Contains("application/json"))
+                {
+                    return Json(new { success = false, message = errorMessage });
+                }
+
+                TempData["Error"] = errorMessage;
+                return RedirectToAction(nameof(Index));
+            }
+        }
+
+        /// <summary>
+        /// Elimina una tarea programada
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Delete(int id)
+        {
+            try
+            {
+                var task = await _context.TaskSchedulers.FindAsync(id);
+                if (task == null)
+                {
+                    TempData["Error"] = "Tarea no encontrada.";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                _context.TaskSchedulers.Remove(task);
+                await _context.SaveChangesAsync();
+
+                TempData["Success"] = "Tarea eliminada exitosamente.";
+                return RedirectToAction(nameof(Index));
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Error al eliminar tarea: {ex.Message}";
+                return RedirectToAction(nameof(Index));
+            }
+        }
+
+        /// <summary>
+        /// Obtiene una tarea por su ID
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetById(int id)
+        {
+            try
+            {
+                var task = await _context.TaskSchedulers.FindAsync(id);
+                if (task == null)
+                {
+                    return Json(new { success = false, message = "Tarea no encontrada." });
+                }
+
+                var viewModel = new TaskSchedulerViewModel
+                {
+                    Id = task.Id,
+                    TaskName = task.TaskName,
+                    DatabaseType = task.DatabaseType,
+                    DatabaseId = task.DatabaseId,
+                    StorageType = task.StorageType,
+                    StorageId = task.StorageId,
+                    FrequencyType = task.FrequencyType,
+                    FrequencyValue = task.FrequencyValue,
+                    IsActive = task.IsActive
+                };
+
+                return Json(new { success = true, data = viewModel });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error al obtener tarea: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
+        /// Activa o desactiva una tarea
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ToggleTask(int id)
+        {
+            try
+            {
+                var task = await _context.TaskSchedulers.FindAsync(id);
+                if (task == null)
+                {
+                    return Json(new { success = false, message = "Tarea no encontrada." });
+                }
+
+                task.IsActive = !task.IsActive;
+                task.LastModifiedAt = DateTime.Now;
+
+                _context.TaskSchedulers.Update(task);
+                await _context.SaveChangesAsync();
+
+                var status = task.IsActive ? "activada" : "pausada";
+                return Json(new { success = true, message = $"Tarea {status} exitosamente.", isActive = task.IsActive });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error al cambiar estado de tarea: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
+        /// Ejecuta una tarea específica de manera manual
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ExecuteTask(int id)
+        {
+            try
+            {
+                var task = await _context.TaskSchedulers.FindAsync(id);
+                if (task == null)
+                {
+                    return Json(new { success = false, message = "Tarea no encontrada." });
+                }
+
+                // TODO: Implementar lógica de ejecución de backup
+                // Por ahora solo actualizamos las fechas
+                task.LastRunAt = DateTime.Now;
+                task.NextRunAt = CalculateNextRun(task.FrequencyType, task.FrequencyValue, task.LastRunAt);
+                task.LastModifiedAt = DateTime.Now;
+
+                _context.TaskSchedulers.Update(task);
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true, message = "Tarea ejecutada exitosamente." });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error al ejecutar tarea: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
+        /// Ejecuta todas las tareas activas de manera manual
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ExecuteAllTasks()
+        {
+            try
+            {
+                var activeTasks = await _context.TaskSchedulers.Where(t => t.IsActive).ToListAsync();
+
+                if (!activeTasks.Any())
+                {
+                    return Json(new { success = false, message = "No hay tareas activas para ejecutar." });
+                }
+
+                foreach (var task in activeTasks)
+                {
+                    // TODO: Implementar lógica de ejecución de backup
+                    // Por ahora solo actualizamos las fechas
+                    task.LastRunAt = DateTime.Now;
+                    task.NextRunAt = CalculateNextRun(task.FrequencyType, task.FrequencyValue, task.LastRunAt);
+                    task.LastModifiedAt = DateTime.Now;
+                }
+
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true, message = $"{activeTasks.Count} tarea(s) ejecutada(s) exitosamente." });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Error al ejecutar tareas: {ex.Message}" });
+            }
+        }
+    }
+}

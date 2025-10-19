@@ -1,0 +1,926 @@
+@model IEnumerable<BackupPro.ViewModels.TaskSchedulerIndexViewModel>
+@{
+    ViewData["Title"] = "Programador de Tareas";
+}
+
+<!-- Mensajes de éxito y error -->
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+        <div class="d-flex align-items-center">
+            <i class="bi bi-check-circle-fill fs-4 me-3"></i>
+            <div>
+                <strong>¡Éxito!</strong>
+                <p class="mb-0">@TempData["Success"]</p>
+            </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+        <div class="d-flex align-items-center">
+            <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
+            <div>
+                <strong>Error</strong>
+                <p class="mb-0">@TempData["Error"]</p>
+            </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-12">
+            <!-- Card principal -->
+            <div class="card shadow-lg border-0 rounded-4">
+                <!-- Header -->
+                <div class="card-header bg-primary text-white border-0 rounded-top-4 py-4">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-calendar-check fs-1 me-3"></i>
+                                <div>
+                                    <h3 class="fw-bold mb-1">Programador de Tareas</h3>
+                                    <p class="mb-0 opacity-75">Administra y programa tus backups automáticos</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                            <button type="button" class="btn btn-light btn-lg rounded-pill shadow-sm" onclick="executeAllTasks()">
+                                <i class="bi bi-play-circle me-2"></i>Ejecutar Todas
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cuerpo -->
+                <div class="card-body p-4">
+                    <!-- Estadísticas -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card border-0 bg-light h-100">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-list-task text-primary fs-2 mb-2"></i>
+                                    <h4 class="fw-bold mb-0">@Model.Count()</h4>
+                                    <small class="text-muted">Total Tareas</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card border-0 bg-light h-100">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-check-circle text-success fs-2 mb-2"></i>
+                                    <h4 class="fw-bold mb-0">@Model.Count(t => t.IsActive)</h4>
+                                    <small class="text-muted">Activas</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card border-0 bg-light h-100">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-pause-circle text-warning fs-2 mb-2"></i>
+                                    <h4 class="fw-bold mb-0">@Model.Count(t => !t.IsActive)</h4>
+                                    <small class="text-muted">Pausadas</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card border-0 bg-light h-100">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-clock-history text-info fs-2 mb-2"></i>
+                                    <h4 class="fw-bold mb-0">@Model.Count(t => t.NextRunAt != null && t.NextRunAt < DateTime.Now.AddHours(1))</h4>
+                                    <small class="text-muted">Próximas (1h)</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Lista de tareas -->
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="fw-semibold mb-0">
+                                <i class="bi bi-gear-fill me-2 text-primary"></i>Tareas Programadas
+                            </h5>
+                            <button type="button" class="btn btn-primary rounded-pill" data-bs-toggle="modal" data-bs-target="#addTaskModal">
+                                <i class="bi bi-plus-circle me-2"></i>Nueva Tarea
+                            </button>
+                        </div>
+
+                        @if (Model != null && Model.Any())
+                        {
+                            @foreach (var task in Model)
+                            {
+                                <div class="card mb-3 border-0 shadow-sm task-card">
+                                    <div class="card-body">
+                                        <div class="row align-items-center">
+                                            <!-- Información principal -->
+                                            <div class="col-md-6">
+                                                <div class="d-flex align-items-start">
+                                                    <div class="@(task.IsActive ? "bg-success" : "bg-secondary") bg-opacity-10 rounded-circle p-3 me-3">
+                                                        <i class="bi bi-@(task.IsActive ? "play-fill" : "pause-fill") @(task.IsActive ? "text-success" : "text-secondary") fs-4"></i>
+                                                    </div>
+                                                    <div class="flex-grow-1">
+                                                        <h6 class="fw-bold mb-1">@task.TaskName</h6>
+                                                        <div class="mb-2">
+                                                            <span class="badge bg-primary bg-opacity-10 text-primary me-1">
+                                                                <i class="bi bi-database me-1"></i>@task.DatabaseType: @task.DatabaseName
+                                                            </span>
+                                                            <span class="badge bg-info bg-opacity-10 text-info">
+                                                                <i class="bi bi-cloud-arrow-up me-1"></i>@task.StorageType: @task.StorageName
+                                                            </span>
+                                                        </div>
+                                                        <div class="small text-muted">
+                                                            <i class="bi bi-arrow-repeat me-1"></i>
+                                                            Cada <strong>@task.FrequencyValue @task.FrequencyType.ToLower()</strong>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Tiempos -->
+                                            <div class="col-md-4">
+                                                <div class="small">
+                                                    <div class="mb-1">
+                                                        <i class="bi bi-clock-history me-1 text-muted"></i>
+                                                        <span class="text-muted">Última ejecución:</span>
+                                                        <br>
+                                                        <strong>@(task.LastRunAt != null ? task.LastRunAt.Value.ToString("dd/MM/yyyy HH:mm") : "Nunca")</strong>
+                                                    </div>
+                                                    @if (task.NextRunAt != null)
+                                                    {
+                                                        <div>
+                                                            <i class="bi bi-calendar-event me-1 text-muted"></i>
+                                                            <span class="text-muted">Próxima ejecución:</span>
+                                                            <br>
+                                                            <strong class="text-primary">@task.NextRunAt.Value.ToString("dd/MM/yyyy HH:mm")</strong>
+                                                        </div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <div>
+                                                            <span class="badge bg-secondary">Pausada</span>
+                                                        </div>
+                                                    }
+                                                </div>
+                                            </div>
+
+                                            <!-- Acciones -->
+                                            <div class="col-md-2 text-end">
+                                                <div class="btn-group-vertical w-100" role="group">
+                                                    <button class="btn btn-sm btn-success rounded-pill mb-2" onclick="executeTask(@task.Id)" title="Ejecutar ahora">
+                                                        <i class="bi bi-play-fill me-1"></i>Ejecutar
+                                                    </button>
+                                                    <div class="btn-group" role="group">
+                                                        <button class="btn btn-sm btn-outline-primary rounded-start-pill"
+                                                                onclick="editTask(@task.Id)"
+                                                                title="Editar">
+                                                            <i class="bi bi-pencil"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-@(task.IsActive ? "warning" : "success") "
+                                                                onclick="toggleTask(@task.Id, @task.IsActive.ToString().ToLower())"
+                                                                title="@(task.IsActive ? "Pausar" : "Activar")">
+                                                            <i class="bi bi-@(task.IsActive ? "pause-fill" : "play-fill")"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-danger rounded-end-pill"
+                                                                data-bs-toggle="modal"
+                                                                data-bs-target="#deleteTaskModal"
+                                                                data-id="@task.Id"
+                                                                data-name="@task.TaskName"
+                                                                title="Eliminar">
+                                                            <i class="bi bi-trash"></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="alert alert-info d-flex align-items-center" role="alert">
+                                <i class="bi bi-info-circle-fill fs-4 me-3"></i>
+                                <div>
+                                    <h6 class="mb-1">No hay tareas programadas</h6>
+                                    <p class="mb-0 small">Aún no has configurado ninguna tarea automática. Haz clic en el botón "Nueva Tarea" para crear tu primera programación.</p>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Información adicional -->
+            <div class="alert alert-info rounded-4 mt-4 shadow-sm" role="alert">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-info-circle-fill fs-3 me-3"></i>
+                    <div>
+                        <h6 class="mb-1 fw-semibold">Acerca de las tareas programadas</h6>
+                        <p class="mb-0">Las tareas se ejecutarán automáticamente según la frecuencia configurada. Puedes pausar, editar o ejecutar manualmente cualquier tarea en cualquier momento.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Agregar Tarea -->
+<div class="modal fade" id="addTaskModal" tabindex="-1" aria-labelledby="addTaskModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white border-0">
+                <h5 class="modal-title" id="addTaskModalLabel">
+                    <i class="bi bi-plus-circle me-2"></i>Nueva Tarea Programada
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="addTaskForm" asp-action="Create" method="post">
+                @Html.AntiForgeryToken()
+                <div class="modal-body p-4">
+                    <!-- Alerta de errores -->
+                    <div id="add_task_error_alert" class="alert alert-danger alert-dismissible fade" role="alert" style="display: none;">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <span id="add_task_error_message"></span>
+                        <button type="button" class="btn-close" onclick="hideAlert('add_task_error_alert')"></button>
+                    </div>
+
+                    <div class="row g-3">
+                        <!-- Nombre de la tarea -->
+                        <div class="col-12">
+                            <label for="add_task_name" class="form-label fw-semibold">
+                                <i class="bi bi-tag me-1 text-primary"></i>Nombre de la Tarea
+                            </label>
+                            <input type="text" class="form-control" id="add_task_name" name="TaskName"
+                                   placeholder="Ej: Backup diario BD Producción" required>
+                            <small class="text-muted">Nombre descriptivo para identificar esta tarea</small>
+                        </div>
+
+                        <!-- Tipo de Base de Datos -->
+                        <div class="col-md-6">
+                            <label for="add_database_type" class="form-label fw-semibold">
+                                <i class="bi bi-database me-1 text-primary"></i>Tipo de Base de Datos
+                            </label>
+                            <select class="form-select" id="add_database_type" name="DatabaseType" required onchange="loadDatabases('add')">
+                                <option value="">Seleccionar tipo...</option>
+                                <option value="SqlServer">SQL Server</option>
+                                <option value="MySQL">MySQL</option>
+                                <option value="PostgreSQL">PostgreSQL</option>
+                                <option value="MongoDB">MongoDB</option>
+                            </select>
+                        </div>
+
+                        <!-- Base de Datos Específica -->
+                        <div class="col-md-6">
+                            <label for="add_database_id" class="form-label fw-semibold">
+                                <i class="bi bi-server me-1 text-primary"></i>Base de Datos
+                            </label>
+                            <select class="form-select" id="add_database_id" name="DatabaseId" required disabled>
+                                <option value="">Primero selecciona un tipo...</option>
+                            </select>
+                            <small class="text-muted">Configuración de base de datos a respaldar</small>
+                        </div>
+
+                        <!-- Tipo de Almacenamiento -->
+                        <div class="col-md-6">
+                            <label for="add_storage_type" class="form-label fw-semibold">
+                                <i class="bi bi-cloud-arrow-up me-1 text-primary"></i>Tipo de Almacenamiento
+                            </label>
+                            <select class="form-select" id="add_storage_type" name="StorageType" required onchange="loadStorages('add')">
+                                <option value="">Seleccionar tipo...</option>
+                                <option value="GoogleDrive">Google Drive</option>
+                                <option value="OneDrive">OneDrive</option>
+                                <option value="AzureBlob">Azure Blob Storage</option>
+                                <option value="Ftp">FTP/SFTP</option>
+                                <option value="Local">Almacenamiento Local</option>
+                            </select>
+                        </div>
+
+                        <!-- Almacenamiento Específico -->
+                        <div class="col-md-6">
+                            <label for="add_storage_id" class="form-label fw-semibold">
+                                <i class="bi bi-hdd me-1 text-primary"></i>Almacenamiento
+                            </label>
+                            <select class="form-select" id="add_storage_id" name="StorageId" required disabled>
+                                <option value="">Primero selecciona un tipo...</option>
+                            </select>
+                            <small class="text-muted">Destino donde se guardará el backup</small>
+                        </div>
+
+                        <!-- Frecuencia -->
+                        <div class="col-md-6">
+                            <label for="add_frequency_type" class="form-label fw-semibold">
+                                <i class="bi bi-arrow-repeat me-1 text-primary"></i>Tipo de Frecuencia
+                            </label>
+                            <select class="form-select" id="add_frequency_type" name="FrequencyType" required>
+                                <option value="Minutos">Minutos</option>
+                                <option value="Horas" selected>Horas</option>
+                                <option value="Días">Días</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="add_frequency_value" class="form-label fw-semibold">
+                                <i class="bi bi-123 me-1 text-primary"></i>Cada cuánto
+                            </label>
+                            <input type="number" class="form-control" id="add_frequency_value" name="FrequencyValue"
+                                   min="1" value="6" required>
+                            <small class="text-muted">Intervalo de tiempo entre ejecuciones</small>
+                        </div>
+
+                        <!-- Estado inicial -->
+                        <div class="col-12">
+                            <div class="card bg-light border-0">
+                                <div class="card-body">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="add_is_active"
+                                               name="IsActive" value="true" checked>
+                                        <label class="form-check-label" for="add_is_active">
+                                            <strong>Activar tarea inmediatamente</strong>
+                                            <br><small class="text-muted">La tarea comenzará a ejecutarse según la frecuencia configurada</small>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i>Cancelar
+                    </button>
+                    <button type="submit" id="add_task_submit_btn" class="btn btn-primary rounded-pill px-4">
+                        <i class="bi bi-check-circle me-2"></i>Crear Tarea
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Editar Tarea -->
+<div class="modal fade" id="editTaskModal" tabindex="-1" aria-labelledby="editTaskModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-warning text-dark border-0">
+                <h5 class="modal-title" id="editTaskModalLabel">
+                    <i class="bi bi-pencil-square me-2"></i>Editar Tarea Programada
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editTaskForm" asp-action="Edit" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="edit_task_id" name="Id">
+                <div class="modal-body p-4">
+                    <!-- Alerta de errores -->
+                    <div id="edit_task_error_alert" class="alert alert-danger alert-dismissible fade" role="alert" style="display: none;">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <span id="edit_task_error_message"></span>
+                        <button type="button" class="btn-close" onclick="hideAlert('edit_task_error_alert')"></button>
+                    </div>
+
+                    <div class="row g-3">
+                        <!-- Nombre de la tarea -->
+                        <div class="col-12">
+                            <label for="edit_task_name" class="form-label fw-semibold">
+                                <i class="bi bi-tag me-1 text-warning"></i>Nombre de la Tarea
+                            </label>
+                            <input type="text" class="form-control" id="edit_task_name" name="TaskName"
+                                   placeholder="Ej: Backup diario BD Producción" required>
+                        </div>
+
+                        <!-- Tipo de Base de Datos -->
+                        <div class="col-md-6">
+                            <label for="edit_database_type" class="form-label fw-semibold">
+                                <i class="bi bi-database me-1 text-warning"></i>Tipo de Base de Datos
+                            </label>
+                            <select class="form-select" id="edit_database_type" name="DatabaseType" required onchange="loadDatabases('edit')">
+                                <option value="">Seleccionar tipo...</option>
+                                <option value="SqlServer">SQL Server</option>
+                                <option value="MySQL">MySQL</option>
+                                <option value="PostgreSQL">PostgreSQL</option>
+                                <option value="MongoDB">MongoDB</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="edit_database_id" class="form-label fw-semibold">
+                                <i class="bi bi-server me-1 text-warning"></i>Base de Datos
+                            </label>
+                            <select class="form-select" id="edit_database_id" name="DatabaseId" required>
+                                <option value="">Primero selecciona un tipo...</option>
+                            </select>
+                        </div>
+
+                        <!-- Tipo de Almacenamiento -->
+                        <div class="col-md-6">
+                            <label for="edit_storage_type" class="form-label fw-semibold">
+                                <i class="bi bi-cloud-arrow-up me-1 text-warning"></i>Tipo de Almacenamiento
+                            </label>
+                            <select class="form-select" id="edit_storage_type" name="StorageType" required onchange="loadStorages('edit')">
+                                <option value="">Seleccionar tipo...</option>
+                                <option value="GoogleDrive">Google Drive</option>
+                                <option value="OneDrive">OneDrive</option>
+                                <option value="AzureBlob">Azure Blob Storage</option>
+                                <option value="Ftp">FTP/SFTP</option>
+                                <option value="Local">Almacenamiento Local</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="edit_storage_id" class="form-label fw-semibold">
+                                <i class="bi bi-hdd me-1 text-warning"></i>Almacenamiento
+                            </label>
+                            <select class="form-select" id="edit_storage_id" name="StorageId" required>
+                                <option value="">Primero selecciona un tipo...</option>
+                            </select>
+                        </div>
+
+                        <!-- Frecuencia -->
+                        <div class="col-md-6">
+                            <label for="edit_frequency_type" class="form-label fw-semibold">
+                                <i class="bi bi-arrow-repeat me-1 text-warning"></i>Tipo de Frecuencia
+                            </label>
+                            <select class="form-select" id="edit_frequency_type" name="FrequencyType" required>
+                                <option value="Minutos">Minutos</option>
+                                <option value="Horas">Horas</option>
+                                <option value="Días">Días</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="edit_frequency_value" class="form-label fw-semibold">
+                                <i class="bi bi-123 me-1 text-warning"></i>Cada cuánto
+                            </label>
+                            <input type="number" class="form-control" id="edit_frequency_value" name="FrequencyValue"
+                                   min="1" required>
+                        </div>
+
+                        <!-- Estado -->
+                        <div class="col-12">
+                            <div class="card bg-light border-0">
+                                <div class="card-body">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="edit_is_active"
+                                               name="IsActive" value="true">
+                                        <label class="form-check-label" for="edit_is_active">
+                                            <strong>Tarea activa</strong>
+                                            <br><small class="text-muted">Desmarca para pausar la tarea</small>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i>Cancelar
+                    </button>
+                    <button type="submit" id="edit_task_submit_btn" class="btn btn-warning text-dark rounded-pill px-4">
+                        <i class="bi bi-check-circle me-2"></i>Actualizar Tarea
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Eliminar Tarea -->
+<div class="modal fade" id="deleteTaskModal" tabindex="-1" aria-labelledby="deleteTaskModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-danger text-white border-0">
+                <h5 class="modal-title" id="deleteTaskModalLabel">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Confirmar Eliminación
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form asp-action="Delete" method="post">
+                <input type="hidden" id="delete_task_id" name="id">
+                <div class="modal-body p-4">
+                    <div class="text-center mb-4">
+                        <i class="bi bi-exclamation-circle text-danger" style="font-size: 4rem;"></i>
+                    </div>
+                    <h6 class="text-center mb-3">¿Está seguro que desea eliminar esta tarea?</h6>
+                    <div class="alert alert-warning d-flex align-items-center" role="alert">
+                        <i class="bi bi-info-circle-fill me-2 flex-shrink-0"></i>
+                        <div>
+                            <strong id="delete_task_name"></strong>
+                            <p class="mb-0 small">Esta acción no se puede deshacer.</p>
+                        </div>
+                    </div>
+                    <p class="text-muted small text-center mb-0">
+                        Los backups programados dejarán de ejecutarse automáticamente.
+                    </p>
+                </div>
+                <div class="modal-footer border-0 bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i>Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-danger rounded-pill px-4">
+                        <i class="bi bi-trash me-2"></i>Eliminar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    .task-card {
+        transition: all 0.3s ease;
+    }
+
+    .task-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15) !important;
+    }
+
+    .btn-group-vertical .btn {
+        margin-bottom: 0.25rem;
+    }
+
+    .btn-group-vertical .btn:last-child {
+        margin-bottom: 0;
+    }
+</style>
+
+<script>
+    // Función para ocultar alertas
+    function hideAlert(alertId) {
+        const alert = document.getElementById(alertId);
+        if (alert) {
+            alert.style.display = 'none';
+            alert.classList.remove('show');
+        }
+    }
+
+    // Función para mostrar alerta
+    function showAlert(alertId, messageId, message) {
+        const alert = document.getElementById(alertId);
+        const messageSpan = document.getElementById(messageId);
+        if (alert && messageSpan) {
+            messageSpan.textContent = message;
+            alert.style.display = 'block';
+            alert.classList.add('show');
+        }
+    }
+
+    // Cargar bases de datos según el tipo seleccionado
+    async function loadDatabases(mode) {
+        const typeSelect = document.getElementById(`${mode}_database_type`);
+        const dbSelect = document.getElementById(`${mode}_database_id`);
+        const type = typeSelect.value;
+
+        if (!type) {
+            dbSelect.disabled = true;
+            dbSelect.innerHTML = '<option value="">Primero selecciona un tipo...</option>';
+            return;
+        }
+
+        dbSelect.disabled = true;
+        dbSelect.innerHTML = '<option value="">Cargando...</option>';
+
+        try {
+            const response = await fetch(`/TaskScheduler/GetDatabasesByType?type=${encodeURIComponent(type)}`);
+            const result = await response.json();
+
+            if (result.success) {
+                dbSelect.disabled = false;
+                dbSelect.innerHTML = '<option value="">Seleccionar base de datos...</option>';
+
+                result.data.forEach(db => {
+                    const option = document.createElement('option');
+                    option.value = db.id;
+                    option.textContent = db.name;
+                    dbSelect.appendChild(option);
+                });
+
+                if (result.data.length === 0) {
+                    dbSelect.innerHTML = '<option value="">No hay configuraciones disponibles</option>';
+                }
+            } else {
+                dbSelect.innerHTML = '<option value="">Error al cargar</option>';
+                console.error('Error:', result.message);
+            }
+        } catch (error) {
+            dbSelect.innerHTML = '<option value="">Error de conexión</option>';
+            console.error('Error:', error);
+        }
+    }
+
+    // Cargar almacenamientos según el tipo seleccionado
+    async function loadStorages(mode) {
+        const typeSelect = document.getElementById(`${mode}_storage_type`);
+        const storageSelect = document.getElementById(`${mode}_storage_id`);
+        const type = typeSelect.value;
+
+        if (!type) {
+            storageSelect.disabled = true;
+            storageSelect.innerHTML = '<option value="">Primero selecciona un tipo...</option>';
+            return;
+        }
+
+        storageSelect.disabled = true;
+        storageSelect.innerHTML = '<option value="">Cargando...</option>';
+
+        try {
+            const response = await fetch(`/TaskScheduler/GetStoragesByType?type=${encodeURIComponent(type)}`);
+            const result = await response.json();
+
+            if (result.success) {
+                storageSelect.disabled = false;
+                storageSelect.innerHTML = '<option value="">Seleccionar almacenamiento...</option>';
+
+                result.data.forEach(storage => {
+                    const option = document.createElement('option');
+                    option.value = storage.id;
+                    option.textContent = storage.name;
+                    storageSelect.appendChild(option);
+                });
+
+                if (result.data.length === 0) {
+                    storageSelect.innerHTML = '<option value="">No hay configuraciones disponibles</option>';
+                }
+            } else {
+                storageSelect.innerHTML = '<option value="">Error al cargar</option>';
+                console.error('Error:', result.message);
+            }
+        } catch (error) {
+            storageSelect.innerHTML = '<option value="">Error de conexión</option>';
+            console.error('Error:', error);
+        }
+    }
+
+    // Ejecutar una tarea específica
+    async function executeTask(taskId) {
+        const result = await Swal.fire({
+            title: '¿Ejecutar tarea ahora?',
+            text: 'Se iniciará el proceso de backup inmediatamente',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: '<i class="bi bi-play-fill me-2"></i>Ejecutar',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#198754',
+            cancelButtonColor: '#6c757d'
+        });
+
+        if (result.isConfirmed) {
+            Swal.fire({
+                title: 'Ejecutando...',
+                html: 'El backup está en proceso',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            try {
+                const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+                const response = await fetch('/TaskScheduler/ExecuteTask', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `id=${taskId}&__RequestVerificationToken=${encodeURIComponent(token)}`
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    await Swal.fire('¡Éxito!', data.message, 'success');
+                    location.reload();
+                } else {
+                    Swal.fire('Error', data.message, 'error');
+                }
+            } catch (error) {
+                Swal.fire('Error', 'Error al ejecutar la tarea', 'error');
+                console.error('Error:', error);
+            }
+        }
+    }
+
+    // Ejecutar todas las tareas
+    async function executeAllTasks() {
+        const result = await Swal.fire({
+            title: '¿Ejecutar todas las tareas?',
+            text: 'Se iniciarán todos los procesos de backup activos',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: '<i class="bi bi-play-circle me-2"></i>Ejecutar Todas',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#0d6efd',
+            cancelButtonColor: '#6c757d'
+        });
+
+        if (result.isConfirmed) {
+            Swal.fire({
+                title: 'Ejecutando...',
+                html: 'Los backups están en proceso',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            try {
+                const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+                const response = await fetch('/TaskScheduler/ExecuteAllTasks', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `__RequestVerificationToken=${encodeURIComponent(token)}`
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    await Swal.fire('¡Éxito!', data.message, 'success');
+                    location.reload();
+                } else {
+                    Swal.fire('Error', data.message, 'error');
+                }
+            } catch (error) {
+                Swal.fire('Error', 'Error al ejecutar las tareas', 'error');
+                console.error('Error:', error);
+            }
+        }
+    }
+
+    // Pausar/Activar tarea
+    async function toggleTask(taskId, isActive) {
+        const action = isActive ? 'pausar' : 'activar';
+        const actionUpper = isActive ? 'Pausar' : 'Activar';
+
+        const result = await Swal.fire({
+            title: `¿${actionUpper} tarea?`,
+            text: isActive ? 'La tarea dejará de ejecutarse automáticamente' : 'La tarea se reanudará según su programación',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: `<i class="bi bi-${isActive ? 'pause' : 'play'}-fill me-2"></i>${actionUpper}`,
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: isActive ? '#ffc107' : '#198754',
+            cancelButtonColor: '#6c757d'
+        });
+
+        if (result.isConfirmed) {
+            try {
+                const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+                const response = await fetch('/TaskScheduler/ToggleTask', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `id=${taskId}&__RequestVerificationToken=${encodeURIComponent(token)}`
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    await Swal.fire('¡Hecho!', data.message, 'success');
+                    location.reload();
+                } else {
+                    Swal.fire('Error', data.message, 'error');
+                }
+            } catch (error) {
+                Swal.fire('Error', 'Error al cambiar el estado de la tarea', 'error');
+                console.error('Error:', error);
+            }
+        }
+    }
+
+    // Editar tarea
+    async function editTask(taskId) {
+        try {
+            const response = await fetch(`/TaskScheduler/GetById?id=${taskId}`);
+            const result = await response.json();
+
+            if (result.success) {
+                const task = result.data;
+
+                // Poblar el modal con los datos
+                document.getElementById('edit_task_id').value = task.id;
+                document.getElementById('edit_task_name').value = task.taskName;
+                document.getElementById('edit_database_type').value = task.databaseType;
+                document.getElementById('edit_storage_type').value = task.storageType;
+                document.getElementById('edit_frequency_type').value = task.frequencyType;
+                document.getElementById('edit_frequency_value').value = task.frequencyValue;
+                document.getElementById('edit_is_active').checked = task.isActive;
+
+                // Cargar databases y storages basándose en los tipos
+                await loadDatabases('edit');
+                await loadStorages('edit');
+
+                // Seleccionar los valores específicos
+                document.getElementById('edit_database_id').value = task.databaseId;
+                document.getElementById('edit_storage_id').value = task.storageId;
+
+                // Abrir el modal
+                const modal = new bootstrap.Modal(document.getElementById('editTaskModal'));
+                modal.show();
+            } else {
+                Swal.fire('Error', result.message, 'error');
+            }
+        } catch (error) {
+            Swal.fire('Error', 'Error al cargar los datos de la tarea', 'error');
+            console.error('Error:', error);
+        }
+    }
+
+    // Form submission handlers
+    document.getElementById('addTaskForm')?.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const submitBtn = document.getElementById('add_task_submit_btn');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creando...';
+
+        try {
+            const formData = new FormData(this);
+            const response = await fetch('/TaskScheduler/Create', {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                body: new URLSearchParams(formData)
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                await Swal.fire('¡Éxito!', data.message, 'success');
+                location.reload();
+            } else {
+                showAlert('add_task_error_alert', 'add_task_error_message', data.message);
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        } catch (error) {
+            showAlert('add_task_error_alert', 'add_task_error_message', 'Error al crear la tarea');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+            console.error('Error:', error);
+        }
+    });
+
+    document.getElementById('editTaskForm')?.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const submitBtn = document.getElementById('edit_task_submit_btn');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Actualizando...';
+
+        try {
+            const formData = new FormData(this);
+            const response = await fetch('/TaskScheduler/Edit', {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                body: new URLSearchParams(formData)
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                await Swal.fire('¡Éxito!', data.message, 'success');
+                location.reload();
+            } else {
+                showAlert('edit_task_error_alert', 'edit_task_error_message', data.message);
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        } catch (error) {
+            showAlert('edit_task_error_alert', 'edit_task_error_message', 'Error al actualizar la tarea');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+            console.error('Error:', error);
+        }
+    });
+
+    // Cargar datos en el modal de eliminación
+    document.getElementById('deleteTaskModal')?.addEventListener('show.bs.modal', function (event) {
+        const button = event.relatedTarget;
+
+        document.getElementById('delete_task_id').value = button.getAttribute('data-id');
+        document.getElementById('delete_task_name').textContent = button.getAttribute('data-name');
+    });
+
+    // Limpiar formulario cuando se cierra el modal de agregar
+    document.getElementById('addTaskModal')?.addEventListener('hidden.bs.modal', function() {
+        document.getElementById('addTaskForm').reset();
+        hideAlert('add_task_error_alert');
+        document.getElementById('add_database_id').disabled = true;
+        document.getElementById('add_storage_id').disabled = true;
+    });
+</script>

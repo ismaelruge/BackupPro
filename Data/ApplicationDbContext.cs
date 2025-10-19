@@ -30,5 +30,8 @@ namespace BackupPro.Data
         public DbSet<PostgresSqlDataBase> PostgresSqlDataBases { get; set; }
         public DbSet<MySqlDataBase> MySqlDataBases { get; set; }
         public DbSet<MongoDBDataBase> MongoDBDataBases { get; set; }
+
+        // Task Scheduler
+        public DbSet<Models.TaskScheduler> TaskSchedulers { get; set; }
     }
 }
