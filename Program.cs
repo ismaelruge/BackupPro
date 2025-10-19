@@ -103,6 +103,7 @@ namespace BackupPro
             builder.Services.AddScoped<BackupPro.Controllers.DataBasesTypes.SqlServerDataBaseController>();
             builder.Services.AddScoped<BackupPro.Controllers.StorageTypes.LocalStorageController>();
             builder.Services.AddScoped<BackupPro.Controllers.StorageTypes.FtpStorageController>();
+            builder.Services.AddScoped<BackupPro.Controllers.StorageTypes.BlobStorageController>();
 
             // Agregar soporte para sesiones
             builder.Services.AddDistributedMemoryCache();

@@ -15,17 +15,20 @@ namespace BackupPro.Controllers
         private readonly DataBasesTypes.SqlServerDataBaseController _sqlServerController;
         private readonly StorageTypes.LocalStorageController _localStorageController;
         private readonly StorageTypes.FtpStorageController _ftpStorageController;
+        private readonly StorageTypes.BlobStorageController _blobStorageController;
 
         public TaskSchedulerController(
             ApplicationDbContext context,
             DataBasesTypes.SqlServerDataBaseController sqlServerController,
             StorageTypes.LocalStorageController localStorageController,
-            StorageTypes.FtpStorageController ftpStorageController)
+            StorageTypes.FtpStorageController ftpStorageController,
+            StorageTypes.BlobStorageController blobStorageController)
         {
             _context = context;
             _sqlServerController = sqlServerController;
             _localStorageController = localStorageController;
             _ftpStorageController = ftpStorageController;
+            _blobStorageController = blobStorageController;
         }
 
         public async Task<IActionResult> Index()
@@ -578,6 +581,10 @@ namespace BackupPro.Controllers
             {
                 return await ExecuteBackupSqlServerFtp(task.DatabaseId, task.StorageId);
             }
+            else if (task.DatabaseType == "SqlServer" && task.StorageType == "AzureBlob")
+            {
+                return await ExecuteBackupSqlServerBlob(task.DatabaseId, task.StorageId);
+            }
             // Otras combinaciones que aún no están implementadas
             else if (task.DatabaseType == "SqlServer")
             {
@@ -694,6 +701,52 @@ namespace BackupPro.Controllers
         }
 
         /// <summary>
+        /// Ejecuta backup de SQL Server a Azure Blob Storage
+        /// </summary>
+        private async Task<string> ExecuteBackupSqlServerBlob(int sqlServerDatabaseId, int blobStorageId)
+        {
+            MemoryStream? backupStream = null;
+
+            try
+            {
+                // Paso 1: Crear el backup en SQL Server y obtener el MemoryStream
+                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _sqlServerController.CreateBackup(sqlServerDatabaseId);
+
+                if (!backupSuccess || backupStream2 == null)
+                {
+                    throw new Exception(backupError);
+                }
+
+                backupStream = backupStream2;
+
+                // Paso 2: Guardar el backup en Azure Blob Storage
+                var (saveSuccess, filePath, fileSize, saveError) = await _blobStorageController.SaveBackup(
+                    blobStorageId,
+                    backupStream,
+                    fileName,
+                    databaseName,
+                    sqlServerDatabaseId
+                );
+
+                if (!saveSuccess)
+                {
+                    throw new Exception(saveError);
+                }
+
+                return $"Backup creado exitosamente en Azure Blob: {fileName} ({FormatBytes(fileSize)})";
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error al ejecutar backup Azure Blob: {ex.Message}", ex);
+            }
+            finally
+            {
+                // Liberar el MemoryStream
+                backupStream?.Dispose();
+            }
+        }
+
+        /// <summary>
         /// Formatea bytes a una representación legible (KB, MB, GB)
         /// </summary>
         private string FormatBytes(long bytes)
@@ -724,6 +777,12 @@ namespace BackupPro.Controllers
                 if (task == null)
                 {
                     return Json(new { success = false, message = "Tarea no encontrada." });
+                }
+
+                // Validar que la tarea esté activa
+                if (!task.IsActive)
+                {
+                    return Json(new { success = false, message = "No se puede ejecutar una tarea pausada. Activa la tarea primero." });
                 }
 
                 // Ejecutar backup según el tipo de base de datos y almacenamiento
