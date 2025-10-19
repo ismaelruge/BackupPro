@@ -16,19 +16,25 @@ namespace BackupPro.Controllers
         private readonly StorageTypes.LocalStorageController _localStorageController;
         private readonly StorageTypes.FtpStorageController _ftpStorageController;
         private readonly StorageTypes.BlobStorageController _blobStorageController;
+        private readonly StorageTypes.OneDriveStorageController _oneDriveStorageController;
+        private readonly StorageTypes.GoogleDriveStorageController _googleDriveStorageController;
 
         public TaskSchedulerController(
             ApplicationDbContext context,
             DataBasesTypes.SqlServerDataBaseController sqlServerController,
             StorageTypes.LocalStorageController localStorageController,
             StorageTypes.FtpStorageController ftpStorageController,
-            StorageTypes.BlobStorageController blobStorageController)
+            StorageTypes.BlobStorageController blobStorageController,
+            StorageTypes.OneDriveStorageController oneDriveStorageController,
+            StorageTypes.GoogleDriveStorageController googleDriveStorageController)
         {
             _context = context;
             _sqlServerController = sqlServerController;
             _localStorageController = localStorageController;
             _ftpStorageController = ftpStorageController;
             _blobStorageController = blobStorageController;
+            _oneDriveStorageController = oneDriveStorageController;
+            _googleDriveStorageController = googleDriveStorageController;
         }
 
         public async Task<IActionResult> Index()
@@ -585,6 +591,14 @@ namespace BackupPro.Controllers
             {
                 return await ExecuteBackupSqlServerBlob(task.DatabaseId, task.StorageId);
             }
+            else if (task.DatabaseType == "SqlServer" && task.StorageType == "OneDrive")
+            {
+                return await ExecuteBackupSqlServerOneDrive(task.DatabaseId, task.StorageId);
+            }
+            else if (task.DatabaseType == "SqlServer" && task.StorageType == "GoogleDrive")
+            {
+                return await ExecuteBackupSqlServerGoogleDrive(task.DatabaseId, task.StorageId);
+            }
             // Otras combinaciones que aún no están implementadas
             else if (task.DatabaseType == "SqlServer")
             {
@@ -738,6 +752,98 @@ namespace BackupPro.Controllers
             catch (Exception ex)
             {
                 throw new Exception($"Error al ejecutar backup Azure Blob: {ex.Message}", ex);
+            }
+            finally
+            {
+                // Liberar el MemoryStream
+                backupStream?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Ejecuta backup de SQL Server a OneDrive
+        /// </summary>
+        private async Task<string> ExecuteBackupSqlServerOneDrive(int sqlServerDatabaseId, int oneDriveStorageId)
+        {
+            MemoryStream? backupStream = null;
+
+            try
+            {
+                // Paso 1: Crear el backup en SQL Server y obtener el MemoryStream
+                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _sqlServerController.CreateBackup(sqlServerDatabaseId);
+
+                if (!backupSuccess || backupStream2 == null)
+                {
+                    throw new Exception(backupError);
+                }
+
+                backupStream = backupStream2;
+
+                // Paso 2: Guardar el backup en OneDrive
+                var (saveSuccess, filePath, fileSize, saveError) = await _oneDriveStorageController.SaveBackup(
+                    oneDriveStorageId,
+                    backupStream,
+                    fileName,
+                    databaseName,
+                    sqlServerDatabaseId
+                );
+
+                if (!saveSuccess)
+                {
+                    throw new Exception(saveError);
+                }
+
+                return $"Backup creado exitosamente en OneDrive: {fileName} ({FormatBytes(fileSize)})";
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error al ejecutar backup OneDrive: {ex.Message}", ex);
+            }
+            finally
+            {
+                // Liberar el MemoryStream
+                backupStream?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Ejecuta backup de SQL Server a Google Drive
+        /// </summary>
+        private async Task<string> ExecuteBackupSqlServerGoogleDrive(int sqlServerDatabaseId, int googleDriveStorageId)
+        {
+            MemoryStream? backupStream = null;
+
+            try
+            {
+                // Paso 1: Crear el backup en SQL Server y obtener el MemoryStream
+                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _sqlServerController.CreateBackup(sqlServerDatabaseId);
+
+                if (!backupSuccess || backupStream2 == null)
+                {
+                    throw new Exception(backupError);
+                }
+
+                backupStream = backupStream2;
+
+                // Paso 2: Guardar el backup en Google Drive
+                var (saveSuccess, filePath, fileSize, saveError) = await _googleDriveStorageController.SaveBackup(
+                    googleDriveStorageId,
+                    backupStream,
+                    fileName,
+                    databaseName,
+                    sqlServerDatabaseId
+                );
+
+                if (!saveSuccess)
+                {
+                    throw new Exception(saveError);
+                }
+
+                return $"Backup creado exitosamente en Google Drive: {fileName} ({FormatBytes(fileSize)})";
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error al ejecutar backup Google Drive: {ex.Message}", ex);
             }
             finally
             {

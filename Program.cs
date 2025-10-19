@@ -104,6 +104,8 @@ namespace BackupPro
             builder.Services.AddScoped<BackupPro.Controllers.StorageTypes.LocalStorageController>();
             builder.Services.AddScoped<BackupPro.Controllers.StorageTypes.FtpStorageController>();
             builder.Services.AddScoped<BackupPro.Controllers.StorageTypes.BlobStorageController>();
+            builder.Services.AddScoped<BackupPro.Controllers.StorageTypes.OneDriveStorageController>();
+            builder.Services.AddScoped<BackupPro.Controllers.StorageTypes.GoogleDriveStorageController>();
 
             // Agregar soporte para sesiones
             builder.Services.AddDistributedMemoryCache();

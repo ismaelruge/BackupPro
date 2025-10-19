@@ -4,6 +4,7 @@ using BackupPro.Data;
 using BackupPro.Models;
 using BackupPro.ViewModels;
 using Microsoft.EntityFrameworkCore;
+using System.IO.Compression;
 
 namespace BackupPro.Controllers.StorageTypes
 {
@@ -476,6 +477,181 @@ namespace BackupPro.Controllers.StorageTypes
             {
                 return Json(new { success = false, message = $"Error: {ex.Message}" });
             }
+        }
+
+        // ========== BACKUP OPERATIONS ==========
+
+        /// <summary>
+        /// Guarda un backup (MemoryStream) en OneDrive
+        /// </summary>
+        /// <param name="oneDriveStorageId">ID de la configuración de OneDrive</param>
+        /// <param name="backupStream">Stream del backup</param>
+        /// <param name="fileName">Nombre del archivo</param>
+        /// <param name="databaseName">Nombre de la base de datos</param>
+        /// <param name="databaseId">ID de la base de datos de origen</param>
+        /// <returns>Tuple con el resultado de la operación</returns>
+        public async Task<(bool success, string filePath, long fileSize, string errorMessage)> SaveBackup(int oneDriveStorageId, MemoryStream backupStream, string fileName, string databaseName, int databaseId)
+        {
+            var startTime = DateTime.Now;
+            string oneDrivePath = string.Empty;
+            string localTempPath = string.Empty;
+
+            try
+            {
+                // Obtener configuración de OneDrive
+                var oneDriveStorage = await _context.OneDriveStorages.FindAsync(oneDriveStorageId);
+                if (oneDriveStorage == null)
+                {
+                    return (false, string.Empty, 0, "Configuración de OneDrive no encontrada");
+                }
+
+                // Verificar que tenga un token válido
+                if (string.IsNullOrEmpty(oneDriveStorage.AccessToken))
+                {
+                    return (false, string.Empty, 0, "No hay un token de acceso válido para OneDrive. Por favor, autentícate primero.");
+                }
+
+                // Cambiar extensión a .zip
+                string zipFileName = Path.ChangeExtension(fileName, ".zip");
+
+                // Construir ruta de OneDrive
+                oneDrivePath = string.IsNullOrEmpty(oneDriveStorage.FolderPath)
+                    ? zipFileName
+                    : $"{oneDriveStorage.FolderPath.TrimEnd('/')}/{zipFileName}";
+
+                // Crear archivo temporal local comprimido
+                localTempPath = Path.Combine(Path.GetTempPath(), zipFileName);
+
+                // Comprimir el backup en un archivo .zip temporal
+                using (var fileStream = new FileStream(localTempPath, FileMode.Create, FileAccess.Write))
+                using (var zipArchive = new ZipArchive(fileStream, ZipArchiveMode.Create, false))
+                {
+                    var entry = zipArchive.CreateEntry(fileName, CompressionLevel.Optimal);
+
+                    using (var entryStream = entry.Open())
+                    {
+                        backupStream.Position = 0; // Asegurar que el stream está al inicio
+                        await backupStream.CopyToAsync(entryStream);
+                    }
+                }
+
+                // Subir a OneDrive usando Microsoft Graph API
+                using var httpClient = new HttpClient();
+                httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {oneDriveStorage.AccessToken}");
+
+                // Determinar la URL de upload
+                string uploadUrl;
+                if (string.IsNullOrEmpty(oneDriveStorage.ItemId))
+                {
+                    // Subir a la raíz o a una ruta específica
+                    uploadUrl = $"https://graph.microsoft.com/v1.0/me/drive/root:/{zipFileName}:/content";
+                }
+                else
+                {
+                    // Subir a una carpeta específica por ID
+                    uploadUrl = $"https://graph.microsoft.com/v1.0/me/drive/items/{oneDriveStorage.ItemId}:/{zipFileName}:/content";
+                }
+
+                // Leer el archivo y subirlo
+                using (var uploadStream = System.IO.File.OpenRead(localTempPath))
+                {
+                    var content = new StreamContent(uploadStream);
+                    content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/zip");
+
+                    var response = await httpClient.PutAsync(uploadUrl, content);
+                    var responseJson = await response.Content.ReadAsStringAsync();
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        return (false, string.Empty, 0, $"Error al subir archivo a OneDrive: {responseJson}");
+                    }
+
+                    // Obtener tamaño del archivo desde la respuesta
+                    var responseData = System.Text.Json.JsonDocument.Parse(responseJson);
+                    long fileSize = responseData.RootElement.GetProperty("size").GetInt64();
+
+                    var duration = DateTime.Now - startTime;
+
+                    // Registrar en el histórico
+                    var backupHistory = new BackupHistory
+                    {
+                        DatabaseSourceId = databaseId,
+                        DatabaseName = databaseName,
+                        Date = startTime,
+                        Status = "Exitoso",
+                        Message = $"Backup guardado exitosamente en OneDrive. Tamaño: {FormatBytes(fileSize)}. Duración: {duration.TotalSeconds:F2} segundos.",
+                        BackupPath = oneDrivePath
+                    };
+
+                    _context.BackupHistories.Add(backupHistory);
+                    await _context.SaveChangesAsync();
+
+                    // Eliminar archivo temporal local
+                    try
+                    {
+                        if (System.IO.File.Exists(localTempPath))
+                        {
+                            System.IO.File.Delete(localTempPath);
+                        }
+                    }
+                    catch { /* Ignorar errores al eliminar */ }
+
+                    return (true, oneDrivePath, fileSize, string.Empty);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Error general
+                var errorMessage = $"Error al guardar backup en OneDrive: {ex.Message}";
+
+                // Eliminar archivo temporal local si existe
+                try
+                {
+                    if (!string.IsNullOrEmpty(localTempPath) && System.IO.File.Exists(localTempPath))
+                    {
+                        System.IO.File.Delete(localTempPath);
+                    }
+                }
+                catch { /* Ignorar errores al eliminar */ }
+
+                // Registrar error en el histórico
+                try
+                {
+                    var backupHistory = new BackupHistory
+                    {
+                        DatabaseSourceId = databaseId,
+                        DatabaseName = databaseName,
+                        Date = startTime,
+                        Status = "Error",
+                        Message = errorMessage,
+                        BackupPath = oneDrivePath ?? "N/A"
+                    };
+
+                    _context.BackupHistories.Add(backupHistory);
+                    await _context.SaveChangesAsync();
+                }
+                catch { /* Ignorar errores al registrar */ }
+
+                return (false, string.Empty, 0, errorMessage);
+            }
+        }
+
+        /// <summary>
+        /// Formatea bytes a una representación legible (KB, MB, GB)
+        /// </summary>
+        private string FormatBytes(long bytes)
+        {
+            string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+            double len = bytes;
+            int order = 0;
+
+            while (len >= 1024 && order < sizes.Length - 1)
+            {
+                order++;
+                len = len / 1024;
+            }
+
+            return $"{len:0.##} {sizes[order]}";
         }
     }
 
