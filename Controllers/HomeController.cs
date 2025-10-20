@@ -14,7 +14,6 @@ namespace BackupPro.Controllers
     /// </summary>
     public class HomeController : Controller
     {
-        //private readonly BackupService _backupService;
         private readonly EmailService _emailSender;
         private readonly UserManager<IdentityUser> _userManager;
 
@@ -132,7 +131,6 @@ namespace BackupPro.Controllers
         /// </summary>
         public async Task<IActionResult> EjecutarBackups()
         {
-            //await _backupService.EjecutarBackupsAsync();
             return RedirectToAction("Index");
         }
     }

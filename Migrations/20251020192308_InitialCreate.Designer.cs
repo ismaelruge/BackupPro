@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BackupPro.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20251017211227_AddTaskScheduler")]
-    partial class AddTaskScheduler
+    [Migration("20251020192308_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

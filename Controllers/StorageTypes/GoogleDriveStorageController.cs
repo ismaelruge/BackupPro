@@ -14,13 +14,11 @@ namespace BackupPro.Controllers.StorageTypes
     {
         private readonly ApplicationDbContext _context;
         private readonly GoogleOAuthSettings _googleOAuthSettings;
-        private readonly ILogger<GoogleDriveStorageController> _logger;
 
-        public GoogleDriveStorageController(ApplicationDbContext context, GoogleOAuthSettings googleOAuthSettings, ILogger<GoogleDriveStorageController> logger)
+        public GoogleDriveStorageController(ApplicationDbContext context, GoogleOAuthSettings googleOAuthSettings)
         {
             _context = context;
             _googleOAuthSettings = googleOAuthSettings;
-            _logger = logger;
         }
 
         public async Task<IActionResult> Index()
@@ -193,22 +191,7 @@ namespace BackupPro.Controllers.StorageTypes
                 var googleDrive = await _context.GoogleDriveStorages.FindAsync(request.Id);
                 if (googleDrive == null)
                 {
-                    _logger.LogWarning("Intento de guardar tokens para configuración inexistente ID: {Id}", request.Id);
                     return Json(new { success = false, message = "Configuración no encontrada." });
-                }
-
-                // Verificar si se recibió RefreshToken
-                if (string.IsNullOrEmpty(request.RefreshToken))
-                {
-                    _logger.LogWarning("No se recibió RefreshToken para la configuración {ConfigId} ({ConfigName}). " +
-                        "Esto puede suceder si Google no devolvió un refresh_token. " +
-                        "El usuario debe revocar el acceso desde https://myaccount.google.com/permissions y volver a autenticarse.",
-                        googleDrive.Id, googleDrive.ConfigurationName);
-                }
-                else
-                {
-                    _logger.LogInformation("RefreshToken recibido correctamente para la configuración {ConfigId} ({ConfigName})",
-                        googleDrive.Id, googleDrive.ConfigurationName);
                 }
 
                 // TODO: En producción, encriptar los tokens antes de guardarlos
@@ -220,17 +203,10 @@ namespace BackupPro.Controllers.StorageTypes
                 _context.GoogleDriveStorages.Update(googleDrive);
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Tokens guardados exitosamente para la configuración {ConfigId}. " +
-                    "AccessToken: {HasAccessToken}, RefreshToken: {HasRefreshToken}",
-                    googleDrive.Id,
-                    !string.IsNullOrEmpty(googleDrive.AccessToken),
-                    !string.IsNullOrEmpty(googleDrive.RefreshToken));
-
                 return Json(new { success = true, message = "Tokens guardados exitosamente." });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al guardar tokens para la configuración ID: {Id}", request.Id);
                 return Json(new { success = false, message = $"Error al guardar tokens: {ex.Message}" });
             }
         }
@@ -347,17 +323,6 @@ namespace BackupPro.Controllers.StorageTypes
                 {
                     refreshToken = refreshTokenElement.GetString();
                     hasRefreshToken = !string.IsNullOrEmpty(refreshToken);
-                }
-
-                // Log importante para debugging
-                _logger.LogInformation("OAuth Callback - Access Token recibido: {HasAccessToken}, Refresh Token recibido: {HasRefreshToken}",
-                    !string.IsNullOrEmpty(accessToken), hasRefreshToken);
-
-                // Si no se recibió refresh token, loggearlo
-                if (!hasRefreshToken)
-                {
-                    _logger.LogWarning("Google no devolvió un refresh_token. Esto puede ocurrir si el usuario ya autorizó la aplicación anteriormente. " +
-                        "Solicite al usuario revocar el acceso desde https://myaccount.google.com/permissions y volver a autenticarse.");
                 }
 
                 var userInfoResponse = await httpClient.GetAsync($"https://www.googleapis.com/oauth2/v2/userinfo?access_token={accessToken}");
@@ -533,7 +498,6 @@ namespace BackupPro.Controllers.StorageTypes
             {
                 if (string.IsNullOrEmpty(googleDriveStorage.RefreshToken))
                 {
-                    _logger.LogWarning("No hay RefreshToken disponible para la configuración {ConfigId}", googleDriveStorage.Id);
                     return false;
                 }
 
@@ -552,8 +516,6 @@ namespace BackupPro.Controllers.StorageTypes
                 if (!tokenResponse.IsSuccessStatusCode)
                 {
                     var errorContent = await tokenResponse.Content.ReadAsStringAsync();
-                    _logger.LogError("Error al refrescar token de Google Drive. Status: {Status}, Error: {Error}",
-                        tokenResponse.StatusCode, errorContent);
                     return false;
                 }
 
@@ -573,12 +535,10 @@ namespace BackupPro.Controllers.StorageTypes
                 _context.GoogleDriveStorages.Update(googleDriveStorage);
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Token de Google Drive refrescado exitosamente para la configuración {ConfigId}", googleDriveStorage.Id);
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Excepción al refrescar token de Google Drive para la configuración {ConfigId}", googleDriveStorage.Id);
                 return false;
             }
         }
@@ -591,21 +551,15 @@ namespace BackupPro.Controllers.StorageTypes
             // Si no hay token, no se puede renovar
             if (string.IsNullOrEmpty(googleDriveStorage.AccessToken))
             {
-                _logger.LogWarning("No hay AccessToken para la configuración {ConfigId}. Se requiere autenticación.", googleDriveStorage.Id);
                 return false;
             }
 
             // Si el token no ha expirado, está válido
             if (googleDriveStorage.TokenExpiresAt.HasValue && googleDriveStorage.TokenExpiresAt.Value > DateTime.Now.AddMinutes(5))
             {
-                _logger.LogDebug("Token de Google Drive válido para la configuración {ConfigId}. Expira: {ExpiresAt}",
-                    googleDriveStorage.Id, googleDriveStorage.TokenExpiresAt);
                 return true;
             }
 
-            // Token expirado o próximo a expirar, intentar renovar
-            _logger.LogInformation("Token de Google Drive expirado o próximo a expirar para la configuración {ConfigId}. TokenExpiresAt: {ExpiresAt}, Now: {Now}",
-                googleDriveStorage.Id, googleDriveStorage.TokenExpiresAt, DateTime.Now);
             return await RefreshAccessToken(googleDriveStorage);
         }
 

@@ -10,12 +10,10 @@ namespace BackupPro.Controllers
     public class BackupHistoryController : Controller
     {
         private readonly ApplicationDbContext _context;
-        private readonly ILogger<BackupHistoryController> _logger;
 
-        public BackupHistoryController(ApplicationDbContext context, ILogger<BackupHistoryController> logger)
+        public BackupHistoryController(ApplicationDbContext context)
         {
             _context = context;
-            _logger = logger;
         }
 
         /// <summary>
@@ -68,7 +66,6 @@ namespace BackupPro.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al cargar el historial de backups");
                 return View(new List<BackupHistory>());
             }
         }
@@ -104,7 +101,6 @@ namespace BackupPro.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al obtener detalles del historial {Id}", id);
                 return Json(new { success = false, message = $"Error: {ex.Message}" });
             }
         }
@@ -127,12 +123,10 @@ namespace BackupPro.Controllers
                 _context.BackupHistories.Remove(history);
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Historial de backup {Id} eliminado exitosamente", id);
                 return Json(new { success = true, message = "Registro eliminado exitosamente." });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al eliminar historial {Id}", id);
                 return Json(new { success = false, message = $"Error: {ex.Message}" });
             }
         }
@@ -149,12 +143,10 @@ namespace BackupPro.Controllers
                 _context.BackupHistories.RemoveRange(allHistories);
                 await _context.SaveChangesAsync();
 
-                _logger.LogWarning("Se ha limpiado todo el historial de backups");
                 return Json(new { success = true, message = "Historial limpiado exitosamente." });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al limpiar el historial");
                 return Json(new { success = false, message = $"Error: {ex.Message}" });
             }
         }
@@ -198,7 +190,6 @@ namespace BackupPro.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al obtener estadísticas");
                 return Json(new { success = false, message = $"Error: {ex.Message}" });
             }
         }

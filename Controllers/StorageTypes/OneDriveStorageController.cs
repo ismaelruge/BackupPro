@@ -13,13 +13,11 @@ namespace BackupPro.Controllers.StorageTypes
     {
         private readonly ApplicationDbContext _context;
         private readonly OneDriveSettings _oneDriveSettings;
-        private readonly ILogger<OneDriveStorageController> _logger;
 
-        public OneDriveStorageController(ApplicationDbContext context, OneDriveSettings oneDriveSettings, ILogger<OneDriveStorageController> logger)
+        public OneDriveStorageController(ApplicationDbContext context, OneDriveSettings oneDriveSettings)
         {
             _context = context;
             _oneDriveSettings = oneDriveSettings;
-            _logger = logger;
         }
 
         public async Task<IActionResult> Index()
@@ -323,17 +321,6 @@ namespace BackupPro.Controllers.StorageTypes
                 {
                     refreshToken = refreshTokenElement.GetString();
                     hasRefreshToken = !string.IsNullOrEmpty(refreshToken);
-                }
-
-                // Log importante para debugging
-                _logger.LogInformation("OAuth Callback OneDrive - Access Token recibido: {HasAccessToken}, Refresh Token recibido: {HasRefreshToken}",
-                    !string.IsNullOrEmpty(accessToken), hasRefreshToken);
-
-                // Si no se recibió refresh token, loggearlo
-                if (!hasRefreshToken)
-                {
-                    _logger.LogWarning("Microsoft no devolvió un refresh_token. Esto puede ocurrir si el usuario ya autorizó la aplicación anteriormente. " +
-                        "Solicite al usuario revocar el acceso desde https://account.microsoft.com/privacy/app-access y volver a autenticarse.");
                 }
 
                 // Obtener información del usuario de Microsoft Graph
