@@ -403,5 +403,240 @@ namespace BackupPro.Controllers.DataBasesTypes
                 return Json(new { success = false, message = $"Error al obtener configuración: {ex.Message}" });
             }
         }
+
+        // ========== BACKUP OPERATIONS ==========
+
+        /// <summary>
+        /// Crea un backup de la base de datos MongoDB usando mongodump y lo retorna como MemoryStream.
+        /// </summary>
+        public async Task<(bool success, MemoryStream? backupStream, string fileName, string databaseName, string errorMessage)> CreateBackup(int mongodbDatabaseId)
+        {
+            string tempBackupPath = string.Empty;
+            string tempArchivePath = string.Empty;
+
+            try
+            {
+                // Obtener configuración de MongoDB
+                var mongodbConfig = await _context.MongoDBDataBases.FindAsync(mongodbDatabaseId);
+                if (mongodbConfig == null)
+                {
+                    return (false, null, string.Empty, string.Empty, "Configuración de MongoDB no encontrada");
+                }
+
+                // Generar nombre de archivo de backup con timestamp
+                string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                string backupFolderName = $"{mongodbConfig.DatabaseName}_backup_{timestamp}";
+                string fileName = $"{backupFolderName}.zip";
+
+                // Buscar el disco con más espacio disponible
+                var drives = DriveInfo.GetDrives()
+                    .Where(d => d.IsReady && d.DriveType == DriveType.Fixed)
+                    .OrderByDescending(d => d.AvailableFreeSpace)
+                    .ToList();
+
+                if (drives.Count == 0)
+                {
+                    return (false, null, string.Empty, string.Empty, "No se encontraron discos disponibles para crear el backup temporal");
+                }
+
+                // Usar el disco con más espacio disponible
+                string tempFolder = Path.Combine(drives[0].Name, "Temp");
+
+                if (!Directory.Exists(tempFolder))
+                {
+                    Directory.CreateDirectory(tempFolder);
+                }
+
+                tempBackupPath = Path.Combine(tempFolder, backupFolderName);
+                tempArchivePath = Path.Combine(tempFolder, fileName);
+
+                // Buscar mongodump en las rutas comunes
+                string mongoDumpPath = FindMongoDump();
+                if (string.IsNullOrEmpty(mongoDumpPath))
+                {
+                    return (false, null, string.Empty, string.Empty, "No se encontró mongodump. Asegúrate de que MongoDB Database Tools esté instalado y mongodump esté en el PATH del sistema.");
+                }
+
+                // Construir argumentos para mongodump
+                var arguments = new System.Text.StringBuilder();
+                arguments.Append($"--host={mongodbConfig.Host} ");
+                arguments.Append($"--port={mongodbConfig.Port} ");
+                arguments.Append($"--db={mongodbConfig.DatabaseName} ");
+                arguments.Append($"--out=\"{tempBackupPath}\" ");
+
+                // Agregar credenciales si están configuradas
+                if (!string.IsNullOrWhiteSpace(mongodbConfig.Username) && !string.IsNullOrWhiteSpace(mongodbConfig.Password))
+                {
+                    arguments.Append($"--username={mongodbConfig.Username} ");
+                    arguments.Append($"--password={mongodbConfig.Password} ");
+                    arguments.Append("--authenticationDatabase=admin ");
+                }
+
+                // Agregar SSL si está habilitado
+                if (mongodbConfig.SslEnabled)
+                {
+                    arguments.Append("--ssl ");
+                }
+
+                // Ejecutar mongodump
+                var processStartInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = mongoDumpPath,
+                    Arguments = arguments.ToString(),
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+
+                using (var process = System.Diagnostics.Process.Start(processStartInfo))
+                {
+                    if (process == null)
+                    {
+                        return (false, null, string.Empty, string.Empty, "No se pudo iniciar el proceso mongodump");
+                    }
+
+                    // Esperar a que termine el proceso (máximo 5 minutos)
+                    bool exited = await Task.Run(() => process.WaitForExit(300000)); // 5 minutos
+
+                    if (!exited)
+                    {
+                        process.Kill();
+                        return (false, null, string.Empty, string.Empty, "El proceso mongodump excedió el tiempo límite de 5 minutos");
+                    }
+
+                    string errorOutput = await process.StandardError.ReadToEndAsync();
+
+                    if (process.ExitCode != 0)
+                    {
+                        return (false, null, string.Empty, string.Empty, $"Error al ejecutar mongodump: {errorOutput}");
+                    }
+                }
+
+                // Verificar que el directorio se creó correctamente
+                if (!Directory.Exists(tempBackupPath))
+                {
+                    return (false, null, string.Empty, string.Empty, "El directorio de backup no se creó correctamente");
+                }
+
+                // Comprimir el directorio de backup en un archivo ZIP
+                System.IO.Compression.ZipFile.CreateFromDirectory(tempBackupPath, tempArchivePath);
+
+                // Verificar que el archivo ZIP se creó
+                if (!System.IO.File.Exists(tempArchivePath))
+                {
+                    return (false, null, string.Empty, string.Empty, "El archivo ZIP del backup no se creó correctamente");
+                }
+
+                // Leer el archivo ZIP a MemoryStream
+                var memoryStream = new MemoryStream();
+                using (var fileStream = new FileStream(tempArchivePath, FileMode.Open, FileAccess.Read))
+                {
+                    await fileStream.CopyToAsync(memoryStream);
+                }
+
+                // Posicionar el stream al inicio
+                memoryStream.Position = 0;
+
+                // Eliminar archivos y directorios temporales
+                try
+                {
+                    if (Directory.Exists(tempBackupPath))
+                    {
+                        Directory.Delete(tempBackupPath, true);
+                    }
+                    if (System.IO.File.Exists(tempArchivePath))
+                    {
+                        System.IO.File.Delete(tempArchivePath);
+                    }
+                }
+                catch
+                {
+                    // Ignorar errores al eliminar archivos temporales
+                }
+
+                return (true, memoryStream, fileName, mongodbConfig.DatabaseName, string.Empty);
+            }
+            catch (Exception ex)
+            {
+                // Limpiar archivos temporales si existen
+                try
+                {
+                    if (!string.IsNullOrEmpty(tempBackupPath) && Directory.Exists(tempBackupPath))
+                    {
+                        Directory.Delete(tempBackupPath, true);
+                    }
+                    if (!string.IsNullOrEmpty(tempArchivePath) && System.IO.File.Exists(tempArchivePath))
+                    {
+                        System.IO.File.Delete(tempArchivePath);
+                    }
+                }
+                catch { /* Ignorar errores al eliminar */ }
+
+                return (false, null, string.Empty, string.Empty, $"Error al crear backup: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Busca mongodump en las rutas comunes del sistema.
+        /// </summary>
+        private string FindMongoDump()
+        {
+            // Intentar encontrar mongodump en el PATH
+            string[] paths = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator);
+
+            foreach (string path in paths)
+            {
+                try
+                {
+                    string mongoDumpPath = Path.Combine(path, "mongodump.exe");
+                    if (System.IO.File.Exists(mongoDumpPath))
+                    {
+                        return mongoDumpPath;
+                    }
+                }
+                catch
+                {
+                    // Ignorar errores de path inválidos
+                }
+            }
+
+            // Rutas comunes de instalación de MongoDB Database Tools en Windows
+            string[] commonPaths = new[]
+            {
+                @"C:\Program Files\MongoDB\Server\8.2\bin\mongodump.exe",
+                @"C:\Program Files\MongoDB\Server\8.1\bin\mongodump.exe",
+                @"C:\Program Files\MongoDB\Server\8.0\bin\mongodump.exe",
+                @"C:\Program Files\MongoDB\Tools\100\bin\mongodump.exe",
+                @"C:\Program Files\MongoDB\Server\7.0\bin\mongodump.exe",
+                @"C:\Program Files\MongoDB\Server\6.0\bin\mongodump.exe",
+                @"C:\Program Files\MongoDB\Server\5.0\bin\mongodump.exe",
+                @"C:\Program Files\MongoDB\Server\4.4\bin\mongodump.exe",
+                @"C:\Program Files (x86)\MongoDB\Server\8.2\bin\mongodump.exe",
+                @"C:\Program Files (x86)\MongoDB\Server\8.1\bin\mongodump.exe",
+                @"C:\Program Files (x86)\MongoDB\Server\8.0\bin\mongodump.exe",
+                @"C:\Program Files (x86)\MongoDB\Tools\100\bin\mongodump.exe",
+                @"C:\Program Files (x86)\MongoDB\Server\7.0\bin\mongodump.exe",
+                @"C:\Program Files (x86)\MongoDB\Server\6.0\bin\mongodump.exe",
+                @"C:\Program Files (x86)\MongoDB\Server\5.0\bin\mongodump.exe",
+                @"C:\Program Files (x86)\MongoDB\Server\4.4\bin\mongodump.exe"
+            };
+
+            foreach (string commonPath in commonPaths)
+            {
+                if (System.IO.File.Exists(commonPath))
+                {
+                    return commonPath;
+                }
+            }
+
+            // En Linux/Mac, simplemente devolver "mongodump" y confiar en el PATH
+            if (!OperatingSystem.IsWindows())
+            {
+                return "mongodump";
+            }
+
+            return string.Empty;
+        }
     }
 }

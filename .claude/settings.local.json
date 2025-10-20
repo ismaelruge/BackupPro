@@ -17,7 +17,8 @@
       "Bash(powershell:*)",
       "Bash(dotnet add package:*)",
       "Bash(Select-String -Pattern \"error|succeeded|failed\")",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(where mongodump)"
     ],
     "deny": [],
     "ask": []

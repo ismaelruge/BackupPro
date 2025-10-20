@@ -192,9 +192,21 @@
                         </div>
                         <div class="form-text">Ruta donde se guardarán los backups en Google Drive</div>
                     </div>
-                    <div class="alert alert-info rounded-3 mb-0" role="alert">
+                    <div class="alert alert-info rounded-3 mb-3" role="alert">
                         <i class="bi bi-info-circle me-2"></i>
                         <small>Se abrirá una ventana de autenticación de Google para autorizar el acceso</small>
+                    </div>
+                    <div class="alert alert-warning rounded-3 mb-0" role="alert">
+                        <div class="fw-semibold mb-2">
+                            <i class="bi bi-exclamation-triangle me-2"></i>Importante: Refresh Token
+                        </div>
+                        <small>
+                            <strong>Si ya conectaste esta cuenta antes:</strong><br>
+                            1. Ve a <a href="https://myaccount.google.com/permissions" target="_blank">myaccount.google.com/permissions</a><br>
+                            2. Revoca el acceso a esta aplicación<br>
+                            3. Vuelve aquí y conéctate nuevamente<br>
+                            <em>Esto permite que Google genere un Refresh Token necesario para backups automáticos de largo plazo.</em>
+                        </small>
                     </div>
                 </form>
             </div>
@@ -579,14 +591,14 @@
 
 <script>
     // Función helper para mostrar toasts
-    function showToast(type, message) {
+    function showToast(type, message, duration = 3000) {
         const toastElement = document.getElementById(type + 'Toast');
         const messageElement = document.getElementById(type + 'ToastMessage');
         messageElement.textContent = message;
 
         const toast = new bootstrap.Toast(toastElement, {
             autohide: true,
-            delay: 3000
+            delay: duration
         });
         toast.show();
     }
@@ -989,6 +1001,32 @@
 
                 // Actualizar también el driveExplorerData para que funcione el explorador
                 driveExplorerData.accessToken = event.data.accessToken;
+
+                // Verificar si se recibió el refresh token
+                if (!event.data.hasRefreshToken || !event.data.refreshToken) {
+                    console.warn('No se recibió refresh token de Google. Los backups automáticos pueden fallar cuando expire el access token.');
+
+                    // Mostrar advertencia al usuario (duración 10 segundos)
+                    showToast('warning',
+                        '⚠️ IMPORTANTE: No se recibió el Refresh Token. ' +
+                        'Para backups automáticos de largo plazo, debes revocar el acceso en Google y volver a conectarte. Ver alerta para más detalles.',
+                        10000
+                    );
+
+                    // Mostrar alerta adicional con instrucciones completas
+                    setTimeout(() => {
+                        alert(
+                            '⚠️ ADVERTENCIA IMPORTANTE - Refresh Token No Recibido\n\n' +
+                            'Google no devolvió un Refresh Token porque ya autorizaste esta aplicación anteriormente.\n\n' +
+                            'Sin el Refresh Token, el Access Token expirará en 1 hora y los backups automáticos fallarán.\n\n' +
+                            'SOLUCIÓN:\n' +
+                            '1. Ve a: https://myaccount.google.com/permissions\n' +
+                            '2. Busca y revoca el acceso a "BackupPro" o a esta aplicación\n' +
+                            '3. Vuelve aquí y conéctate nuevamente\n\n' +
+                            'Entonces Google te dará un nuevo Refresh Token que permitirá renovar automáticamente el acceso.'
+                        );
+                    }, 1000);
+                }
 
                 if (isReconnect) {
                     // Actualizar el email en el modal de editar

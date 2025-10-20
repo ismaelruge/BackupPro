@@ -13,11 +13,13 @@ namespace BackupPro.Controllers.StorageTypes
     {
         private readonly ApplicationDbContext _context;
         private readonly OneDriveSettings _oneDriveSettings;
+        private readonly ILogger<OneDriveStorageController> _logger;
 
-        public OneDriveStorageController(ApplicationDbContext context, OneDriveSettings oneDriveSettings)
+        public OneDriveStorageController(ApplicationDbContext context, OneDriveSettings oneDriveSettings, ILogger<OneDriveStorageController> logger)
         {
             _context = context;
             _oneDriveSettings = oneDriveSettings;
+            _logger = logger;
         }
 
         public async Task<IActionResult> Index()
@@ -230,7 +232,8 @@ namespace BackupPro.Controllers.StorageTypes
                               $"&redirect_uri={Uri.EscapeDataString(redirectUri)}" +
                               $"&response_type=code" +
                               $"&scope={Uri.EscapeDataString("Files.ReadWrite.All offline_access User.Read")}" +
-                              $"&response_mode=query";
+                              $"&response_mode=query" +
+                              $"&prompt=consent";
 
                 return Redirect(authUrl);
             }
@@ -315,9 +318,22 @@ namespace BackupPro.Controllers.StorageTypes
 
                 // Intentar obtener el refresh token
                 string? refreshToken = null;
+                bool hasRefreshToken = false;
                 if (tokenData.RootElement.TryGetProperty("refresh_token", out var refreshTokenElement))
                 {
                     refreshToken = refreshTokenElement.GetString();
+                    hasRefreshToken = !string.IsNullOrEmpty(refreshToken);
+                }
+
+                // Log importante para debugging
+                _logger.LogInformation("OAuth Callback OneDrive - Access Token recibido: {HasAccessToken}, Refresh Token recibido: {HasRefreshToken}",
+                    !string.IsNullOrEmpty(accessToken), hasRefreshToken);
+
+                // Si no se recibió refresh token, loggearlo
+                if (!hasRefreshToken)
+                {
+                    _logger.LogWarning("Microsoft no devolvió un refresh_token. Esto puede ocurrir si el usuario ya autorizó la aplicación anteriormente. " +
+                        "Solicite al usuario revocar el acceso desde https://account.microsoft.com/privacy/app-access y volver a autenticarse.");
                 }
 
                 // Obtener información del usuario de Microsoft Graph
@@ -346,6 +362,7 @@ namespace BackupPro.Controllers.StorageTypes
                 var safeEmail = System.Text.Json.JsonSerializer.Serialize(email);
                 var safeAccessToken = System.Text.Json.JsonSerializer.Serialize(accessToken);
                 var safeRefreshToken = refreshToken != null ? System.Text.Json.JsonSerializer.Serialize(refreshToken) : "null";
+                var hasRefreshTokenJson = hasRefreshToken.ToString().ToLower();
 
                 // Retornar éxito con el email, accessToken y refreshToken
                 var successScript = $@"
@@ -359,7 +376,8 @@ namespace BackupPro.Controllers.StorageTypes
                                         success: true,
                                         email: {safeEmail},
                                         accessToken: {safeAccessToken},
-                                        refreshToken: {safeRefreshToken}
+                                        refreshToken: {safeRefreshToken},
+                                        hasRefreshToken: {hasRefreshTokenJson}
                                     }}, window.location.origin);
                                 }}
                             }} catch (e) {{

@@ -15,6 +15,7 @@ namespace BackupPro.Controllers
         private readonly DataBasesTypes.SqlServerDataBaseController _sqlServerController;
         private readonly DataBasesTypes.MySqlDataBaseController _mySqlController;
         private readonly DataBasesTypes.PostgresSqlDataBaseController _postgresSqlController;
+        private readonly DataBasesTypes.MongoDBDataBaseController _mongoDBController;
         private readonly StorageTypes.LocalStorageController _localStorageController;
         private readonly StorageTypes.FtpStorageController _ftpStorageController;
         private readonly StorageTypes.BlobStorageController _blobStorageController;
@@ -26,6 +27,7 @@ namespace BackupPro.Controllers
             DataBasesTypes.SqlServerDataBaseController sqlServerController,
             DataBasesTypes.MySqlDataBaseController mySqlController,
             DataBasesTypes.PostgresSqlDataBaseController postgresSqlController,
+            DataBasesTypes.MongoDBDataBaseController mongoDBController,
             StorageTypes.LocalStorageController localStorageController,
             StorageTypes.FtpStorageController ftpStorageController,
             StorageTypes.BlobStorageController blobStorageController,
@@ -36,6 +38,7 @@ namespace BackupPro.Controllers
             _sqlServerController = sqlServerController;
             _mySqlController = mySqlController;
             _postgresSqlController = postgresSqlController;
+            _mongoDBController = mongoDBController;
             _localStorageController = localStorageController;
             _ftpStorageController = ftpStorageController;
             _blobStorageController = blobStorageController;
@@ -660,9 +663,26 @@ namespace BackupPro.Controllers
             {
                 return $"Backup de PostgreSQL a {task.StorageType} aún no implementado.";
             }
-            else if (task.DatabaseType == "MongoDB")
+            // MongoDB combinaciones
+            else if (task.DatabaseType == "MongoDB" && task.StorageType == "Local")
             {
-                return $"Backup de MongoDB a {task.StorageType} aún no implementado.";
+                return await ExecuteBackupMongoDBLocal(task.DatabaseId, task.StorageId);
+            }
+            else if (task.DatabaseType == "MongoDB" && task.StorageType == "Ftp")
+            {
+                return await ExecuteBackupMongoDBFtp(task.DatabaseId, task.StorageId);
+            }
+            else if (task.DatabaseType == "MongoDB" && task.StorageType == "AzureBlob")
+            {
+                return await ExecuteBackupMongoDBBlob(task.DatabaseId, task.StorageId);
+            }
+            else if (task.DatabaseType == "MongoDB" && task.StorageType == "OneDrive")
+            {
+                return await ExecuteBackupMongoDBOneDrive(task.DatabaseId, task.StorageId);
+            }
+            else if (task.DatabaseType == "MongoDB" && task.StorageType == "GoogleDrive")
+            {
+                return await ExecuteBackupMongoDBGoogleDrive(task.DatabaseId, task.StorageId);
             }
             else
             {
@@ -1340,6 +1360,233 @@ namespace BackupPro.Controllers
                     fileName,
                     databaseName,
                     postgresDatabaseId
+                );
+
+                if (!saveSuccess)
+                {
+                    throw new Exception(saveError);
+                }
+
+                return $"Backup creado exitosamente en Google Drive: {fileName} ({FormatBytes(fileSize)})";
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error al ejecutar backup Google Drive: {ex.Message}", ex);
+            }
+            finally
+            {
+                // Liberar el MemoryStream
+                backupStream?.Dispose();
+            }
+        }
+
+        // ========== MONGODB BACKUP METHODS ==========
+
+        /// <summary>
+        /// Ejecuta backup de MongoDB a almacenamiento local
+        /// </summary>
+        private async Task<string> ExecuteBackupMongoDBLocal(int mongodbDatabaseId, int localStorageId)
+        {
+            MemoryStream? backupStream = null;
+            try
+            {
+                // 1. Crear backup de MongoDB
+                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _mongoDBController.CreateBackup(mongodbDatabaseId);
+
+                if (!backupSuccess || backupStream2 == null)
+                {
+                    throw new Exception(backupError);
+                }
+
+                backupStream = backupStream2;
+
+                // 2. Guardar en almacenamiento local
+                var (saveSuccess, filePath, fileSize, saveError) = await _localStorageController.SaveBackup(
+                    localStorageId,
+                    backupStream,
+                    fileName,
+                    databaseName,
+                    mongodbDatabaseId
+                );
+
+                if (!saveSuccess)
+                {
+                    throw new Exception(saveError);
+                }
+
+                return $"Backup creado exitosamente: {fileName} ({FormatBytes(fileSize)})";
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error al ejecutar backup: {ex.Message}", ex);
+            }
+            finally
+            {
+                // Liberar el MemoryStream
+                backupStream?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Ejecuta backup de MongoDB a almacenamiento FTP
+        /// </summary>
+        private async Task<string> ExecuteBackupMongoDBFtp(int mongodbDatabaseId, int ftpStorageId)
+        {
+            MemoryStream? backupStream = null;
+            try
+            {
+                // 1. Crear backup de MongoDB
+                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _mongoDBController.CreateBackup(mongodbDatabaseId);
+
+                if (!backupSuccess || backupStream2 == null)
+                {
+                    throw new Exception(backupError);
+                }
+
+                backupStream = backupStream2;
+
+                // 2. Guardar en almacenamiento FTP
+                var (saveSuccess, filePath, fileSize, saveError) = await _ftpStorageController.SaveBackup(
+                    ftpStorageId,
+                    backupStream,
+                    fileName,
+                    databaseName,
+                    mongodbDatabaseId
+                );
+
+                if (!saveSuccess)
+                {
+                    throw new Exception(saveError);
+                }
+
+                return $"Backup creado exitosamente en FTP: {fileName} ({FormatBytes(fileSize)})";
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error al ejecutar backup FTP: {ex.Message}", ex);
+            }
+            finally
+            {
+                // Liberar el MemoryStream
+                backupStream?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Ejecuta backup de MongoDB a Azure Blob Storage
+        /// </summary>
+        private async Task<string> ExecuteBackupMongoDBBlob(int mongodbDatabaseId, int blobStorageId)
+        {
+            MemoryStream? backupStream = null;
+            try
+            {
+                // 1. Crear backup de MongoDB
+                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _mongoDBController.CreateBackup(mongodbDatabaseId);
+
+                if (!backupSuccess || backupStream2 == null)
+                {
+                    throw new Exception(backupError);
+                }
+
+                backupStream = backupStream2;
+
+                // 2. Guardar en Azure Blob Storage
+                var (saveSuccess, filePath, fileSize, saveError) = await _blobStorageController.SaveBackup(
+                    blobStorageId,
+                    backupStream,
+                    fileName,
+                    databaseName,
+                    mongodbDatabaseId
+                );
+
+                if (!saveSuccess)
+                {
+                    throw new Exception(saveError);
+                }
+
+                return $"Backup creado exitosamente en Azure Blob: {fileName} ({FormatBytes(fileSize)})";
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error al ejecutar backup Azure Blob: {ex.Message}", ex);
+            }
+            finally
+            {
+                // Liberar el MemoryStream
+                backupStream?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Ejecuta backup de MongoDB a OneDrive
+        /// </summary>
+        private async Task<string> ExecuteBackupMongoDBOneDrive(int mongodbDatabaseId, int oneDriveStorageId)
+        {
+            MemoryStream? backupStream = null;
+            try
+            {
+                // 1. Crear backup de MongoDB
+                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _mongoDBController.CreateBackup(mongodbDatabaseId);
+
+                if (!backupSuccess || backupStream2 == null)
+                {
+                    throw new Exception(backupError);
+                }
+
+                backupStream = backupStream2;
+
+                // 2. Guardar en OneDrive
+                var (saveSuccess, filePath, fileSize, saveError) = await _oneDriveStorageController.SaveBackup(
+                    oneDriveStorageId,
+                    backupStream,
+                    fileName,
+                    databaseName,
+                    mongodbDatabaseId
+                );
+
+                if (!saveSuccess)
+                {
+                    throw new Exception(saveError);
+                }
+
+                return $"Backup creado exitosamente en OneDrive: {fileName} ({FormatBytes(fileSize)})";
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error al ejecutar backup OneDrive: {ex.Message}", ex);
+            }
+            finally
+            {
+                // Liberar el MemoryStream
+                backupStream?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Ejecuta backup de MongoDB a Google Drive
+        /// </summary>
+        private async Task<string> ExecuteBackupMongoDBGoogleDrive(int mongodbDatabaseId, int googleDriveStorageId)
+        {
+            MemoryStream? backupStream = null;
+            try
+            {
+                // 1. Crear backup de MongoDB
+                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _mongoDBController.CreateBackup(mongodbDatabaseId);
+
+                if (!backupSuccess || backupStream2 == null)
+                {
+                    throw new Exception(backupError);
+                }
+
+                backupStream = backupStream2;
+
+                // 2. Guardar en Google Drive
+                var (saveSuccess, filePath, fileSize, saveError) = await _googleDriveStorageController.SaveBackup(
+                    googleDriveStorageId,
+                    backupStream,
+                    fileName,
+                    databaseName,
+                    mongodbDatabaseId
                 );
 
                 if (!saveSuccess)
