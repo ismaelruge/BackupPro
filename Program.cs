@@ -102,6 +102,7 @@ namespace BackupPro
             // Registrar controladores para inyección de dependencias
             builder.Services.AddScoped<BackupPro.Controllers.DataBasesTypes.SqlServerDataBaseController>();
             builder.Services.AddScoped<BackupPro.Controllers.DataBasesTypes.MySqlDataBaseController>();
+            builder.Services.AddScoped<BackupPro.Controllers.DataBasesTypes.PostgresSqlDataBaseController>();
             builder.Services.AddScoped<BackupPro.Controllers.StorageTypes.LocalStorageController>();
             builder.Services.AddScoped<BackupPro.Controllers.StorageTypes.FtpStorageController>();
             builder.Services.AddScoped<BackupPro.Controllers.StorageTypes.BlobStorageController>();

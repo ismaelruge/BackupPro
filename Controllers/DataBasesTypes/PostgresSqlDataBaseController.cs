@@ -385,5 +385,211 @@ namespace BackupPro.Controllers.DataBasesTypes
                 return Json(new { success = false, message = $"Error al obtener configuración: {ex.Message}" });
             }
         }
+
+        // ========== BACKUP OPERATIONS ==========
+
+        /// <summary>
+        /// Crea un backup de la base de datos PostgreSQL usando pg_dump y lo retorna como MemoryStream.
+        /// </summary>
+        public async Task<(bool success, MemoryStream? backupStream, string fileName, string databaseName, string errorMessage)> CreateBackup(int postgresDatabaseId)
+        {
+            string tempBackupPath = string.Empty;
+
+            try
+            {
+                // Obtener configuración de PostgreSQL
+                var postgresConfig = await _context.PostgresSqlDataBases.FindAsync(postgresDatabaseId);
+                if (postgresConfig == null)
+                {
+                    return (false, null, string.Empty, string.Empty, "Configuración de PostgreSQL no encontrada");
+                }
+
+                // Generar nombre de archivo de backup con timestamp
+                string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                string fileName = $"{postgresConfig.DatabaseName}_backup_{timestamp}.sql";
+
+                // Buscar el disco con más espacio disponible
+                var drives = DriveInfo.GetDrives()
+                    .Where(d => d.IsReady && d.DriveType == DriveType.Fixed)
+                    .OrderByDescending(d => d.AvailableFreeSpace)
+                    .ToList();
+
+                if (drives.Count == 0)
+                {
+                    return (false, null, string.Empty, string.Empty, "No se encontraron discos disponibles para crear el backup temporal");
+                }
+
+                // Usar el disco con más espacio disponible
+                string tempFolder = Path.Combine(drives[0].Name, "Temp");
+
+                if (!Directory.Exists(tempFolder))
+                {
+                    Directory.CreateDirectory(tempFolder);
+                }
+
+                tempBackupPath = Path.Combine(tempFolder, fileName);
+
+                // Buscar pg_dump en las rutas comunes
+                string pgDumpPath = FindPgDump();
+                if (string.IsNullOrEmpty(pgDumpPath))
+                {
+                    return (false, null, string.Empty, string.Empty, "No se encontró pg_dump. Asegúrate de que PostgreSQL esté instalado y pg_dump esté en el PATH del sistema.");
+                }
+
+                // Configurar variable de entorno para la contraseña (pg_dump la lee de PGPASSWORD)
+                var processStartInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = pgDumpPath,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+
+                // Añadir la contraseña como variable de entorno
+                processStartInfo.EnvironmentVariables["PGPASSWORD"] = postgresConfig.Password;
+
+                // Construir argumentos para pg_dump
+                string arguments = $"--host={postgresConfig.Host} " +
+                                 $"--port={postgresConfig.Port} " +
+                                 $"--username={postgresConfig.Username} " +
+                                 $"--dbname={postgresConfig.DatabaseName} " +
+                                 $"--file=\"{tempBackupPath}\" " +
+                                 "--format=plain " +
+                                 "--no-owner " +
+                                 "--no-acl " +
+                                 "--clean " +
+                                 "--if-exists";
+
+                processStartInfo.Arguments = arguments;
+
+                // Ejecutar pg_dump
+                using (var process = System.Diagnostics.Process.Start(processStartInfo))
+                {
+                    if (process == null)
+                    {
+                        return (false, null, string.Empty, string.Empty, "No se pudo iniciar el proceso pg_dump");
+                    }
+
+                    // Esperar a que termine el proceso (máximo 5 minutos)
+                    bool exited = await Task.Run(() => process.WaitForExit(300000)); // 5 minutos
+
+                    if (!exited)
+                    {
+                        process.Kill();
+                        return (false, null, string.Empty, string.Empty, "El proceso pg_dump excedió el tiempo límite de 5 minutos");
+                    }
+
+                    string errorOutput = await process.StandardError.ReadToEndAsync();
+
+                    if (process.ExitCode != 0)
+                    {
+                        return (false, null, string.Empty, string.Empty, $"Error al ejecutar pg_dump: {errorOutput}");
+                    }
+                }
+
+                // Verificar que el archivo se creó correctamente
+                if (!System.IO.File.Exists(tempBackupPath))
+                {
+                    return (false, null, string.Empty, string.Empty, "El archivo de backup no se creó correctamente");
+                }
+
+                // Leer el archivo a MemoryStream
+                var memoryStream = new MemoryStream();
+                using (var fileStream = new FileStream(tempBackupPath, FileMode.Open, FileAccess.Read))
+                {
+                    await fileStream.CopyToAsync(memoryStream);
+                }
+
+                // Posicionar el stream al inicio
+                memoryStream.Position = 0;
+
+                // Eliminar archivo temporal
+                try
+                {
+                    System.IO.File.Delete(tempBackupPath);
+                }
+                catch
+                {
+                    // Ignorar errores al eliminar archivo temporal
+                }
+
+                return (true, memoryStream, fileName, postgresConfig.DatabaseName, string.Empty);
+            }
+            catch (Exception ex)
+            {
+                // Limpiar archivo temporal si existe
+                if (!string.IsNullOrEmpty(tempBackupPath) && System.IO.File.Exists(tempBackupPath))
+                {
+                    try
+                    {
+                        System.IO.File.Delete(tempBackupPath);
+                    }
+                    catch { /* Ignorar errores al eliminar */ }
+                }
+
+                return (false, null, string.Empty, string.Empty, $"Error al crear backup: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Busca pg_dump en las rutas comunes del sistema.
+        /// </summary>
+        private string FindPgDump()
+        {
+            // Intentar encontrar pg_dump en el PATH
+            string[] paths = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator);
+
+            foreach (string path in paths)
+            {
+                try
+                {
+                    string pgDumpPath = Path.Combine(path, "pg_dump.exe");
+                    if (System.IO.File.Exists(pgDumpPath))
+                    {
+                        return pgDumpPath;
+                    }
+                }
+                catch
+                {
+                    // Ignorar errores de path inválidos
+                }
+            }
+
+            // Rutas comunes de instalación de PostgreSQL en Windows
+            string[] commonPaths = new[]
+            {
+                @"C:\Program Files\PostgreSQL\18\bin\pg_dump.exe",
+                @"C:\Program Files\PostgreSQL\17\bin\pg_dump.exe",
+                @"C:\Program Files\PostgreSQL\16\bin\pg_dump.exe",
+                @"C:\Program Files\PostgreSQL\15\bin\pg_dump.exe",
+                @"C:\Program Files\PostgreSQL\14\bin\pg_dump.exe",
+                @"C:\Program Files\PostgreSQL\13\bin\pg_dump.exe",
+                @"C:\Program Files\PostgreSQL\12\bin\pg_dump.exe",
+                @"C:\Program Files (x86)\PostgreSQL\18\bin\pg_dump.exe",
+                @"C:\Program Files (x86)\PostgreSQL\17\bin\pg_dump.exe",
+                @"C:\Program Files (x86)\PostgreSQL\16\bin\pg_dump.exe",
+                @"C:\Program Files (x86)\PostgreSQL\15\bin\pg_dump.exe",
+                @"C:\Program Files (x86)\PostgreSQL\14\bin\pg_dump.exe",
+                @"C:\Program Files (x86)\PostgreSQL\13\bin\pg_dump.exe",
+                @"C:\Program Files (x86)\PostgreSQL\12\bin\pg_dump.exe"
+            };
+
+            foreach (string commonPath in commonPaths)
+            {
+                if (System.IO.File.Exists(commonPath))
+                {
+                    return commonPath;
+                }
+            }
+
+            // En Linux/Mac, simplemente devolver "pg_dump" y confiar en el PATH
+            if (!OperatingSystem.IsWindows())
+            {
+                return "pg_dump";
+            }
+
+            return string.Empty;
+        }
     }
 }

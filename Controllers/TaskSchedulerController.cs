@@ -14,6 +14,7 @@ namespace BackupPro.Controllers
         private readonly ApplicationDbContext _context;
         private readonly DataBasesTypes.SqlServerDataBaseController _sqlServerController;
         private readonly DataBasesTypes.MySqlDataBaseController _mySqlController;
+        private readonly DataBasesTypes.PostgresSqlDataBaseController _postgresSqlController;
         private readonly StorageTypes.LocalStorageController _localStorageController;
         private readonly StorageTypes.FtpStorageController _ftpStorageController;
         private readonly StorageTypes.BlobStorageController _blobStorageController;
@@ -24,6 +25,7 @@ namespace BackupPro.Controllers
             ApplicationDbContext context,
             DataBasesTypes.SqlServerDataBaseController sqlServerController,
             DataBasesTypes.MySqlDataBaseController mySqlController,
+            DataBasesTypes.PostgresSqlDataBaseController postgresSqlController,
             StorageTypes.LocalStorageController localStorageController,
             StorageTypes.FtpStorageController ftpStorageController,
             StorageTypes.BlobStorageController blobStorageController,
@@ -33,6 +35,7 @@ namespace BackupPro.Controllers
             _context = context;
             _sqlServerController = sqlServerController;
             _mySqlController = mySqlController;
+            _postgresSqlController = postgresSqlController;
             _localStorageController = localStorageController;
             _ftpStorageController = ftpStorageController;
             _blobStorageController = blobStorageController;
@@ -623,6 +626,27 @@ namespace BackupPro.Controllers
             {
                 return await ExecuteBackupMySqlGoogleDrive(task.DatabaseId, task.StorageId);
             }
+            // PostgreSQL combinaciones
+            else if (task.DatabaseType == "PostgreSQL" && task.StorageType == "Local")
+            {
+                return await ExecuteBackupPostgreSqlLocal(task.DatabaseId, task.StorageId);
+            }
+            else if (task.DatabaseType == "PostgreSQL" && task.StorageType == "Ftp")
+            {
+                return await ExecuteBackupPostgreSqlFtp(task.DatabaseId, task.StorageId);
+            }
+            else if (task.DatabaseType == "PostgreSQL" && task.StorageType == "AzureBlob")
+            {
+                return await ExecuteBackupPostgreSqlBlob(task.DatabaseId, task.StorageId);
+            }
+            else if (task.DatabaseType == "PostgreSQL" && task.StorageType == "OneDrive")
+            {
+                return await ExecuteBackupPostgreSqlOneDrive(task.DatabaseId, task.StorageId);
+            }
+            else if (task.DatabaseType == "PostgreSQL" && task.StorageType == "GoogleDrive")
+            {
+                return await ExecuteBackupPostgreSqlGoogleDrive(task.DatabaseId, task.StorageId);
+            }
             // Otras combinaciones que aún no están implementadas
             else if (task.DatabaseType == "SqlServer")
             {
@@ -1086,6 +1110,236 @@ namespace BackupPro.Controllers
                     fileName,
                     databaseName,
                     mySqlDatabaseId
+                );
+
+                if (!saveSuccess)
+                {
+                    throw new Exception(saveError);
+                }
+
+                return $"Backup creado exitosamente en Google Drive: {fileName} ({FormatBytes(fileSize)})";
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error al ejecutar backup Google Drive: {ex.Message}", ex);
+            }
+            finally
+            {
+                // Liberar el MemoryStream
+                backupStream?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Ejecuta backup de PostgreSQL a almacenamiento local
+        /// </summary>
+        private async Task<string> ExecuteBackupPostgreSqlLocal(int postgresDatabaseId, int localStorageId)
+        {
+            MemoryStream? backupStream = null;
+
+            try
+            {
+                // Paso 1: Crear el backup en PostgreSQL y obtener el MemoryStream
+                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _postgresSqlController.CreateBackup(postgresDatabaseId);
+
+                if (!backupSuccess || backupStream2 == null)
+                {
+                    throw new Exception(backupError);
+                }
+
+                backupStream = backupStream2;
+
+                // Paso 2: Guardar el backup en almacenamiento local
+                var (saveSuccess, filePath, fileSize, saveError) = await _localStorageController.SaveBackup(
+                    localStorageId,
+                    backupStream,
+                    fileName,
+                    databaseName,
+                    postgresDatabaseId
+                );
+
+                if (!saveSuccess)
+                {
+                    throw new Exception(saveError);
+                }
+
+                return $"Backup creado exitosamente: {fileName} ({FormatBytes(fileSize)})";
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error al ejecutar backup: {ex.Message}", ex);
+            }
+            finally
+            {
+                // Liberar el MemoryStream
+                backupStream?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Ejecuta backup de PostgreSQL a almacenamiento FTP
+        /// </summary>
+        private async Task<string> ExecuteBackupPostgreSqlFtp(int postgresDatabaseId, int ftpStorageId)
+        {
+            MemoryStream? backupStream = null;
+
+            try
+            {
+                // Paso 1: Crear el backup en PostgreSQL y obtener el MemoryStream
+                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _postgresSqlController.CreateBackup(postgresDatabaseId);
+
+                if (!backupSuccess || backupStream2 == null)
+                {
+                    throw new Exception(backupError);
+                }
+
+                backupStream = backupStream2;
+
+                // Paso 2: Guardar el backup en almacenamiento FTP
+                var (saveSuccess, filePath, fileSize, saveError) = await _ftpStorageController.SaveBackup(
+                    ftpStorageId,
+                    backupStream,
+                    fileName,
+                    databaseName,
+                    postgresDatabaseId
+                );
+
+                if (!saveSuccess)
+                {
+                    throw new Exception(saveError);
+                }
+
+                return $"Backup creado exitosamente en FTP: {fileName} ({FormatBytes(fileSize)})";
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error al ejecutar backup FTP: {ex.Message}", ex);
+            }
+            finally
+            {
+                // Liberar el MemoryStream
+                backupStream?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Ejecuta backup de PostgreSQL a Azure Blob Storage
+        /// </summary>
+        private async Task<string> ExecuteBackupPostgreSqlBlob(int postgresDatabaseId, int blobStorageId)
+        {
+            MemoryStream? backupStream = null;
+
+            try
+            {
+                // Paso 1: Crear el backup en PostgreSQL y obtener el MemoryStream
+                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _postgresSqlController.CreateBackup(postgresDatabaseId);
+
+                if (!backupSuccess || backupStream2 == null)
+                {
+                    throw new Exception(backupError);
+                }
+
+                backupStream = backupStream2;
+
+                // Paso 2: Guardar el backup en Azure Blob Storage
+                var (saveSuccess, filePath, fileSize, saveError) = await _blobStorageController.SaveBackup(
+                    blobStorageId,
+                    backupStream,
+                    fileName,
+                    databaseName,
+                    postgresDatabaseId
+                );
+
+                if (!saveSuccess)
+                {
+                    throw new Exception(saveError);
+                }
+
+                return $"Backup creado exitosamente en Azure Blob: {fileName} ({FormatBytes(fileSize)})";
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error al ejecutar backup Azure Blob: {ex.Message}", ex);
+            }
+            finally
+            {
+                // Liberar el MemoryStream
+                backupStream?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Ejecuta backup de PostgreSQL a OneDrive
+        /// </summary>
+        private async Task<string> ExecuteBackupPostgreSqlOneDrive(int postgresDatabaseId, int oneDriveStorageId)
+        {
+            MemoryStream? backupStream = null;
+
+            try
+            {
+                // Paso 1: Crear el backup en PostgreSQL y obtener el MemoryStream
+                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _postgresSqlController.CreateBackup(postgresDatabaseId);
+
+                if (!backupSuccess || backupStream2 == null)
+                {
+                    throw new Exception(backupError);
+                }
+
+                backupStream = backupStream2;
+
+                // Paso 2: Guardar el backup en OneDrive
+                var (saveSuccess, filePath, fileSize, saveError) = await _oneDriveStorageController.SaveBackup(
+                    oneDriveStorageId,
+                    backupStream,
+                    fileName,
+                    databaseName,
+                    postgresDatabaseId
+                );
+
+                if (!saveSuccess)
+                {
+                    throw new Exception(saveError);
+                }
+
+                return $"Backup creado exitosamente en OneDrive: {fileName} ({FormatBytes(fileSize)})";
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error al ejecutar backup OneDrive: {ex.Message}", ex);
+            }
+            finally
+            {
+                // Liberar el MemoryStream
+                backupStream?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Ejecuta backup de PostgreSQL a Google Drive
+        /// </summary>
+        private async Task<string> ExecuteBackupPostgreSqlGoogleDrive(int postgresDatabaseId, int googleDriveStorageId)
+        {
+            MemoryStream? backupStream = null;
+
+            try
+            {
+                // Paso 1: Crear el backup en PostgreSQL y obtener el MemoryStream
+                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _postgresSqlController.CreateBackup(postgresDatabaseId);
+
+                if (!backupSuccess || backupStream2 == null)
+                {
+                    throw new Exception(backupError);
+                }
+
+                backupStream = backupStream2;
+
+                // Paso 2: Guardar el backup en Google Drive
+                var (saveSuccess, filePath, fileSize, saveError) = await _googleDriveStorageController.SaveBackup(
+                    googleDriveStorageId,
+                    backupStream,
+                    fileName,
+                    databaseName,
+                    postgresDatabaseId
                 );
 
                 if (!saveSuccess)
