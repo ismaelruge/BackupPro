@@ -316,6 +316,13 @@ namespace BackupPro.Controllers.StorageTypes
                 var tokenData = System.Text.Json.JsonDocument.Parse(tokenJson);
                 var accessToken = tokenData.RootElement.GetProperty("access_token").GetString();
 
+                // Intentar obtener el refresh token
+                string? refreshToken = null;
+                if (tokenData.RootElement.TryGetProperty("refresh_token", out var refreshTokenElement))
+                {
+                    refreshToken = refreshTokenElement.GetString();
+                }
+
                 var userInfoResponse = await httpClient.GetAsync($"https://www.googleapis.com/oauth2/v2/userinfo?access_token={accessToken}");
                 var userInfoJson = await userInfoResponse.Content.ReadAsStringAsync();
                 var userInfo = System.Text.Json.JsonDocument.Parse(userInfoJson);
@@ -325,9 +332,9 @@ namespace BackupPro.Controllers.StorageTypes
                 try
                 {
                     HttpContext.Session.SetString($"GoogleDrive_AccessToken_{email}", accessToken!);
-                    if (tokenData.RootElement.TryGetProperty("refresh_token", out var refreshTokenElement))
+                    if (!string.IsNullOrEmpty(refreshToken))
                     {
-                        HttpContext.Session.SetString($"GoogleDrive_RefreshToken_{email}", refreshTokenElement.GetString()!);
+                        HttpContext.Session.SetString($"GoogleDrive_RefreshToken_{email}", refreshToken);
                     }
                 }
                 catch (Exception sessionEx)
@@ -340,8 +347,9 @@ namespace BackupPro.Controllers.StorageTypes
                 // Escapar valores para JavaScript
                 var safeEmail = System.Text.Json.JsonSerializer.Serialize(email);
                 var safeAccessToken = System.Text.Json.JsonSerializer.Serialize(accessToken);
+                var safeRefreshToken = refreshToken != null ? System.Text.Json.JsonSerializer.Serialize(refreshToken) : "null";
 
-                // Retornar éxito con el email
+                // Retornar éxito con el email, accessToken y refreshToken
                 var successScript = $@"
                     <html>
                     <head><title>Autenticación exitosa</title></head>
@@ -352,7 +360,8 @@ namespace BackupPro.Controllers.StorageTypes
                                     window.opener.postMessage({{
                                         success: true,
                                         email: {safeEmail},
-                                        accessToken: {safeAccessToken}
+                                        accessToken: {safeAccessToken},
+                                        refreshToken: {safeRefreshToken}
                                     }}, window.location.origin);
                                 }}
                             }} catch (e) {{

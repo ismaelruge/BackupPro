@@ -596,8 +596,9 @@
 
     // ========== ONEDRIVE AUTHENTICATION ==========
 
-    // Variable global para almacenar el access token de OneDrive
+    // Variables globales para almacenar tokens de OneDrive
     let oneDriveAccessToken = null;
+    let oneDriveRefreshToken = null;
     let oneDriveEmail = null;
 
     // Variables globales para OneDrive Explorer
@@ -647,6 +648,7 @@
 
             if (event.data.success) {
                 oneDriveAccessToken = event.data.accessToken;
+                oneDriveRefreshToken = event.data.refreshToken; // Guardar refresh token
                 oneDriveEmail = event.data.email;
 
                 // Actualizar también el oneDriveExplorerData para que funcione el explorador
@@ -662,7 +664,7 @@
 
                     // Si hay un ID de configuración guardado, actualizar los tokens inmediatamente
                     if (currentOneDriveConfigId) {
-                        saveOneDriveTokens(currentOneDriveConfigId, oneDriveAccessToken, '').then(() => {
+                        saveOneDriveTokens(currentOneDriveConfigId, oneDriveAccessToken, oneDriveRefreshToken).then(() => {
                             showToast('success', 'Tokens actualizados correctamente.');
                         });
                     }
@@ -958,7 +960,7 @@
             if (data.success) {
                 // Guardar tokens si hay acceso token
                 if (oneDriveAccessToken && data.id) {
-                    await saveOneDriveTokens(data.id, oneDriveAccessToken, '');
+                    await saveOneDriveTokens(data.id, oneDriveAccessToken, oneDriveRefreshToken);
                 }
 
                 showToast('success', data.message || 'Configuración creada exitosamente.');
@@ -971,6 +973,7 @@
                 document.getElementById('addOneDriveForm').reset();
                 document.getElementById('btnExploreOneDrive').disabled = true;
                 oneDriveAccessToken = null;
+                oneDriveRefreshToken = null;
                 oneDriveEmail = null;
 
                 // Recargar página
@@ -1054,7 +1057,7 @@
             if (data.success) {
                 // Guardar tokens si se reconectó
                 if (oneDriveAccessToken) {
-                    await saveOneDriveTokens(parseInt(id), oneDriveAccessToken, '');
+                    await saveOneDriveTokens(parseInt(id), oneDriveAccessToken, oneDriveRefreshToken);
                 }
 
                 showToast('success', data.message || 'Configuración actualizada exitosamente.');

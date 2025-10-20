@@ -348,9 +348,7 @@
                             <div class="card bg-light border-0">
                                 <div class="card-body">
                                     <div class="form-check form-switch">
-                                        <input type="hidden" name="IsActive" value="false">
-                                        <input class="form-check-input" type="checkbox" id="add_is_active"
-                                               name="IsActive" value="true" checked>
+                                        <input class="form-check-input" type="checkbox" id="add_is_active" checked>
                                         <label class="form-check-label" for="add_is_active">
                                             <strong>Activar tarea inmediatamente</strong>
                                             <br><small class="text-muted">La tarea comenzará a ejecutarse según la frecuencia configurada</small>
@@ -477,9 +475,7 @@
                             <div class="card bg-light border-0">
                                 <div class="card-body">
                                     <div class="form-check form-switch">
-                                        <input type="hidden" name="IsActive" value="false">
-                                        <input class="form-check-input" type="checkbox" id="edit_is_active"
-                                               name="IsActive" value="true">
+                                        <input class="form-check-input" type="checkbox" id="edit_is_active">
                                         <label class="form-check-label" for="edit_is_active">
                                             <strong>Tarea activa</strong>
                                             <br><small class="text-muted">Desmarca para pausar la tarea</small>
@@ -857,6 +853,10 @@
 
         try {
             const formData = new FormData(this);
+            // Añadir el valor del checkbox IsActive
+            const isActiveCheckbox = document.getElementById('add_is_active');
+            formData.set('IsActive', isActiveCheckbox.checked);
+
             const response = await fetch('/TaskScheduler/Create', {
                 method: 'POST',
                 headers: {
@@ -894,6 +894,10 @@
 
         try {
             const formData = new FormData(this);
+            // Añadir el valor del checkbox IsActive
+            const isActiveCheckbox = document.getElementById('edit_is_active');
+            formData.set('IsActive', isActiveCheckbox.checked);
+
             const response = await fetch('/TaskScheduler/Edit', {
                 method: 'POST',
                 headers: {

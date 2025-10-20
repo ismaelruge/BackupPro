@@ -385,5 +385,199 @@ namespace BackupPro.Controllers.DataBasesTypes
                 return Json(new { success = false, message = $"Error al obtener configuración: {ex.Message}" });
             }
         }
+
+        // ========== BACKUP OPERATIONS ==========
+
+        /// <summary>
+        /// Crea un backup de la base de datos MySQL usando mysqldump y lo retorna como MemoryStream.
+        /// </summary>
+        public async Task<(bool success, MemoryStream? backupStream, string fileName, string databaseName, string errorMessage)> CreateBackup(int mysqlDatabaseId)
+        {
+            string tempBackupPath = string.Empty;
+
+            try
+            {
+                // Obtener configuración de MySQL
+                var mysqlConfig = await _context.MySqlDataBases.FindAsync(mysqlDatabaseId);
+                if (mysqlConfig == null)
+                {
+                    return (false, null, string.Empty, string.Empty, "Configuración de MySQL no encontrada");
+                }
+
+                // Generar nombre de archivo de backup con timestamp
+                string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                string fileName = $"{mysqlConfig.DatabaseName}_backup_{timestamp}.sql";
+
+                // Buscar el disco con más espacio disponible
+                var drives = DriveInfo.GetDrives()
+                    .Where(d => d.IsReady && d.DriveType == DriveType.Fixed)
+                    .OrderByDescending(d => d.AvailableFreeSpace)
+                    .ToList();
+
+                if (drives.Count == 0)
+                {
+                    return (false, null, string.Empty, string.Empty, "No se encontraron discos disponibles para crear el backup temporal");
+                }
+
+                // Usar el disco con más espacio disponible
+                string tempFolder = Path.Combine(drives[0].Name, "Temp");
+
+                if (!Directory.Exists(tempFolder))
+                {
+                    Directory.CreateDirectory(tempFolder);
+                }
+
+                tempBackupPath = Path.Combine(tempFolder, fileName);
+
+                // Buscar mysqldump en las rutas comunes
+                string mysqldumpPath = FindMySqlDump();
+                if (string.IsNullOrEmpty(mysqldumpPath))
+                {
+                    return (false, null, string.Empty, string.Empty, "No se encontró mysqldump. Asegúrate de que MySQL esté instalado y mysqldump esté en el PATH del sistema.");
+                }
+
+                // Construir argumentos para mysqldump
+                string arguments = $"--host={mysqlConfig.Host} " +
+                                 $"--port={mysqlConfig.Port} " +
+                                 $"--user={mysqlConfig.Username} " +
+                                 $"--password={mysqlConfig.Password} " +
+                                 $"--databases {mysqlConfig.DatabaseName} " +
+                                 $"--result-file=\"{tempBackupPath}\" " +
+                                 "--single-transaction " +
+                                 "--routines " +
+                                 "--triggers";
+
+                // Ejecutar mysqldump
+                var processStartInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = mysqldumpPath,
+                    Arguments = arguments,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+
+                using (var process = System.Diagnostics.Process.Start(processStartInfo))
+                {
+                    if (process == null)
+                    {
+                        return (false, null, string.Empty, string.Empty, "No se pudo iniciar el proceso mysqldump");
+                    }
+
+                    // Esperar a que termine el proceso (máximo 5 minutos)
+                    bool exited = await Task.Run(() => process.WaitForExit(300000)); // 5 minutos
+
+                    if (!exited)
+                    {
+                        process.Kill();
+                        return (false, null, string.Empty, string.Empty, "El proceso mysqldump excedió el tiempo límite de 5 minutos");
+                    }
+
+                    string errorOutput = await process.StandardError.ReadToEndAsync();
+
+                    if (process.ExitCode != 0)
+                    {
+                        return (false, null, string.Empty, string.Empty, $"Error al ejecutar mysqldump: {errorOutput}");
+                    }
+                }
+
+                // Verificar que el archivo se creó correctamente
+                if (!System.IO.File.Exists(tempBackupPath))
+                {
+                    return (false, null, string.Empty, string.Empty, "El archivo de backup no se creó correctamente");
+                }
+
+                // Leer el archivo a MemoryStream
+                var memoryStream = new MemoryStream();
+                using (var fileStream = new FileStream(tempBackupPath, FileMode.Open, FileAccess.Read))
+                {
+                    await fileStream.CopyToAsync(memoryStream);
+                }
+
+                // Posicionar el stream al inicio
+                memoryStream.Position = 0;
+
+                // Eliminar archivo temporal
+                try
+                {
+                    System.IO.File.Delete(tempBackupPath);
+                }
+                catch
+                {
+                    // Ignorar errores al eliminar archivo temporal
+                }
+
+                return (true, memoryStream, fileName, mysqlConfig.DatabaseName, string.Empty);
+            }
+            catch (Exception ex)
+            {
+                // Limpiar archivo temporal si existe
+                if (!string.IsNullOrEmpty(tempBackupPath) && System.IO.File.Exists(tempBackupPath))
+                {
+                    try
+                    {
+                        System.IO.File.Delete(tempBackupPath);
+                    }
+                    catch { /* Ignorar errores al eliminar */ }
+                }
+
+                return (false, null, string.Empty, string.Empty, $"Error al crear backup: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Busca mysqldump en las rutas comunes del sistema.
+        /// </summary>
+        private string FindMySqlDump()
+        {
+            // Intentar encontrar mysqldump en el PATH
+            string[] paths = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator);
+
+            foreach (string path in paths)
+            {
+                try
+                {
+                    string mysqldumpPath = Path.Combine(path, "mysqldump.exe");
+                    if (System.IO.File.Exists(mysqldumpPath))
+                    {
+                        return mysqldumpPath;
+                    }
+                }
+                catch
+                {
+                    // Ignorar errores de path inválidos
+                }
+            }
+
+            // Rutas comunes de instalación de MySQL en Windows
+            string[] commonPaths = new[]
+            {
+                @"C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe",
+                @"C:\Program Files\MySQL\MySQL Server 8.4\bin\mysqldump.exe",
+                @"C:\Program Files\MySQL\MySQL Server 9.0\bin\mysqldump.exe",
+                @"C:\Program Files (x86)\MySQL\MySQL Server 8.0\bin\mysqldump.exe",
+                @"C:\Program Files (x86)\MySQL\MySQL Server 8.4\bin\mysqldump.exe",
+                @"C:\xampp\mysql\bin\mysqldump.exe",
+                @"C:\wamp\bin\mysql\mysql8.0.27\bin\mysqldump.exe",
+                @"C:\wamp64\bin\mysql\mysql8.0.27\bin\mysqldump.exe"
+            };
+
+            foreach (string commonPath in commonPaths)
+            {
+                if (System.IO.File.Exists(commonPath))
+                {
+                    return commonPath;
+                }
+            }
+
+            // En Linux/Mac, simplemente devolver "mysqldump" y confiar en el PATH
+            if (!OperatingSystem.IsWindows())
+            {
+                return "mysqldump";
+            }
+
+            return string.Empty;
+        }
     }
 }

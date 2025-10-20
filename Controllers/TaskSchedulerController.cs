@@ -13,6 +13,7 @@ namespace BackupPro.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly DataBasesTypes.SqlServerDataBaseController _sqlServerController;
+        private readonly DataBasesTypes.MySqlDataBaseController _mySqlController;
         private readonly StorageTypes.LocalStorageController _localStorageController;
         private readonly StorageTypes.FtpStorageController _ftpStorageController;
         private readonly StorageTypes.BlobStorageController _blobStorageController;
@@ -22,6 +23,7 @@ namespace BackupPro.Controllers
         public TaskSchedulerController(
             ApplicationDbContext context,
             DataBasesTypes.SqlServerDataBaseController sqlServerController,
+            DataBasesTypes.MySqlDataBaseController mySqlController,
             StorageTypes.LocalStorageController localStorageController,
             StorageTypes.FtpStorageController ftpStorageController,
             StorageTypes.BlobStorageController blobStorageController,
@@ -30,6 +32,7 @@ namespace BackupPro.Controllers
         {
             _context = context;
             _sqlServerController = sqlServerController;
+            _mySqlController = mySqlController;
             _localStorageController = localStorageController;
             _ftpStorageController = ftpStorageController;
             _blobStorageController = blobStorageController;
@@ -599,6 +602,27 @@ namespace BackupPro.Controllers
             {
                 return await ExecuteBackupSqlServerGoogleDrive(task.DatabaseId, task.StorageId);
             }
+            // MySQL combinaciones
+            else if (task.DatabaseType == "MySQL" && task.StorageType == "Local")
+            {
+                return await ExecuteBackupMySqlLocal(task.DatabaseId, task.StorageId);
+            }
+            else if (task.DatabaseType == "MySQL" && task.StorageType == "Ftp")
+            {
+                return await ExecuteBackupMySqlFtp(task.DatabaseId, task.StorageId);
+            }
+            else if (task.DatabaseType == "MySQL" && task.StorageType == "AzureBlob")
+            {
+                return await ExecuteBackupMySqlBlob(task.DatabaseId, task.StorageId);
+            }
+            else if (task.DatabaseType == "MySQL" && task.StorageType == "OneDrive")
+            {
+                return await ExecuteBackupMySqlOneDrive(task.DatabaseId, task.StorageId);
+            }
+            else if (task.DatabaseType == "MySQL" && task.StorageType == "GoogleDrive")
+            {
+                return await ExecuteBackupMySqlGoogleDrive(task.DatabaseId, task.StorageId);
+            }
             // Otras combinaciones que aún no están implementadas
             else if (task.DatabaseType == "SqlServer")
             {
@@ -832,6 +856,236 @@ namespace BackupPro.Controllers
                     fileName,
                     databaseName,
                     sqlServerDatabaseId
+                );
+
+                if (!saveSuccess)
+                {
+                    throw new Exception(saveError);
+                }
+
+                return $"Backup creado exitosamente en Google Drive: {fileName} ({FormatBytes(fileSize)})";
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error al ejecutar backup Google Drive: {ex.Message}", ex);
+            }
+            finally
+            {
+                // Liberar el MemoryStream
+                backupStream?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Ejecuta backup de MySQL a almacenamiento local
+        /// </summary>
+        private async Task<string> ExecuteBackupMySqlLocal(int mySqlDatabaseId, int localStorageId)
+        {
+            MemoryStream? backupStream = null;
+
+            try
+            {
+                // Paso 1: Crear el backup en MySQL y obtener el MemoryStream
+                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _mySqlController.CreateBackup(mySqlDatabaseId);
+
+                if (!backupSuccess || backupStream2 == null)
+                {
+                    throw new Exception(backupError);
+                }
+
+                backupStream = backupStream2;
+
+                // Paso 2: Guardar el backup en almacenamiento local
+                var (saveSuccess, filePath, fileSize, saveError) = await _localStorageController.SaveBackup(
+                    localStorageId,
+                    backupStream,
+                    fileName,
+                    databaseName,
+                    mySqlDatabaseId
+                );
+
+                if (!saveSuccess)
+                {
+                    throw new Exception(saveError);
+                }
+
+                return $"Backup creado exitosamente: {fileName} ({FormatBytes(fileSize)})";
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error al ejecutar backup: {ex.Message}", ex);
+            }
+            finally
+            {
+                // Liberar el MemoryStream
+                backupStream?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Ejecuta backup de MySQL a almacenamiento FTP
+        /// </summary>
+        private async Task<string> ExecuteBackupMySqlFtp(int mySqlDatabaseId, int ftpStorageId)
+        {
+            MemoryStream? backupStream = null;
+
+            try
+            {
+                // Paso 1: Crear el backup en MySQL y obtener el MemoryStream
+                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _mySqlController.CreateBackup(mySqlDatabaseId);
+
+                if (!backupSuccess || backupStream2 == null)
+                {
+                    throw new Exception(backupError);
+                }
+
+                backupStream = backupStream2;
+
+                // Paso 2: Guardar el backup en almacenamiento FTP
+                var (saveSuccess, filePath, fileSize, saveError) = await _ftpStorageController.SaveBackup(
+                    ftpStorageId,
+                    backupStream,
+                    fileName,
+                    databaseName,
+                    mySqlDatabaseId
+                );
+
+                if (!saveSuccess)
+                {
+                    throw new Exception(saveError);
+                }
+
+                return $"Backup creado exitosamente en FTP: {fileName} ({FormatBytes(fileSize)})";
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error al ejecutar backup FTP: {ex.Message}", ex);
+            }
+            finally
+            {
+                // Liberar el MemoryStream
+                backupStream?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Ejecuta backup de MySQL a Azure Blob Storage
+        /// </summary>
+        private async Task<string> ExecuteBackupMySqlBlob(int mySqlDatabaseId, int blobStorageId)
+        {
+            MemoryStream? backupStream = null;
+
+            try
+            {
+                // Paso 1: Crear el backup en MySQL y obtener el MemoryStream
+                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _mySqlController.CreateBackup(mySqlDatabaseId);
+
+                if (!backupSuccess || backupStream2 == null)
+                {
+                    throw new Exception(backupError);
+                }
+
+                backupStream = backupStream2;
+
+                // Paso 2: Guardar el backup en Azure Blob Storage
+                var (saveSuccess, filePath, fileSize, saveError) = await _blobStorageController.SaveBackup(
+                    blobStorageId,
+                    backupStream,
+                    fileName,
+                    databaseName,
+                    mySqlDatabaseId
+                );
+
+                if (!saveSuccess)
+                {
+                    throw new Exception(saveError);
+                }
+
+                return $"Backup creado exitosamente en Azure Blob: {fileName} ({FormatBytes(fileSize)})";
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error al ejecutar backup Azure Blob: {ex.Message}", ex);
+            }
+            finally
+            {
+                // Liberar el MemoryStream
+                backupStream?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Ejecuta backup de MySQL a OneDrive
+        /// </summary>
+        private async Task<string> ExecuteBackupMySqlOneDrive(int mySqlDatabaseId, int oneDriveStorageId)
+        {
+            MemoryStream? backupStream = null;
+
+            try
+            {
+                // Paso 1: Crear el backup en MySQL y obtener el MemoryStream
+                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _mySqlController.CreateBackup(mySqlDatabaseId);
+
+                if (!backupSuccess || backupStream2 == null)
+                {
+                    throw new Exception(backupError);
+                }
+
+                backupStream = backupStream2;
+
+                // Paso 2: Guardar el backup en OneDrive
+                var (saveSuccess, filePath, fileSize, saveError) = await _oneDriveStorageController.SaveBackup(
+                    oneDriveStorageId,
+                    backupStream,
+                    fileName,
+                    databaseName,
+                    mySqlDatabaseId
+                );
+
+                if (!saveSuccess)
+                {
+                    throw new Exception(saveError);
+                }
+
+                return $"Backup creado exitosamente en OneDrive: {fileName} ({FormatBytes(fileSize)})";
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error al ejecutar backup OneDrive: {ex.Message}", ex);
+            }
+            finally
+            {
+                // Liberar el MemoryStream
+                backupStream?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Ejecuta backup de MySQL a Google Drive
+        /// </summary>
+        private async Task<string> ExecuteBackupMySqlGoogleDrive(int mySqlDatabaseId, int googleDriveStorageId)
+        {
+            MemoryStream? backupStream = null;
+
+            try
+            {
+                // Paso 1: Crear el backup en MySQL y obtener el MemoryStream
+                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _mySqlController.CreateBackup(mySqlDatabaseId);
+
+                if (!backupSuccess || backupStream2 == null)
+                {
+                    throw new Exception(backupError);
+                }
+
+                backupStream = backupStream2;
+
+                // Paso 2: Guardar el backup en Google Drive
+                var (saveSuccess, filePath, fileSize, saveError) = await _googleDriveStorageController.SaveBackup(
+                    googleDriveStorageId,
+                    backupStream,
+                    fileName,
+                    databaseName,
+                    mySqlDatabaseId
                 );
 
                 if (!saveSuccess)

@@ -4,8 +4,8 @@
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>
       <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
-        <!-- Requiere privilegios de administrador -->
-        <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
+        <!-- Ejecutar con permisos del usuario actual (sin privilegios de administrador) -->
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
       </requestedPrivileges>
     </security>
   </trustInfo>

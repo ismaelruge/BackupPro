@@ -943,8 +943,9 @@
 
     // ========== GOOGLE DRIVE AUTHENTICATION ==========
 
-    // Variable global para almacenar el access token de Google Drive
+    // Variables globales para almacenar tokens de Google Drive
     let googleDriveAccessToken = null;
+    let googleDriveRefreshToken = null;
     let googleDriveEmail = null;
 
     // Botón para conectar con Google Drive (modal agregar)
@@ -983,6 +984,7 @@
 
             if (event.data.success) {
                 googleDriveAccessToken = event.data.accessToken;
+                googleDriveRefreshToken = event.data.refreshToken; // Guardar refresh token
                 googleDriveEmail = event.data.email;
 
                 // Actualizar también el driveExplorerData para que funcione el explorador
@@ -1080,7 +1082,7 @@
 
             if (data.success) {
                 // Guardar tokens con el ID retornado
-                const tokensSaved = await saveGoogleDriveTokens(data.id, googleDriveAccessToken, null);
+                const tokensSaved = await saveGoogleDriveTokens(data.id, googleDriveAccessToken, googleDriveRefreshToken);
 
                 if (tokensSaved) {
                     showToast('success', 'Configuración de Google Drive creada exitosamente.');
@@ -1092,6 +1094,7 @@
                     // Resetear formulario y variables
                     document.getElementById('addGoogleDriveForm').reset();
                     googleDriveAccessToken = null;
+                    googleDriveRefreshToken = null;
                     googleDriveEmail = null;
                     driveExplorerData.accessToken = '';
                     document.getElementById('btnExploreDrive').disabled = true;
@@ -1134,6 +1137,7 @@
                     document.getElementById('btnExploreEditDrive').disabled = false;
                 } else {
                     googleDriveAccessToken = null;
+                    googleDriveRefreshToken = null;
                     driveExplorerData.accessToken = '';
                     document.getElementById('btnExploreEditDrive').disabled = true;
                 }
