@@ -583,6 +583,32 @@ namespace BackupPro.Controllers
         }
 
         /// <summary>
+        /// Registra un error en el histórico de backups
+        /// </summary>
+        private async Task LogBackupError(int databaseId, string databaseName, DateTime startTime, string errorMessage)
+        {
+            try
+            {
+                var backupHistory = new BackupHistory
+                {
+                    DatabaseSourceId = databaseId,
+                    DatabaseName = databaseName,
+                    Date = startTime,
+                    Status = "Error",
+                    Message = errorMessage,
+                    BackupPath = "N/A"
+                };
+
+                _context.BackupHistories.Add(backupHistory);
+                await _context.SaveChangesAsync();
+            }
+            catch
+            {
+                // Ignorar errores al registrar en histórico
+            }
+        }
+
+        /// <summary>
         /// Ejecuta el backup según el tipo de base de datos y almacenamiento
         /// </summary>
         private async Task<string> ExecuteBackupByType(Models.TaskScheduler task)
@@ -696,14 +722,18 @@ namespace BackupPro.Controllers
         private async Task<string> ExecuteBackupSqlServerLocal(int sqlServerDatabaseId, int localStorageId)
         {
             MemoryStream? backupStream = null;
+            var startTime = DateTime.Now;
+            string databaseName = "Desconocida";
 
             try
             {
                 // Paso 1: Crear el backup en SQL Server y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _sqlServerController.CreateBackup(sqlServerDatabaseId);
+                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _sqlServerController.CreateBackup(sqlServerDatabaseId);
+                databaseName = dbName;
 
                 if (!backupSuccess || backupStream2 == null)
                 {
+                    await LogBackupError(sqlServerDatabaseId, databaseName, startTime, backupError);
                     throw new Exception(backupError);
                 }
 
@@ -727,6 +757,8 @@ namespace BackupPro.Controllers
             }
             catch (Exception ex)
             {
+                // El error ya fue registrado en el histórico si es de CreateBackup
+                // o será registrado por SaveBackup si es de almacenamiento
                 throw new Exception($"Error al ejecutar backup: {ex.Message}", ex);
             }
             finally
@@ -742,14 +774,18 @@ namespace BackupPro.Controllers
         private async Task<string> ExecuteBackupSqlServerFtp(int sqlServerDatabaseId, int ftpStorageId)
         {
             MemoryStream? backupStream = null;
+            var startTime = DateTime.Now;
+            string databaseName = "Desconocida";
 
             try
             {
                 // Paso 1: Crear el backup en SQL Server y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _sqlServerController.CreateBackup(sqlServerDatabaseId);
+                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _sqlServerController.CreateBackup(sqlServerDatabaseId);
+                databaseName = dbName;
 
                 if (!backupSuccess || backupStream2 == null)
                 {
+                    await LogBackupError(sqlServerDatabaseId, databaseName, startTime, backupError);
                     throw new Exception(backupError);
                 }
 
@@ -788,14 +824,18 @@ namespace BackupPro.Controllers
         private async Task<string> ExecuteBackupSqlServerBlob(int sqlServerDatabaseId, int blobStorageId)
         {
             MemoryStream? backupStream = null;
+            var startTime = DateTime.Now;
+            string databaseName = "Desconocida";
 
             try
             {
                 // Paso 1: Crear el backup en SQL Server y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _sqlServerController.CreateBackup(sqlServerDatabaseId);
+                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _sqlServerController.CreateBackup(sqlServerDatabaseId);
+                databaseName = dbName;
 
                 if (!backupSuccess || backupStream2 == null)
                 {
+                    await LogBackupError(sqlServerDatabaseId, databaseName, startTime, backupError);
                     throw new Exception(backupError);
                 }
 
@@ -834,14 +874,18 @@ namespace BackupPro.Controllers
         private async Task<string> ExecuteBackupSqlServerOneDrive(int sqlServerDatabaseId, int oneDriveStorageId)
         {
             MemoryStream? backupStream = null;
+            var startTime = DateTime.Now;
+            string databaseName = "Desconocida";
 
             try
             {
                 // Paso 1: Crear el backup en SQL Server y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _sqlServerController.CreateBackup(sqlServerDatabaseId);
+                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _sqlServerController.CreateBackup(sqlServerDatabaseId);
+                databaseName = dbName;
 
                 if (!backupSuccess || backupStream2 == null)
                 {
+                    await LogBackupError(sqlServerDatabaseId, databaseName, startTime, backupError);
                     throw new Exception(backupError);
                 }
 
@@ -880,14 +924,18 @@ namespace BackupPro.Controllers
         private async Task<string> ExecuteBackupSqlServerGoogleDrive(int sqlServerDatabaseId, int googleDriveStorageId)
         {
             MemoryStream? backupStream = null;
+            var startTime = DateTime.Now;
+            string databaseName = "Desconocida";
 
             try
             {
                 // Paso 1: Crear el backup en SQL Server y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _sqlServerController.CreateBackup(sqlServerDatabaseId);
+                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _sqlServerController.CreateBackup(sqlServerDatabaseId);
+                databaseName = dbName;
 
                 if (!backupSuccess || backupStream2 == null)
                 {
+                    await LogBackupError(sqlServerDatabaseId, databaseName, startTime, backupError);
                     throw new Exception(backupError);
                 }
 
@@ -926,14 +974,18 @@ namespace BackupPro.Controllers
         private async Task<string> ExecuteBackupMySqlLocal(int mySqlDatabaseId, int localStorageId)
         {
             MemoryStream? backupStream = null;
+            var startTime = DateTime.Now;
+            string databaseName = "Desconocida";
 
             try
             {
                 // Paso 1: Crear el backup en MySQL y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _mySqlController.CreateBackup(mySqlDatabaseId);
+                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _mySqlController.CreateBackup(mySqlDatabaseId);
+                databaseName = dbName;
 
                 if (!backupSuccess || backupStream2 == null)
                 {
+                    await LogBackupError(mySqlDatabaseId, databaseName, startTime, backupError);
                     throw new Exception(backupError);
                 }
 
@@ -972,14 +1024,18 @@ namespace BackupPro.Controllers
         private async Task<string> ExecuteBackupMySqlFtp(int mySqlDatabaseId, int ftpStorageId)
         {
             MemoryStream? backupStream = null;
+            var startTime = DateTime.Now;
+            string databaseName = "Desconocida";
 
             try
             {
                 // Paso 1: Crear el backup en MySQL y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _mySqlController.CreateBackup(mySqlDatabaseId);
+                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _mySqlController.CreateBackup(mySqlDatabaseId);
+                databaseName = dbName;
 
                 if (!backupSuccess || backupStream2 == null)
                 {
+                    await LogBackupError(mySqlDatabaseId, databaseName, startTime, backupError);
                     throw new Exception(backupError);
                 }
 
@@ -1018,14 +1074,18 @@ namespace BackupPro.Controllers
         private async Task<string> ExecuteBackupMySqlBlob(int mySqlDatabaseId, int blobStorageId)
         {
             MemoryStream? backupStream = null;
+            var startTime = DateTime.Now;
+            string databaseName = "Desconocida";
 
             try
             {
                 // Paso 1: Crear el backup en MySQL y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _mySqlController.CreateBackup(mySqlDatabaseId);
+                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _mySqlController.CreateBackup(mySqlDatabaseId);
+                databaseName = dbName;
 
                 if (!backupSuccess || backupStream2 == null)
                 {
+                    await LogBackupError(mySqlDatabaseId, databaseName, startTime, backupError);
                     throw new Exception(backupError);
                 }
 
@@ -1064,14 +1124,18 @@ namespace BackupPro.Controllers
         private async Task<string> ExecuteBackupMySqlOneDrive(int mySqlDatabaseId, int oneDriveStorageId)
         {
             MemoryStream? backupStream = null;
+            var startTime = DateTime.Now;
+            string databaseName = "Desconocida";
 
             try
             {
                 // Paso 1: Crear el backup en MySQL y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _mySqlController.CreateBackup(mySqlDatabaseId);
+                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _mySqlController.CreateBackup(mySqlDatabaseId);
+                databaseName = dbName;
 
                 if (!backupSuccess || backupStream2 == null)
                 {
+                    await LogBackupError(mySqlDatabaseId, databaseName, startTime, backupError);
                     throw new Exception(backupError);
                 }
 
@@ -1110,14 +1174,18 @@ namespace BackupPro.Controllers
         private async Task<string> ExecuteBackupMySqlGoogleDrive(int mySqlDatabaseId, int googleDriveStorageId)
         {
             MemoryStream? backupStream = null;
+            var startTime = DateTime.Now;
+            string databaseName = "Desconocida";
 
             try
             {
                 // Paso 1: Crear el backup en MySQL y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _mySqlController.CreateBackup(mySqlDatabaseId);
+                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _mySqlController.CreateBackup(mySqlDatabaseId);
+                databaseName = dbName;
 
                 if (!backupSuccess || backupStream2 == null)
                 {
+                    await LogBackupError(mySqlDatabaseId, databaseName, startTime, backupError);
                     throw new Exception(backupError);
                 }
 
@@ -1156,14 +1224,18 @@ namespace BackupPro.Controllers
         private async Task<string> ExecuteBackupPostgreSqlLocal(int postgresDatabaseId, int localStorageId)
         {
             MemoryStream? backupStream = null;
+            var startTime = DateTime.Now;
+            string databaseName = "Desconocida";
 
             try
             {
                 // Paso 1: Crear el backup en PostgreSQL y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _postgresSqlController.CreateBackup(postgresDatabaseId);
+                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _postgresSqlController.CreateBackup(postgresDatabaseId);
+                databaseName = dbName;
 
                 if (!backupSuccess || backupStream2 == null)
                 {
+                    await LogBackupError(postgresDatabaseId, databaseName, startTime, backupError);
                     throw new Exception(backupError);
                 }
 
@@ -1202,14 +1274,18 @@ namespace BackupPro.Controllers
         private async Task<string> ExecuteBackupPostgreSqlFtp(int postgresDatabaseId, int ftpStorageId)
         {
             MemoryStream? backupStream = null;
+            var startTime = DateTime.Now;
+            string databaseName = "Desconocida";
 
             try
             {
                 // Paso 1: Crear el backup en PostgreSQL y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _postgresSqlController.CreateBackup(postgresDatabaseId);
+                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _postgresSqlController.CreateBackup(postgresDatabaseId);
+                databaseName = dbName;
 
                 if (!backupSuccess || backupStream2 == null)
                 {
+                    await LogBackupError(postgresDatabaseId, databaseName, startTime, backupError);
                     throw new Exception(backupError);
                 }
 
@@ -1248,14 +1324,18 @@ namespace BackupPro.Controllers
         private async Task<string> ExecuteBackupPostgreSqlBlob(int postgresDatabaseId, int blobStorageId)
         {
             MemoryStream? backupStream = null;
+            var startTime = DateTime.Now;
+            string databaseName = "Desconocida";
 
             try
             {
                 // Paso 1: Crear el backup en PostgreSQL y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _postgresSqlController.CreateBackup(postgresDatabaseId);
+                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _postgresSqlController.CreateBackup(postgresDatabaseId);
+                databaseName = dbName;
 
                 if (!backupSuccess || backupStream2 == null)
                 {
+                    await LogBackupError(postgresDatabaseId, databaseName, startTime, backupError);
                     throw new Exception(backupError);
                 }
 
@@ -1294,14 +1374,18 @@ namespace BackupPro.Controllers
         private async Task<string> ExecuteBackupPostgreSqlOneDrive(int postgresDatabaseId, int oneDriveStorageId)
         {
             MemoryStream? backupStream = null;
+            var startTime = DateTime.Now;
+            string databaseName = "Desconocida";
 
             try
             {
                 // Paso 1: Crear el backup en PostgreSQL y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _postgresSqlController.CreateBackup(postgresDatabaseId);
+                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _postgresSqlController.CreateBackup(postgresDatabaseId);
+                databaseName = dbName;
 
                 if (!backupSuccess || backupStream2 == null)
                 {
+                    await LogBackupError(postgresDatabaseId, databaseName, startTime, backupError);
                     throw new Exception(backupError);
                 }
 
@@ -1340,14 +1424,18 @@ namespace BackupPro.Controllers
         private async Task<string> ExecuteBackupPostgreSqlGoogleDrive(int postgresDatabaseId, int googleDriveStorageId)
         {
             MemoryStream? backupStream = null;
+            var startTime = DateTime.Now;
+            string databaseName = "Desconocida";
 
             try
             {
                 // Paso 1: Crear el backup en PostgreSQL y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _postgresSqlController.CreateBackup(postgresDatabaseId);
+                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _postgresSqlController.CreateBackup(postgresDatabaseId);
+                databaseName = dbName;
 
                 if (!backupSuccess || backupStream2 == null)
                 {
+                    await LogBackupError(postgresDatabaseId, databaseName, startTime, backupError);
                     throw new Exception(backupError);
                 }
 
@@ -1388,13 +1476,18 @@ namespace BackupPro.Controllers
         private async Task<string> ExecuteBackupMongoDBLocal(int mongodbDatabaseId, int localStorageId)
         {
             MemoryStream? backupStream = null;
+            var startTime = DateTime.Now;
+            string databaseName = "Desconocida";
+
             try
             {
                 // 1. Crear backup de MongoDB
-                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _mongoDBController.CreateBackup(mongodbDatabaseId);
+                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _mongoDBController.CreateBackup(mongodbDatabaseId);
+                databaseName = dbName;
 
                 if (!backupSuccess || backupStream2 == null)
                 {
+                    await LogBackupError(mongodbDatabaseId, databaseName, startTime, backupError);
                     throw new Exception(backupError);
                 }
 
@@ -1433,13 +1526,18 @@ namespace BackupPro.Controllers
         private async Task<string> ExecuteBackupMongoDBFtp(int mongodbDatabaseId, int ftpStorageId)
         {
             MemoryStream? backupStream = null;
+            var startTime = DateTime.Now;
+            string databaseName = "Desconocida";
+
             try
             {
                 // 1. Crear backup de MongoDB
-                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _mongoDBController.CreateBackup(mongodbDatabaseId);
+                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _mongoDBController.CreateBackup(mongodbDatabaseId);
+                databaseName = dbName;
 
                 if (!backupSuccess || backupStream2 == null)
                 {
+                    await LogBackupError(mongodbDatabaseId, databaseName, startTime, backupError);
                     throw new Exception(backupError);
                 }
 
@@ -1478,13 +1576,18 @@ namespace BackupPro.Controllers
         private async Task<string> ExecuteBackupMongoDBBlob(int mongodbDatabaseId, int blobStorageId)
         {
             MemoryStream? backupStream = null;
+            var startTime = DateTime.Now;
+            string databaseName = "Desconocida";
+
             try
             {
                 // 1. Crear backup de MongoDB
-                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _mongoDBController.CreateBackup(mongodbDatabaseId);
+                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _mongoDBController.CreateBackup(mongodbDatabaseId);
+                databaseName = dbName;
 
                 if (!backupSuccess || backupStream2 == null)
                 {
+                    await LogBackupError(mongodbDatabaseId, databaseName, startTime, backupError);
                     throw new Exception(backupError);
                 }
 
@@ -1523,13 +1626,18 @@ namespace BackupPro.Controllers
         private async Task<string> ExecuteBackupMongoDBOneDrive(int mongodbDatabaseId, int oneDriveStorageId)
         {
             MemoryStream? backupStream = null;
+            var startTime = DateTime.Now;
+            string databaseName = "Desconocida";
+
             try
             {
                 // 1. Crear backup de MongoDB
-                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _mongoDBController.CreateBackup(mongodbDatabaseId);
+                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _mongoDBController.CreateBackup(mongodbDatabaseId);
+                databaseName = dbName;
 
                 if (!backupSuccess || backupStream2 == null)
                 {
+                    await LogBackupError(mongodbDatabaseId, databaseName, startTime, backupError);
                     throw new Exception(backupError);
                 }
 
@@ -1568,13 +1676,18 @@ namespace BackupPro.Controllers
         private async Task<string> ExecuteBackupMongoDBGoogleDrive(int mongodbDatabaseId, int googleDriveStorageId)
         {
             MemoryStream? backupStream = null;
+            var startTime = DateTime.Now;
+            string databaseName = "Desconocida";
+
             try
             {
                 // 1. Crear backup de MongoDB
-                var (backupSuccess, backupStream2, fileName, databaseName, backupError) = await _mongoDBController.CreateBackup(mongodbDatabaseId);
+                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _mongoDBController.CreateBackup(mongodbDatabaseId);
+                databaseName = dbName;
 
                 if (!backupSuccess || backupStream2 == null)
                 {
+                    await LogBackupError(mongodbDatabaseId, databaseName, startTime, backupError);
                     throw new Exception(backupError);
                 }
 

@@ -299,6 +299,32 @@ namespace BackupPro.Controllers.StorageTypes
         #region Métodos de Backup
 
         /// <summary>
+        /// Registra un error en el histórico de backups
+        /// </summary>
+        private async Task LogBackupError(int databaseId, string databaseName, DateTime startTime, string errorMessage)
+        {
+            try
+            {
+                var backupHistory = new BackupHistory
+                {
+                    DatabaseSourceId = databaseId,
+                    DatabaseName = databaseName,
+                    Date = startTime,
+                    Status = "Error",
+                    Message = errorMessage,
+                    BackupPath = "N/A"
+                };
+
+                _context.BackupHistories.Add(backupHistory);
+                await _context.SaveChangesAsync();
+            }
+            catch
+            {
+                // Ignorar errores al registrar en histórico
+            }
+        }
+
+        /// <summary>
         /// Guarda un backup (MemoryStream) en Azure Blob Storage
         /// </summary>
         /// <param name="blobStorageId">ID de la configuración de Azure Blob Storage</param>
@@ -319,7 +345,9 @@ namespace BackupPro.Controllers.StorageTypes
                 var blobStorage = await _context.AzureBlobStorages.FindAsync(blobStorageId);
                 if (blobStorage == null)
                 {
-                    return (false, string.Empty, 0, "Configuración de Azure Blob Storage no encontrada");
+                    var errorMsg = "Configuración de Azure Blob Storage no encontrada";
+                    await LogBackupError(databaseId, databaseName, startTime, errorMsg);
+                    return (false, string.Empty, 0, errorMsg);
                 }
 
                 // Cambiar extensión a .zip

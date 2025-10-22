@@ -92,7 +92,7 @@ namespace BackupPro.Controllers
                     {
                         id = history.Id,
                         databaseName = history.DatabaseName,
-                        date = history.Date.ToString("dd/MM/yyyy HH:mm:ss"),
+                        date = history.Date.ToString("dd/MM/yyyy hh:mm:ss tt"),
                         status = history.Status,
                         message = history.Message,
                         backupPath = history.BackupPath

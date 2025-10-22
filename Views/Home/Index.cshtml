@@ -36,9 +36,6 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Contenedor de alertas -->
-            <div id="alertContainer"></div>
         </div>
     </div>
 
@@ -95,10 +92,6 @@
         document.getElementById("btnBackups").addEventListener("click", async function () {
             const btn = this;
             const spinner = document.getElementById("spinner");
-            const alertContainer = document.getElementById("alertContainer");
-
-            // Limpiar alertas anteriores
-            alertContainer.innerHTML = "";
 
             // Deshabilitar botón y mostrar spinner
             btn.disabled = true;
@@ -109,54 +102,27 @@
                 // Llamada al método del controlador
                 const response = await fetch('/Home/EjecutarBackups', { method: 'POST' });
 
+                // Restaurar botón y ocultar spinner
+                spinner.style.display = "none";
+                btn.disabled = false;
+                btn.innerHTML = `<i class="bi bi-play-circle-fill me-2"></i> Ejecutar Backups Ahora`;
+
                 if (response.ok) {
-                    // Mostrar alerta de éxito
-                    alertContainer.innerHTML = `
-                        <div class="alert alert-success alert-dismissible fade show shadow-sm rounded-4" role="alert">
-                            <div class="d-flex align-items-center">
-                                <i class="bi bi-check-circle-fill fs-4 me-3"></i>
-                                <div>
-                                    <h6 class="mb-0 fw-bold">¡Éxito!</h6>
-                                    <small>Los backups se ejecutaron correctamente.</small>
-                                </div>
-                            </div>
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>
-                    `;
+                    // Mostrar toast de éxito
+                    showToast('success', 'Los backups se ejecutaron correctamente');
                 } else {
-                    // Mostrar alerta de error
-                    alertContainer.innerHTML = `
-                        <div class="alert alert-danger alert-dismissible fade show shadow-sm rounded-4" role="alert">
-                            <div class="d-flex align-items-center">
-                                <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
-                                <div>
-                                    <h6 class="mb-0 fw-bold">Error</h6>
-                                    <small>Hubo un error al ejecutar los backups.</small>
-                                </div>
-                            </div>
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>
-                    `;
+                    // Mostrar toast de error
+                    showToast('error', 'Hubo un error al ejecutar los backups');
                 }
             } catch (error) {
-                alertContainer.innerHTML = `
-                    <div class="alert alert-danger alert-dismissible fade show shadow-sm rounded-4" role="alert">
-                        <div class="d-flex align-items-center">
-                            <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
-                            <div>
-                                <h6 class="mb-0 fw-bold">Error inesperado</h6>
-                                <small>Ocurrió un error al procesar la solicitud.</small>
-                            </div>
-                        </div>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                `;
-            }
+                // Restaurar botón y ocultar spinner
+                spinner.style.display = "none";
+                btn.disabled = false;
+                btn.innerHTML = `<i class="bi bi-play-circle-fill me-2"></i> Ejecutar Backups Ahora`;
 
-            // Restaurar botón y ocultar spinner
-            spinner.style.display = "none";
-            btn.disabled = false;
-            btn.innerHTML = `<i class="bi bi-play-circle-fill me-2"></i> Ejecutar Backups Ahora`;
+                // Mostrar toast de error
+                showToast('error', 'Ocurrió un error inesperado al procesar la solicitud');
+            }
         });
     </script>
 }

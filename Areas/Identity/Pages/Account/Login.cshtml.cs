@@ -96,6 +96,12 @@ namespace BackupPro.Areas.Identity.Pages.Account
 
             ExternalLogins = (await _signInManager.GetExternalAuthenticationSchemesAsync()).ToList();
 
+            Console.WriteLine($"[DEBUG] ExternalLogins count: {ExternalLogins.Count}");
+            foreach (var login in ExternalLogins)
+            {
+                Console.WriteLine($"[DEBUG] Provider: {login.Name}, DisplayName: {login.DisplayName}");
+            }
+
             ReturnUrl = returnUrl;
         }
 

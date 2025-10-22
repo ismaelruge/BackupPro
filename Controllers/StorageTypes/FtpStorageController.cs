@@ -308,6 +308,32 @@ namespace BackupPro.Controllers.StorageTypes
         #region Métodos de Backup
 
         /// <summary>
+        /// Registra un error en el histórico de backups
+        /// </summary>
+        private async Task LogBackupError(int databaseId, string databaseName, DateTime startTime, string errorMessage)
+        {
+            try
+            {
+                var backupHistory = new BackupHistory
+                {
+                    DatabaseSourceId = databaseId,
+                    DatabaseName = databaseName,
+                    Date = startTime,
+                    Status = "Error",
+                    Message = errorMessage,
+                    BackupPath = "N/A"
+                };
+
+                _context.BackupHistories.Add(backupHistory);
+                await _context.SaveChangesAsync();
+            }
+            catch
+            {
+                // Ignorar errores al registrar en histórico
+            }
+        }
+
+        /// <summary>
         /// Guarda un backup (MemoryStream) en el almacenamiento FTP
         /// </summary>
         /// <param name="ftpStorageId">ID de la configuración de almacenamiento FTP</param>
@@ -328,7 +354,9 @@ namespace BackupPro.Controllers.StorageTypes
                 var ftpStorage = await _context.FtpStorages.FindAsync(ftpStorageId);
                 if (ftpStorage == null)
                 {
-                    return (false, string.Empty, 0, "Configuración de almacenamiento FTP no encontrada");
+                    var errorMsg = "Configuración de almacenamiento FTP no encontrada";
+                    await LogBackupError(databaseId, databaseName, startTime, errorMsg);
+                    return (false, string.Empty, 0, errorMsg);
                 }
 
                 // Cambiar extensión a .zip
@@ -363,7 +391,9 @@ namespace BackupPro.Controllers.StorageTypes
 
                     if (uploadResult != FtpStatus.Success)
                     {
-                        return (false, string.Empty, 0, $"Error al subir archivo al FTP: {uploadResult}");
+                        var errorMsg = $"Error al subir archivo al FTP: {uploadResult}";
+                        await LogBackupError(databaseId, databaseName, startTime, errorMsg);
+                        return (false, string.Empty, 0, errorMsg);
                     }
 
                     // Obtener el tamaño del archivo remoto

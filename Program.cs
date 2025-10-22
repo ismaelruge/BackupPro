@@ -46,8 +46,8 @@ namespace BackupPro
             builder.Services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseSqlite($"Data Source={dbPath}"));
 
-            // Configurar Identity
-            builder.Services.AddDefaultIdentity<IdentityUser>(options =>
+            // Configurar Identity (sin UI, usando controladores MVC personalizados)
+            builder.Services.AddIdentity<IdentityUser, IdentityRole>(options =>
             {
                 options.SignIn.RequireConfirmedAccount = false;
                 options.Password.RequireDigit = false;
@@ -56,7 +56,23 @@ namespace BackupPro
                 options.Password.RequireNonAlphanumeric = false;
                 options.Password.RequiredLength = 6;
             })
-            .AddEntityFrameworkStores<ApplicationDbContext>();
+            .AddEntityFrameworkStores<ApplicationDbContext>()
+            .AddDefaultTokenProviders();
+
+            // Configurar autenticación externa (Google y Microsoft)
+            builder.Services.AddAuthentication()
+                .AddGoogle(googleOptions =>
+                {
+                    googleOptions.ClientId = appSettings.GoogleOAuth.ClientId;
+                    googleOptions.ClientSecret = appSettings.GoogleOAuth.ClientSecret;
+                    googleOptions.CallbackPath = "/signin-google";
+                })
+                .AddMicrosoftAccount(microsoftOptions =>
+                {
+                    microsoftOptions.ClientId = appSettings.OneDrive.ClientId;
+                    microsoftOptions.ClientSecret = appSettings.OneDrive.ClientSecret;
+                    microsoftOptions.CallbackPath = "/signin-microsoft";
+                });
 
             builder.Services.ConfigureApplicationCookie(options =>
             {

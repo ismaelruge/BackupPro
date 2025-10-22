@@ -182,5 +182,120 @@ namespace BackupPro.Controllers
             await _signInManager.SignInAsync(newUser, isPersistent: true);
             return RedirectToAction("Index", "Home");
         }
+
+        /// <summary>
+        /// Inicia el proceso de autenticación externa (Google/Microsoft).
+        /// </summary>
+        /// <param name="provider">Proveedor de autenticación (Google o Microsoft).</param>
+        /// <returns>Redirige al proveedor externo.</returns>
+        [HttpPost]
+        [AllowAnonymous]
+        [ValidateAntiForgeryToken]
+        public IActionResult ExternalLogin(string provider)
+        {
+            Console.WriteLine($"[DEBUG] ExternalLogin llamado con provider: {provider}");
+
+            // Solicitar redirección al proveedor externo
+            var redirectUrl = Url.Action(nameof(ExternalLoginCallback), "Account");
+            Console.WriteLine($"[DEBUG] Redirect URL: {redirectUrl}");
+
+            var properties = _signInManager.ConfigureExternalAuthenticationProperties(provider, redirectUrl);
+            Console.WriteLine($"[DEBUG] Redirigiendo a {provider}...");
+
+            return Challenge(properties, provider);
+        }
+
+        /// <summary>
+        /// Callback que maneja la respuesta del proveedor externo.
+        /// </summary>
+        /// <returns>Redirige al Home o a la vista de Login con error.</returns>
+        [HttpGet]
+        [AllowAnonymous]
+        public async Task<IActionResult> ExternalLoginCallback(string? returnUrl = null, string? remoteError = null)
+        {
+            Console.WriteLine($"[DEBUG] ExternalLoginCallback llamado. remoteError: {remoteError}");
+            returnUrl ??= Url.Content("~/");
+
+            if (remoteError != null)
+            {
+                Console.WriteLine($"[ERROR] Error del proveedor: {remoteError}");
+                TempData["LoginError"] = $"Error del proveedor externo: {remoteError}";
+                return RedirectToAction(nameof(Login));
+            }
+
+            // Obtener información del login externo
+            var info = await _signInManager.GetExternalLoginInfoAsync();
+            Console.WriteLine($"[DEBUG] GetExternalLoginInfoAsync - info: {(info != null ? "OK" : "NULL")}");
+
+            if (info == null)
+            {
+                Console.WriteLine($"[ERROR] No se pudo obtener información del login externo");
+                TempData["LoginError"] = "Error al cargar información del proveedor externo.";
+                return RedirectToAction(nameof(Login));
+            }
+
+            Console.WriteLine($"[DEBUG] Provider: {info.LoginProvider}, Email: {info.Principal.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value}");
+
+            // Intentar iniciar sesión con el proveedor externo
+            var result = await _signInManager.ExternalLoginSignInAsync(info.LoginProvider, info.ProviderKey, isPersistent: true, bypassTwoFactor: true);
+
+            if (result.Succeeded)
+            {
+                // Usuario ya existe y se autenticó correctamente
+                return RedirectToAction("Index", "Home");
+            }
+
+            if (result.IsLockedOut)
+            {
+                TempData["LoginError"] = "Esta cuenta está bloqueada.";
+                return RedirectToAction(nameof(Login));
+            }
+
+            // El usuario no existe, crear uno nuevo
+            var email = info.Principal.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
+            var name = info.Principal.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
+
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                TempData["LoginError"] = "No se pudo obtener el email del proveedor externo.";
+                return RedirectToAction(nameof(Login));
+            }
+
+            // Verificar si ya existe un usuario con este email
+            var existingUser = await _userManager.FindByEmailAsync(email);
+            if (existingUser != null)
+            {
+                // Asociar el login externo al usuario existente
+                var addLoginResult = await _userManager.AddLoginAsync(existingUser, info);
+                if (addLoginResult.Succeeded)
+                {
+                    await _signInManager.SignInAsync(existingUser, isPersistent: true);
+                    return RedirectToAction("Index", "Home");
+                }
+            }
+
+            // Crear nuevo usuario
+            var user = new IdentityUser
+            {
+                UserName = email.Split('@')[0], // Usar parte antes del @ como username
+                Email = email,
+                EmailConfirmed = true // Asumimos que el email está verificado por el proveedor
+            };
+
+            var createResult = await _userManager.CreateAsync(user);
+            if (createResult.Succeeded)
+            {
+                // Asociar el login externo al nuevo usuario
+                createResult = await _userManager.AddLoginAsync(user, info);
+                if (createResult.Succeeded)
+                {
+                    await _signInManager.SignInAsync(user, isPersistent: true);
+                    return RedirectToAction("Index", "Home");
+                }
+            }
+
+            TempData["LoginError"] = "Error al crear la cuenta: " + string.Join(", ", createResult.Errors.Select(e => e.Description));
+            return RedirectToAction(nameof(Login));
+        }
     }
 }

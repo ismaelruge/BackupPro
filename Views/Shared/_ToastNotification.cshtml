@@ -1,0 +1,114 @@
+@* Toast Container - Sistema de notificaciones estandarizado *@
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;">
+    <!-- Toast de Éxito -->
+    <div id="successToast" class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="bi bi-check-circle-fill me-2"></i>
+                <span id="successMessage"></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button>
+        </div>
+    </div>
+
+    <!-- Toast de Error -->
+    <div id="errorToast" class="toast align-items-center text-white bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <span id="errorMessage"></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button>
+        </div>
+    </div>
+
+    <!-- Toast de Advertencia -->
+    <div id="warningToast" class="toast align-items-center text-white bg-warning border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="bi bi-exclamation-circle-fill me-2"></i>
+                <span id="warningMessage"></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button>
+        </div>
+    </div>
+
+    <!-- Toast de Información -->
+    <div id="infoToast" class="toast align-items-center text-white bg-info border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="bi bi-info-circle-fill me-2"></i>
+                <span id="infoMessage"></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button>
+        </div>
+    </div>
+</div>
+
+<script>
+    /**
+     * Función global para mostrar toasts de notificación
+     */
+    window.showToast = function(type, message, duration = 5000) {
+        const toastElement = document.getElementById(type + 'Toast');
+        const messageElement = document.getElementById(type + 'Message');
+
+        if (!toastElement || !messageElement) {
+            console.error('Toast element not found for type:', type);
+            return;
+        }
+
+        messageElement.textContent = message;
+
+        const toast = new bootstrap.Toast(toastElement, {
+            autohide: true,
+            delay: duration
+        });
+
+        toast.show();
+    };
+
+    // Mostrar toasts de TempData si existen (para mensajes del servidor)
+    document.addEventListener('DOMContentLoaded', function() {
+        // Soporte para TempData["Success"] y TempData["SuccessMessage"]
+        @if (TempData["Success"] != null)
+        {
+            <text>
+            showToast('success', '@TempData["Success"]');
+            </text>
+        }
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <text>
+            showToast('success', '@TempData["SuccessMessage"]');
+            </text>
+        }
+
+        // Soporte para TempData["Error"] y TempData["ErrorMessage"]
+        @if (TempData["Error"] != null)
+        {
+            <text>
+            showToast('error', '@TempData["Error"]');
+            </text>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <text>
+            showToast('error', '@TempData["ErrorMessage"]');
+            </text>
+        }
+
+        @if (TempData["WarningMessage"] != null)
+        {
+            <text>
+            showToast('warning', '@TempData["WarningMessage"]');
+            </text>
+        }
+        @if (TempData["InfoMessage"] != null)
+        {
+            <text>
+            showToast('info', '@TempData["InfoMessage"]');
+            </text>
+        }
+    });
+</script>

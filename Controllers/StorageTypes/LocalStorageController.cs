@@ -256,6 +256,32 @@ namespace BackupPro.Controllers.StorageTypes
         }
 
         /// <summary>
+        /// Registra un error en el histórico de backups
+        /// </summary>
+        private async Task LogBackupError(int databaseId, string databaseName, DateTime startTime, string errorMessage)
+        {
+            try
+            {
+                var backupHistory = new BackupHistory
+                {
+                    DatabaseSourceId = databaseId,
+                    DatabaseName = databaseName,
+                    Date = startTime,
+                    Status = "Error",
+                    Message = errorMessage,
+                    BackupPath = "N/A"
+                };
+
+                _context.BackupHistories.Add(backupHistory);
+                await _context.SaveChangesAsync();
+            }
+            catch
+            {
+                // Ignorar errores al registrar en histórico
+            }
+        }
+
+        /// <summary>
         /// Guarda un backup (MemoryStream) en el almacenamiento local
         /// </summary>
         /// <param name="localStorageId">ID de la configuración de almacenamiento local</param>
@@ -275,7 +301,9 @@ namespace BackupPro.Controllers.StorageTypes
                 var localStorage = await _context.LocalStorages.FindAsync(localStorageId);
                 if (localStorage == null)
                 {
-                    return (false, string.Empty, 0, "Configuración de almacenamiento local no encontrada");
+                    var errorMsg = "Configuración de almacenamiento local no encontrada";
+                    await LogBackupError(databaseId, databaseName, startTime, errorMsg);
+                    return (false, string.Empty, 0, errorMsg);
                 }
 
                 // Verificar que la carpeta de destino existe
@@ -287,7 +315,9 @@ namespace BackupPro.Controllers.StorageTypes
                     }
                     catch (Exception ex)
                     {
-                        return (false, string.Empty, 0, $"No se pudo crear la carpeta de destino: {ex.Message}");
+                        var errorMsg = $"No se pudo crear la carpeta de destino: {ex.Message}";
+                        await LogBackupError(databaseId, databaseName, startTime, errorMsg);
+                        return (false, string.Empty, 0, errorMsg);
                     }
                 }
 
@@ -314,7 +344,9 @@ namespace BackupPro.Controllers.StorageTypes
                 // Verificar que el archivo se creó correctamente
                 if (!System.IO.File.Exists(backupFilePath))
                 {
-                    return (false, string.Empty, 0, "El archivo de backup no se creó correctamente");
+                    var errorMsg = "El archivo de backup no se creó correctamente";
+                    await LogBackupError(databaseId, databaseName, startTime, errorMsg);
+                    return (false, string.Empty, 0, errorMsg);
                 }
 
                 var fileInfo = new FileInfo(backupFilePath);

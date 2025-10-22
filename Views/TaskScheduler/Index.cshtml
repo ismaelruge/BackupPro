@@ -3,35 +3,6 @@
     ViewData["Title"] = "Programador de Tareas";
 }
 
-<!-- Mensajes de éxito y error -->
-@if (TempData["Success"] != null)
-{
-    <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
-        <div class="d-flex align-items-center">
-            <i class="bi bi-check-circle-fill fs-4 me-3"></i>
-            <div>
-                <strong>¡Éxito!</strong>
-                <p class="mb-0">@TempData["Success"]</p>
-            </div>
-        </div>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-}
-
-@if (TempData["Error"] != null)
-{
-    <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
-        <div class="d-flex align-items-center">
-            <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
-            <div>
-                <strong>Error</strong>
-                <p class="mb-0">@TempData["Error"]</p>
-            </div>
-        </div>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-}
-
 <div class="container mt-5">
     <div class="row justify-content-center">
         <div class="col-12">

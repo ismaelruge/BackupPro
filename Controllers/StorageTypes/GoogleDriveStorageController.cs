@@ -563,6 +563,32 @@ namespace BackupPro.Controllers.StorageTypes
             return await RefreshAccessToken(googleDriveStorage);
         }
 
+        /// <summary>
+        /// Registra un error en el histórico de backups
+        /// </summary>
+        private async Task LogBackupError(int databaseId, string databaseName, DateTime startTime, string errorMessage)
+        {
+            try
+            {
+                var backupHistory = new BackupHistory
+                {
+                    DatabaseSourceId = databaseId,
+                    DatabaseName = databaseName,
+                    Date = startTime,
+                    Status = "Error",
+                    Message = errorMessage,
+                    BackupPath = "N/A"
+                };
+
+                _context.BackupHistories.Add(backupHistory);
+                await _context.SaveChangesAsync();
+            }
+            catch
+            {
+                // Ignorar errores al registrar en histórico
+            }
+        }
+
         // ========== BACKUP OPERATIONS ==========
 
         /// <summary>
@@ -586,13 +612,17 @@ namespace BackupPro.Controllers.StorageTypes
                 var googleDriveStorage = await _context.GoogleDriveStorages.FindAsync(googleDriveStorageId);
                 if (googleDriveStorage == null)
                 {
-                    return (false, string.Empty, 0, "Configuración de Google Drive no encontrada");
+                    var errorMsg = "Configuración de Google Drive no encontrada";
+                    await LogBackupError(databaseId, databaseName, startTime, errorMsg);
+                    return (false, string.Empty, 0, errorMsg);
                 }
 
                 // Verificar y renovar token si es necesario
                 if (!await EnsureValidToken(googleDriveStorage))
                 {
-                    return (false, string.Empty, 0, "No hay un token de acceso válido para Google Drive. Por favor, autentícate primero.");
+                    var errorMsg = "No hay un token de acceso válido para Google Drive. Por favor, autentícate primero.";
+                    await LogBackupError(databaseId, databaseName, startTime, errorMsg);
+                    return (false, string.Empty, 0, errorMsg);
                 }
 
                 // Cambiar extensión a .zip
@@ -660,7 +690,9 @@ namespace BackupPro.Controllers.StorageTypes
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    return (false, string.Empty, 0, $"Error al subir archivo a Google Drive: {responseJson}");
+                    var errorMsg = $"Error al subir archivo a Google Drive: {responseJson}";
+                    await LogBackupError(databaseId, databaseName, startTime, errorMsg);
+                    return (false, string.Empty, 0, errorMsg);
                 }
 
                 // Obtener tamaño del archivo desde la respuesta
