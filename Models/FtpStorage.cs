@@ -41,7 +41,7 @@ namespace BackupPro.Models
         public string Username { get; set; } = string.Empty;
 
         /// <summary>
-        /// Contraseña para autenticación FTP (encriptada en base de datos).
+        /// Contraseña para autenticación FTP (cifrada con AES-256-GCM antes de guardarse, ver <see cref="Services.CredentialProtector"/>).
         /// </summary>
         [Required(ErrorMessage = "La contraseña es obligatoria")]
         [MaxLength(500)]

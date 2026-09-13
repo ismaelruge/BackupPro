@@ -16,14 +16,16 @@ namespace BackupPro.Controllers
     {
         private readonly EmailService _emailSender;
         private readonly UserManager<IdentityUser> _userManager;
+        private readonly ILogger<HomeController> _logger;
 
         /// <summary>
         /// Inicializa una nueva instancia del <see cref="HomeController"/>.
         /// </summary>
-        public HomeController(EmailService emailSender, UserManager<IdentityUser> userManager)
+        public HomeController(EmailService emailSender, UserManager<IdentityUser> userManager, ILogger<HomeController> logger)
         {
             _emailSender = emailSender;
             _userManager = userManager;
+            _logger = logger;
         }
 
         /// <summary>
@@ -47,61 +49,52 @@ namespace BackupPro.Controllers
         /// Permite recuperar la contraseña de un usuario enviando una nueva por correo.
         /// </summary>
         /// <param name="email">Correo electrónico del usuario.</param>
-        /// <returns>Redirige a la vista de login con mensaje de éxito o error.</returns>
-        [HttpGet]
+        /// <returns>Redirige a la vista de login con un mensaje genérico.</returns>
+        /// <remarks>
+        /// Es POST (no GET) y requiere token antifalsificación porque cambia el estado de la cuenta;
+        /// además siempre responde con el mismo mensaje exista o no la cuenta, para no permitir que
+        /// alguien use este formulario para averiguar qué correos están registrados en el sistema.
+        /// </remarks>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> ForgotPassword(string email)
         {
+            const string genericMessage = "Si existe una cuenta con ese correo, se envió una nueva contraseña.";
+
             if (string.IsNullOrWhiteSpace(email))
             {
                 TempData["Error"] = "Debes ingresar tu correo electrónico.";
                 return RedirectToAction("Login", "Account");
             }
 
-            // Buscar todos los usuarios con ese correo
-            var users = _userManager.Users.Where(u => u.Email == email).ToList();
-
-            if (users.Count == 0)
+            var user = await _userManager.FindByEmailAsync(email);
+            if (user != null)
             {
-                TempData["Error"] = "No existe una cuenta con este correo.";
-                return RedirectToAction("Login", "Account");
-            }
+                // Generar una nueva contraseña aleatoria y resetearla
+                var newPassword = GenerateRandomPassword();
+                var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+                var result = await _userManager.ResetPasswordAsync(user, token, newPassword);
 
-            if (users.Count > 1)
-            {
-                // Eliminar todos menos el primero
-                var userToKeep = users.First();
-                foreach (var duplicate in users.Skip(1))
+                if (result.Succeeded)
                 {
-                    await _userManager.DeleteAsync(duplicate);
+                    bool sent = await _emailSender.SendEmailAsync(email, "Nueva contraseña",
+                        $"Tu nueva contraseña es: <strong>{newPassword}</strong>");
+
+                    if (!sent)
+                    {
+                        _logger.LogError("La contraseña de {Email} fue reseteada pero el correo de notificación no pudo enviarse.", email);
+                    }
                 }
-
-                // Actualizamos la lista para que solo quede uno
-                users = new List<IdentityUser> { userToKeep };
+                else
+                {
+                    _logger.LogError("Error al resetear la contraseña de {Email}: {Errors}", email,
+                        string.Join(", ", result.Errors.Select(e => e.Description)));
+                }
             }
 
-            var user = users.First();
-
-            // Generar una nueva contraseña aleatoria
-            var newPassword = GenerateRandomPassword();
-
-            // Resetear la contraseña
-            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-            var result = await _userManager.ResetPasswordAsync(user, token, newPassword);
-
-            if (result.Succeeded)
-            {
-                // Enviar correo con la nueva contraseña
-                await _emailSender.SendEmailAsync(email, "Nueva contraseña",
-                    $"Tu nueva contraseña es: <strong>{newPassword}</strong>");
-
-                TempData["Success"] = "Se generó una nueva contraseña y se envió a tu correo.";
-            }
-            else
-            {
-                TempData["Error"] = "Error al generar la nueva contraseña: " +
-                                    string.Join(", ", result.Errors.Select(e => e.Description));
-            }
-
+            // Mismo mensaje exista o no la cuenta, y exista o no falla en enviar el correo: no se
+            // revela información sobre qué cuentas existen ni sobre errores internos de envío.
+            TempData["Success"] = genericMessage;
             return RedirectToAction("Login", "Account");
         }
 

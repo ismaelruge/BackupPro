@@ -19,6 +19,7 @@
                 <div class="card-body p-4">
                     <!-- Formulario -->
                     <form method="post" id="companyForm">
+                        @Html.AntiForgeryToken()
                         <!-- Nombre de la Empresa -->
                         <div class="mb-4">
                             <label asp-for="CompanyName" class="form-label fw-semibold">
@@ -54,17 +55,26 @@
                         </div>
 
                         <!-- Contraseña del Administrador -->
-                        <div class="mb-4">
+                        <div class="mb-3">
                             <label asp-for="AdminPassword" class="form-label fw-semibold">
-                                <i class="bi bi-lock-fill me-2 text-primary"></i>Contraseña
+                                <i class="bi bi-lock-fill me-2 text-primary"></i>Nueva contraseña
                             </label>
                             <div class="input-group input-group-lg">
-                                <input type="password" class="form-control rounded-start-3 border-end-0" asp-for="AdminPassword" id="adminPassword" placeholder="Dejar en blanco para no cambiar" />
+                                <input type="password" class="form-control rounded-start-3 border-end-0" asp-for="AdminPassword" id="adminPassword" placeholder="Dejar en blanco para no cambiar" autocomplete="new-password" />
                                 <span class="input-group-text bg-white border-start-0 rounded-end-3" style="cursor: pointer;" id="toggleAdminPassword">
                                     <i class="bi bi-eye-fill" id="toggleAdminIcon"></i>
                                 </span>
                             </div>
                             <small class="text-muted">Dejar en blanco si no deseas cambiar la contraseña</small>
+                        </div>
+
+                        <!-- Contraseña actual (requerida solo si se va a cambiar la contraseña) -->
+                        <div class="mb-4">
+                            <label asp-for="CurrentPassword" class="form-label fw-semibold">
+                                <i class="bi bi-shield-lock-fill me-2 text-primary"></i>Contraseña actual
+                            </label>
+                            <input type="password" class="form-control form-control-lg rounded-3" asp-for="CurrentPassword" id="currentPassword" placeholder="Requerida solo para cambiar la contraseña" autocomplete="current-password" />
+                            <small class="text-muted">Debes confirmar tu contraseña actual para poder establecer una nueva</small>
                         </div>
 
                         <hr class="my-4">
@@ -315,7 +325,8 @@
                     fetch('@Url.Action("SendTestEmail", "CompanyConfig")', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
                         },
                         body: JSON.stringify({ Emails: allEmails })
                     })

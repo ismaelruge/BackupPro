@@ -564,6 +564,7 @@
     // Variables globales para Google Drive
     let driveExplorerData = {
         accessToken: '',
+        storageId: null, // Id de una configuración ya guardada: se usa para explorar sin exponer el token real al navegador
         currentParentId: '',
         currentPath: '/Mi unidad',
         folderStack: [], // Stack para navegación: [{id, name, path}, ...]
@@ -645,7 +646,7 @@
 
     // Función para abrir el explorador de Drive
     function openDriveExplorer(isEditMode) {
-        if (!driveExplorerData.accessToken) {
+        if (!driveExplorerData.accessToken && !driveExplorerData.storageId) {
             showToast('warning', 'Por favor, conéctate con Google Drive primero.');
             return;
         }
@@ -680,15 +681,22 @@
         empty.classList.add('d-none');
 
         try {
-            const response = await fetch('/GoogleDriveStorage/ListDriveFolders', {
+            // Si la configuración ya está guardada, usar el endpoint que resuelve el token en el
+            // servidor (el AccessToken real nunca llega al navegador para configuraciones guardadas).
+            const url = driveExplorerData.storageId
+                ? '/GoogleDriveStorage/ListDriveFoldersById'
+                : '/GoogleDriveStorage/ListDriveFolders';
+            const body = driveExplorerData.storageId
+                ? { id: driveExplorerData.storageId, parentId: parentId || '' }
+                : { accessToken: driveExplorerData.accessToken, parentId: parentId || '' };
+
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
                 },
-                body: JSON.stringify({
-                    accessToken: driveExplorerData.accessToken,
-                    parentId: parentId || ''
-                })
+                body: JSON.stringify(body)
             });
 
             const data = await response.json();
@@ -864,16 +872,20 @@
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Creando...';
 
         try {
-            const response = await fetch('/GoogleDriveStorage/CreateDriveFolder', {
+            const url = driveExplorerData.storageId
+                ? '/GoogleDriveStorage/CreateDriveFolderById'
+                : '/GoogleDriveStorage/CreateDriveFolder';
+            const body = driveExplorerData.storageId
+                ? { id: driveExplorerData.storageId, parentId: driveExplorerData.currentParentId, folderName: folderName }
+                : { accessToken: driveExplorerData.accessToken, parentId: driveExplorerData.currentParentId, folderName: folderName };
+
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
                 },
-                body: JSON.stringify({
-                    accessToken: driveExplorerData.accessToken,
-                    parentId: driveExplorerData.currentParentId,
-                    folderName: folderName
-                })
+                body: JSON.stringify(body)
             });
 
             const data = await response.json();
@@ -954,8 +966,10 @@
                 googleDriveRefreshToken = event.data.refreshToken; // Guardar refresh token
                 googleDriveEmail = event.data.email;
 
-                // Actualizar también el driveExplorerData para que funcione el explorador
+                // Actualizar también el driveExplorerData para que funcione el explorador. Un token
+                // recién obtenido por OAuth siempre tiene prioridad sobre un storageId anterior.
                 driveExplorerData.accessToken = event.data.accessToken;
+                driveExplorerData.storageId = null;
 
                 // Verificar si se recibió el refresh token
                 if (!event.data.hasRefreshToken || !event.data.refreshToken) {
@@ -1022,7 +1036,8 @@
             const response = await fetch('/GoogleDriveStorage/SaveTokens', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
                 },
                 body: JSON.stringify({
                     id: id,
@@ -1061,7 +1076,8 @@
             const response = await fetch('/GoogleDriveStorage/Create', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
                 },
                 body: JSON.stringify({
                     configurationName: configName,
@@ -1123,15 +1139,18 @@
                 document.getElementById('editFolderPath').value = data.folderPath;
                 document.getElementById('editGoogleDriveFolderId').value = data.folderId || '';
 
-                // Si tiene token guardado, cargarlo automáticamente
-                if (result.accessToken && result.hasValidToken) {
-                    googleDriveAccessToken = result.accessToken;
-                    driveExplorerData.accessToken = result.accessToken;
+                // Si tiene un token válido guardado, permitir explorar usando los endpoints "ById"
+                // (el AccessToken real nunca se envía al cliente para una configuración ya guardada)
+                if (result.hasValidToken) {
+                    googleDriveAccessToken = null;
+                    driveExplorerData.accessToken = '';
+                    driveExplorerData.storageId = data.id;
                     document.getElementById('btnExploreEditDrive').disabled = false;
                 } else {
                     googleDriveAccessToken = null;
                     googleDriveRefreshToken = null;
                     driveExplorerData.accessToken = '';
+                    driveExplorerData.storageId = null;
                     document.getElementById('btnExploreEditDrive').disabled = true;
                 }
 
@@ -1164,7 +1183,8 @@
             const response = await fetch('/GoogleDriveStorage/Edit', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
                 },
                 body: JSON.stringify({
                     id: id,

@@ -19,6 +19,7 @@ namespace BackupPro.Controllers
         private readonly ApplicationDbContext _context;
         private readonly UserManager<IdentityUser> _userManager;
         private readonly EmailService _emailService;
+        private readonly ILogger<CompanyConfigController> _logger;
         #endregion
 
         #region Constructor
@@ -28,11 +29,13 @@ namespace BackupPro.Controllers
         /// <param name="context">Contexto de base de datos.</param>
         /// <param name="userManager">Gestor de usuarios de identidad.</param>
         /// <param name="emailService">Servicio de envío de correos.</param>
-        public CompanyConfigController(ApplicationDbContext context, UserManager<IdentityUser> userManager, EmailService emailService)
+        /// <param name="logger">Logger.</param>
+        public CompanyConfigController(ApplicationDbContext context, UserManager<IdentityUser> userManager, EmailService emailService, ILogger<CompanyConfigController> logger)
         {
             _context = context;
             _userManager = userManager;
             _emailService = emailService;
+            _logger = logger;
         }
         #endregion
 
@@ -77,6 +80,7 @@ namespace BackupPro.Controllers
         /// <param name="model">Modelo de configuración de la empresa.</param>
         /// <returns>Vista con el resultado de la operación.</returns>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Index(CompanyConfigViewModel model)
         {
             var errores = new List<string>();
@@ -96,9 +100,18 @@ namespace BackupPro.Controllers
                 model.AdminUserName = currentUser.UserName ?? string.Empty;
                 model.AdminEmail = currentUser.Email ?? string.Empty;
 
-                // Actualizar contraseña si se proporcionó
+                // Actualizar contraseña si se proporcionó (requiere confirmar la contraseña actual,
+                // para que no baste con un CSRF/sesión robada para tomar control de la cuenta)
                 if (!string.IsNullOrEmpty(model.AdminPassword))
                 {
+                    if (string.IsNullOrEmpty(model.CurrentPassword) ||
+                        !await _userManager.CheckPasswordAsync(currentUser, model.CurrentPassword))
+                    {
+                        errores.Add("La contraseña actual no es correcta.");
+                        ViewBag.Errores = errores;
+                        return View(model);
+                    }
+
                     var token = await _userManager.GeneratePasswordResetTokenAsync(currentUser);
                     var result = await _userManager.ResetPasswordAsync(currentUser, token, model.AdminPassword);
 
@@ -148,6 +161,7 @@ namespace BackupPro.Controllers
         /// <param name="request">Lista de correos a los que enviar la prueba.</param>
         /// <returns>Resultado JSON con el estado de la operación.</returns>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> SendTestEmail([FromBody] SendTestEmailRequest request)
         {
             try
@@ -161,23 +175,35 @@ namespace BackupPro.Controllers
                 var config = await _context.CompanyConfigs.FirstOrDefaultAsync();
                 var companyName = config?.CompanyName ?? "Tu Empresa";
 
-                // Enviar correo a cada dirección
+                // Enviar correo a cada dirección y llevar la cuenta de fallos
+                var failed = new List<string>();
                 foreach (var email in request.Emails)
                 {
                     if (!string.IsNullOrEmpty(email))
                     {
-                        await _emailService.SendEmailAsync(
+                        bool sent = await _emailService.SendEmailAsync(
                             email,
                             "Correo de Prueba - BackupPro",
                             $"<h2>Correo de Prueba</h2><p>Este es un correo de prueba enviado desde <strong>BackupPro</strong>.</p><p>Si recibes este mensaje, la configuración de correo está funcionando correctamente.</p><p>Empresa: <strong>{companyName}</strong></p>"
                         );
+
+                        if (!sent)
+                        {
+                            failed.Add(email);
+                        }
                     }
+                }
+
+                if (failed.Count > 0)
+                {
+                    return Json(new { success = false, message = $"No se pudo enviar el correo a: {string.Join(", ", failed)}. Revisa la configuración SMTP." });
                 }
 
                 return Json(new { success = true, message = $"Correo de prueba enviado exitosamente a {request.Emails.Count} destinatario(s)" });
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al enviar correo de prueba");
                 return Json(new { success = false, message = ex.Message });
             }
         }

@@ -171,12 +171,33 @@
             }
         });
 
-        // Acción al hacer click en "¿Olvidaste tu contraseña?"
+        // Acción al hacer click en "¿Olvidaste tu contraseña?": envía un POST con token
+        // antifalsificación (ya no es una navegación GET, para evitar CSRF)
         forgotBtn.addEventListener("click", () => {
-            if (emailInput.validity.valid) {
-                // Redirige al endpoint de recuperación de contraseña con el email
-                window.location.href = `/Home/ForgotPassword?email=${encodeURIComponent(emailInput.value)}`;
+            if (!emailInput.validity.valid) {
+                return;
             }
+
+            const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/Home/ForgotPassword';
+            form.style.display = 'none';
+
+            const tokenField = document.createElement('input');
+            tokenField.type = 'hidden';
+            tokenField.name = '__RequestVerificationToken';
+            tokenField.value = tokenInput ? tokenInput.value : '';
+            form.appendChild(tokenField);
+
+            const emailField = document.createElement('input');
+            emailField.type = 'hidden';
+            emailField.name = 'email';
+            emailField.value = emailInput.value;
+            form.appendChild(emailField);
+
+            document.body.appendChild(form);
+            form.submit();
         });
     </script>
 }

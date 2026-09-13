@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using BackupPro.Data;
 using BackupPro.Models;
+using BackupPro.Services;
 using BackupPro.ViewModels;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -13,10 +14,14 @@ namespace BackupPro.Controllers.DataBasesTypes
     public class PostgresSqlDataBaseController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly CredentialProtector _credentialProtector;
+        private readonly ILogger<PostgresSqlDataBaseController> _logger;
 
-        public PostgresSqlDataBaseController(ApplicationDbContext context)
+        public PostgresSqlDataBaseController(ApplicationDbContext context, CredentialProtector credentialProtector, ILogger<PostgresSqlDataBaseController> logger)
         {
             _context = context;
+            _credentialProtector = credentialProtector;
+            _logger = logger;
         }
 
         public async Task<IActionResult> Index()
@@ -146,7 +151,7 @@ namespace BackupPro.Controllers.DataBasesTypes
                     Port = model.Port,
                     DatabaseName = model.DatabaseName,
                     Username = model.Username ?? string.Empty,
-                    Password = model.Password ?? string.Empty, // TODO: Encriptar en producción
+                    Password = _credentialProtector.Protect(model.Password) ?? string.Empty,
                     SslMode = model.SslMode,
                     CreatedAt = DateTime.Now,
                     CreatedBy = User.Identity?.Name
@@ -167,6 +172,7 @@ namespace BackupPro.Controllers.DataBasesTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al crear configuración de PostgreSQL");
                 var errorMessage = $"Error al crear configuración: {ex.Message}";
 
                 if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || Request.Headers["Accept"].ToString().Contains("application/json"))
@@ -222,7 +228,8 @@ namespace BackupPro.Controllers.DataBasesTypes
                 }
 
                 // Si no hay contraseña nueva y no hay contraseña guardada, es un error
-                if (string.IsNullOrWhiteSpace(model.Password) && string.IsNullOrWhiteSpace(postgres.Password))
+                bool passwordProvided = !string.IsNullOrWhiteSpace(model.Password);
+                if (!passwordProvided && string.IsNullOrWhiteSpace(postgres.Password))
                 {
                     ModelState.AddModelError("Password", "La contraseña es requerida");
                 }
@@ -260,10 +267,10 @@ namespace BackupPro.Controllers.DataBasesTypes
                     return RedirectToAction(nameof(Index));
                 }
 
-                // Si no se proporciona contraseña, mantener la actual
-                if (string.IsNullOrWhiteSpace(model.Password))
+                // Si no se proporciona contraseña, mantener la actual (descifrada solo para probar la conexión)
+                if (!passwordProvided)
                 {
-                    model.Password = postgres.Password;
+                    model.Password = _credentialProtector.Unprotect(postgres.Password);
                 }
 
                 // Validar la conexión antes de actualizar
@@ -288,9 +295,9 @@ namespace BackupPro.Controllers.DataBasesTypes
                 postgres.Username = model.Username ?? string.Empty;
 
                 // Solo actualizar la contraseña si se proporciona una nueva
-                if (!string.IsNullOrWhiteSpace(model.Password))
+                if (passwordProvided)
                 {
-                    postgres.Password = model.Password; // TODO: Encriptar en producción
+                    postgres.Password = _credentialProtector.Protect(model.Password) ?? string.Empty;
                 }
 
                 postgres.SslMode = model.SslMode;
@@ -311,6 +318,7 @@ namespace BackupPro.Controllers.DataBasesTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al actualizar configuración de PostgreSQL");
                 var errorMessage = $"Error al actualizar configuración: {ex.Message}";
 
                 if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || Request.Headers["Accept"].ToString().Contains("application/json"))
@@ -347,6 +355,7 @@ namespace BackupPro.Controllers.DataBasesTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al eliminar configuración de PostgreSQL");
                 TempData["Error"] = $"Error al eliminar configuración: {ex.Message}";
                 return RedirectToAction(nameof(Index));
             }
@@ -374,7 +383,7 @@ namespace BackupPro.Controllers.DataBasesTypes
                     Port = postgres.Port,
                     DatabaseName = postgres.DatabaseName,
                     Username = postgres.Username,
-                    Password = postgres.Password, // TODO: En producción, no enviar la contraseña o enviarla parcialmente
+                    Password = string.Empty, // La contraseña nunca se envía al cliente; dejar en blanco para no cambiarla
                     SslMode = postgres.SslMode
                 };
 
@@ -446,8 +455,9 @@ namespace BackupPro.Controllers.DataBasesTypes
                     CreateNoWindow = true
                 };
 
-                // Añadir la contraseña como variable de entorno
-                processStartInfo.EnvironmentVariables["PGPASSWORD"] = postgresConfig.Password;
+                // Añadir la contraseña como variable de entorno (pg_dump la lee de PGPASSWORD;
+                // nunca se pasa por línea de comandos para no exponerla en la lista de procesos)
+                processStartInfo.EnvironmentVariables["PGPASSWORD"] = _credentialProtector.Unprotect(postgresConfig.Password) ?? string.Empty;
 
                 // Construir argumentos para pg_dump
                 string arguments = $"--host={postgresConfig.Host} " +
@@ -528,6 +538,7 @@ namespace BackupPro.Controllers.DataBasesTypes
                     catch { /* Ignorar errores al eliminar */ }
                 }
 
+                _logger.LogError(ex, "Error al crear backup de PostgreSQL {DatabaseId}", postgresDatabaseId);
                 return (false, null, string.Empty, string.Empty, $"Error al crear backup: {ex.Message}");
             }
         }

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using BackupPro.Data;
 using BackupPro.Models;
+using BackupPro.Services;
 using BackupPro.ViewModels;
 using Microsoft.EntityFrameworkCore;
 using System.IO.Compression;
@@ -16,10 +17,14 @@ namespace BackupPro.Controllers.StorageTypes
     public class BlobStorageController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly CredentialProtector _credentialProtector;
+        private readonly ILogger<BlobStorageController> _logger;
 
-        public BlobStorageController(ApplicationDbContext context)
+        public BlobStorageController(ApplicationDbContext context, CredentialProtector credentialProtector, ILogger<BlobStorageController> logger)
         {
             _context = context;
+            _credentialProtector = credentialProtector;
+            _logger = logger;
         }
 
         #region Métodos CRUD
@@ -40,6 +45,7 @@ namespace BackupPro.Controllers.StorageTypes
         /// <param name="model">Datos de la configuración a crear.</param>
         /// <returns>Resultado JSON con éxito o error.</returns>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create([FromBody] AzureBlobStorageViewModel model)
         {
             try
@@ -58,7 +64,7 @@ namespace BackupPro.Controllers.StorageTypes
                     {
                         ConfigurationName = model.ConfigurationName,
                         AccountName = model.AccountName,
-                        ConnectionString = model.ConnectionString, // TODO: Encriptar en producción
+                        ConnectionString = _credentialProtector.Protect(model.ConnectionString) ?? string.Empty,
                         ContainerName = model.ContainerName,
                         BlobPrefix = model.BlobPrefix ?? string.Empty,
                         CreatedAt = DateTime.Now,
@@ -75,6 +81,7 @@ namespace BackupPro.Controllers.StorageTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al crear configuración de Azure Blob Storage");
                 return Json(new { success = false, message = $"Error al crear configuración: {ex.Message}" });
             }
         }
@@ -85,6 +92,7 @@ namespace BackupPro.Controllers.StorageTypes
         /// <param name="model">Datos editados de la configuración.</param>
         /// <returns>Resultado JSON con éxito o error.</returns>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit([FromBody] AzureBlobStorageViewModel model)
         {
             try
@@ -109,7 +117,14 @@ namespace BackupPro.Controllers.StorageTypes
 
                 blobStorage.ConfigurationName = model.ConfigurationName;
                 blobStorage.AccountName = model.AccountName;
-                blobStorage.ConnectionString = model.ConnectionString; // TODO: Encriptar en producción
+
+                // Solo actualizar la cadena de conexión si se proporciona una nueva (el cliente nunca
+                // recibe la real, así que un valor en blanco significa "no cambiar")
+                if (!string.IsNullOrWhiteSpace(model.ConnectionString))
+                {
+                    blobStorage.ConnectionString = _credentialProtector.Protect(model.ConnectionString) ?? string.Empty;
+                }
+
                 blobStorage.ContainerName = model.ContainerName;
                 blobStorage.BlobPrefix = model.BlobPrefix ?? string.Empty;
                 blobStorage.LastModifiedAt = DateTime.Now;
@@ -121,6 +136,7 @@ namespace BackupPro.Controllers.StorageTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al actualizar configuración de Azure Blob Storage");
                 return Json(new { success = false, message = $"Error al actualizar configuración: {ex.Message}" });
             }
         }
@@ -131,6 +147,7 @@ namespace BackupPro.Controllers.StorageTypes
         /// <param name="id">Id de la configuración a eliminar.</param>
         /// <returns>Resultado JSON con éxito o error.</returns>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Delete(int id)
         {
             try
@@ -148,6 +165,7 @@ namespace BackupPro.Controllers.StorageTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al eliminar configuración de Azure Blob Storage");
                 return Json(new { success = false, message = $"Error al eliminar configuración: {ex.Message}" });
             }
         }
@@ -173,7 +191,7 @@ namespace BackupPro.Controllers.StorageTypes
                     Id = blobStorage.Id,
                     ConfigurationName = blobStorage.ConfigurationName,
                     AccountName = blobStorage.AccountName,
-                    ConnectionString = blobStorage.ConnectionString,
+                    ConnectionString = string.Empty, // La cadena de conexión nunca se envía al cliente; dejar en blanco para no cambiarla
                     ContainerName = blobStorage.ContainerName,
                     BlobPrefix = blobStorage.BlobPrefix
                 };
@@ -196,6 +214,7 @@ namespace BackupPro.Controllers.StorageTypes
         /// <param name="request">Datos para la creación del directorio.</param>
         /// <returns>Resultado JSON con éxito o error.</returns>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateBlobDirectory([FromBody] BlobCreateDirectoryRequest request)
         {
             try
@@ -229,6 +248,7 @@ namespace BackupPro.Controllers.StorageTypes
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> ListBlobContainers([FromBody] BlobConnectionRequest request)
         {
             try
@@ -255,6 +275,7 @@ namespace BackupPro.Controllers.StorageTypes
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> ListBlobDirectories([FromBody] BlobDirectoryRequest request)
         {
             try
@@ -375,7 +396,8 @@ namespace BackupPro.Controllers.StorageTypes
                 }
 
                 // Conectar a Azure Blob Storage y subir el archivo
-                var blobServiceClient = new BlobServiceClient(blobStorage.ConnectionString);
+                string plainConnectionString = _credentialProtector.Unprotect(blobStorage.ConnectionString) ?? string.Empty;
+                var blobServiceClient = new BlobServiceClient(plainConnectionString);
                 var containerClient = blobServiceClient.GetBlobContainerClient(blobStorage.ContainerName);
 
                 // Asegurar que el contenedor existe
@@ -425,6 +447,7 @@ namespace BackupPro.Controllers.StorageTypes
             catch (Exception ex)
             {
                 // Error general
+                _logger.LogError(ex, "Error al guardar backup en Azure Blob Storage {BlobStorageId}", blobStorageId);
                 var errorMessage = $"Error al guardar backup en Azure Blob Storage: {ex.Message}";
 
                 // Eliminar archivo temporal local si existe

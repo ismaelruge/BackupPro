@@ -643,6 +643,7 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
                 },
                 body: JSON.stringify(data)
             });
@@ -713,6 +714,7 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
                 },
                 body: JSON.stringify(data)
             });
@@ -752,6 +754,7 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
                 }
             });
 
@@ -852,6 +855,7 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
                 },
                 body: JSON.stringify({
                     host: ftpExplorerData.host,
@@ -1068,6 +1072,7 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
                 },
                 body: JSON.stringify({
                     host: ftpExplorerData.host,

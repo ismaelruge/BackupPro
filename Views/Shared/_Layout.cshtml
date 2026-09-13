@@ -283,9 +283,31 @@
                 });
 
                 modalForgotPasswordBtn.addEventListener('click', function() {
-                    if (modalEmail.validity.valid) {
-                        window.location.href = `/Home/ForgotPassword?email=${encodeURIComponent(modalEmail.value)}`;
+                    if (!modalEmail.validity.valid) {
+                        return;
                     }
+
+                    // Envía un POST con token antifalsificación (ya no es una navegación GET, para evitar CSRF)
+                    const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = '/Home/ForgotPassword';
+                    form.style.display = 'none';
+
+                    const tokenField = document.createElement('input');
+                    tokenField.type = 'hidden';
+                    tokenField.name = '__RequestVerificationToken';
+                    tokenField.value = tokenInput ? tokenInput.value : '';
+                    form.appendChild(tokenField);
+
+                    const emailField = document.createElement('input');
+                    emailField.type = 'hidden';
+                    emailField.name = 'email';
+                    emailField.value = modalEmail.value;
+                    form.appendChild(emailField);
+
+                    document.body.appendChild(form);
+                    form.submit();
                 });
             }
 

@@ -774,6 +774,7 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
                 },
                 body: JSON.stringify({
                     connectionString: blobExplorerData.connectionString
@@ -913,6 +914,7 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
                 },
                 body: JSON.stringify({
                     connectionString: blobExplorerData.connectionString,
@@ -1143,6 +1145,7 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
                 },
                 body: JSON.stringify({
                     connectionString: blobExplorerData.connectionString,

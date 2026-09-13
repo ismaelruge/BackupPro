@@ -616,6 +616,7 @@
     // Variables globales para OneDrive Explorer
     let oneDriveExplorerData = {
         accessToken: '',
+        storageId: null, // Id de una configuración ya guardada: se usa para explorar sin exponer el token real al navegador
         currentItemId: '',
         currentPath: '/Mi unidad',
         folderStack: [], // Stack para navegación: [{id, name, path}, ...]
@@ -663,8 +664,10 @@
                 oneDriveRefreshToken = event.data.refreshToken; // Guardar refresh token
                 oneDriveEmail = event.data.email;
 
-                // Actualizar también el oneDriveExplorerData para que funcione el explorador
+                // Actualizar también el oneDriveExplorerData para que funcione el explorador. Un token
+                // recién obtenido por OAuth siempre tiene prioridad sobre un storageId anterior.
                 oneDriveExplorerData.accessToken = event.data.accessToken;
+                oneDriveExplorerData.storageId = null;
 
                 // Verificar si se recibió el refresh token
                 if (!event.data.hasRefreshToken || !event.data.refreshToken) {
@@ -742,7 +745,7 @@
 
     // Función para abrir el explorador de OneDrive
     function openOneDriveExplorer(isEditMode) {
-        if (!oneDriveExplorerData.accessToken) {
+        if (!oneDriveExplorerData.accessToken && !oneDriveExplorerData.storageId) {
             showToast('warning', 'Por favor, conéctate con OneDrive primero.');
             return;
         }
@@ -777,15 +780,22 @@
         empty.classList.add('d-none');
 
         try {
-            const response = await fetch('/OneDriveStorage/ListOneDriveFolders', {
+            // Si la configuración ya está guardada, usar el endpoint que resuelve el token en el
+            // servidor (el AccessToken real nunca llega al navegador para configuraciones guardadas).
+            const url = oneDriveExplorerData.storageId
+                ? '/OneDriveStorage/ListOneDriveFoldersById'
+                : '/OneDriveStorage/ListOneDriveFolders';
+            const body = oneDriveExplorerData.storageId
+                ? { id: oneDriveExplorerData.storageId, itemId: itemId || '' }
+                : { accessToken: oneDriveExplorerData.accessToken, itemId: itemId || '' };
+
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
                 },
-                body: JSON.stringify({
-                    accessToken: oneDriveExplorerData.accessToken,
-                    itemId: itemId || ''
-                })
+                body: JSON.stringify(body)
             });
 
             const data = await response.json();
@@ -915,16 +925,20 @@
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creando...';
 
         try {
-            const response = await fetch('/OneDriveStorage/CreateOneDriveFolder', {
+            const url = oneDriveExplorerData.storageId
+                ? '/OneDriveStorage/CreateOneDriveFolderById'
+                : '/OneDriveStorage/CreateOneDriveFolder';
+            const body = oneDriveExplorerData.storageId
+                ? { id: oneDriveExplorerData.storageId, parentId: oneDriveExplorerData.currentItemId || '', folderName: folderName }
+                : { accessToken: oneDriveExplorerData.accessToken, parentId: oneDriveExplorerData.currentItemId || '', folderName: folderName };
+
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
                 },
-                body: JSON.stringify({
-                    accessToken: oneDriveExplorerData.accessToken,
-                    parentId: oneDriveExplorerData.currentItemId || '',
-                    folderName: folderName
-                })
+                body: JSON.stringify(body)
             });
 
             const data = await response.json();
@@ -1040,12 +1054,15 @@
                 document.getElementById('editOneDriveItemId').value = config.itemId || '';
                 document.getElementById('editOneDriveFolderPath').value = config.folderPath || '/Mi unidad';
 
-                // Si hay token guardado, usarlo para el explorador
-                if (data.accessToken && data.hasValidToken) {
-                    oneDriveExplorerData.accessToken = data.accessToken;
-                    oneDriveAccessToken = data.accessToken;
+                // Si hay un token válido guardado, permitir explorar usando los endpoints "ById"
+                // (el AccessToken real nunca se envía al cliente para una configuración ya guardada)
+                if (data.hasValidToken) {
+                    oneDriveExplorerData.accessToken = '';
+                    oneDriveExplorerData.storageId = config.id;
+                    oneDriveAccessToken = null;
                     document.getElementById('btnExploreEditOneDrive').disabled = false;
                 } else {
+                    oneDriveExplorerData.storageId = null;
                     document.getElementById('btnExploreEditOneDrive').disabled = true;
                 }
 

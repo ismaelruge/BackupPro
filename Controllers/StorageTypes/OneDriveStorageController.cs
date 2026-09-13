@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using BackupPro.Data;
 using BackupPro.Models;
+using BackupPro.Services;
 using BackupPro.ViewModels;
 using Microsoft.EntityFrameworkCore;
 using System.IO.Compression;
@@ -13,11 +14,15 @@ namespace BackupPro.Controllers.StorageTypes
     {
         private readonly ApplicationDbContext _context;
         private readonly OneDriveSettings _oneDriveSettings;
+        private readonly CredentialProtector _credentialProtector;
+        private readonly ILogger<OneDriveStorageController> _logger;
 
-        public OneDriveStorageController(ApplicationDbContext context, OneDriveSettings oneDriveSettings)
+        public OneDriveStorageController(ApplicationDbContext context, OneDriveSettings oneDriveSettings, CredentialProtector credentialProtector, ILogger<OneDriveStorageController> logger)
         {
             _context = context;
             _oneDriveSettings = oneDriveSettings;
+            _credentialProtector = credentialProtector;
+            _logger = logger;
         }
 
         public async Task<IActionResult> Index()
@@ -32,6 +37,7 @@ namespace BackupPro.Controllers.StorageTypes
         /// Crea una nueva configuración de OneDrive.
         /// </summary>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create([FromBody] OneDriveStorageViewModel model)
         {
             try
@@ -68,6 +74,7 @@ namespace BackupPro.Controllers.StorageTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al crear configuración de OneDrive");
                 return Json(new { success = false, message = $"Error al crear configuración: {ex.Message}" });
             }
         }
@@ -76,6 +83,7 @@ namespace BackupPro.Controllers.StorageTypes
         /// Actualiza una configuración de OneDrive existente.
         /// </summary>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit([FromBody] OneDriveStorageViewModel model)
         {
             try
@@ -111,6 +119,7 @@ namespace BackupPro.Controllers.StorageTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al actualizar configuración de OneDrive");
                 return Json(new { success = false, message = $"Error al actualizar configuración: {ex.Message}" });
             }
         }
@@ -119,6 +128,7 @@ namespace BackupPro.Controllers.StorageTypes
         /// Elimina una configuración de OneDrive.
         /// </summary>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Delete(int id)
         {
             try
@@ -136,6 +146,7 @@ namespace BackupPro.Controllers.StorageTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al eliminar configuración de OneDrive");
                 return Json(new { success = false, message = $"Error al eliminar configuración: {ex.Message}" });
             }
         }
@@ -164,17 +175,18 @@ namespace BackupPro.Controllers.StorageTypes
                     TokenExpiresAt = oneDrive.TokenExpiresAt
                 };
 
-                // Incluir AccessToken para permitir exploración sin reconectar
-                // TODO: En producción, verificar expiración antes de enviar
+                // El AccessToken NUNCA se envía al cliente. Para explorar carpetas de una configuración
+                // ya guardada, el frontend debe usar ListOneDriveFoldersById/CreateOneDriveFolderById,
+                // que resuelven y refrescan el token en el servidor.
                 return Json(new {
                     success = true,
                     data = viewModel,
-                    accessToken = oneDrive.AccessToken, // Para usar el explorador sin reconectar
                     hasValidToken = !string.IsNullOrEmpty(oneDrive.AccessToken)
                 });
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al obtener configuración de OneDrive {Id}", id);
                 return Json(new { success = false, message = $"Error al obtener configuración: {ex.Message}" });
             }
         }
@@ -183,6 +195,7 @@ namespace BackupPro.Controllers.StorageTypes
         /// Guarda los tokens de OneDrive para una configuración.
         /// </summary>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> SaveTokens([FromBody] SaveTokensRequest request)
         {
             try
@@ -193,9 +206,8 @@ namespace BackupPro.Controllers.StorageTypes
                     return Json(new { success = false, message = "Configuración no encontrada." });
                 }
 
-                // TODO: En producción, encriptar los tokens antes de guardarlos
-                oneDrive.AccessToken = request.AccessToken;
-                oneDrive.RefreshToken = request.RefreshToken;
+                oneDrive.AccessToken = _credentialProtector.Protect(request.AccessToken);
+                oneDrive.RefreshToken = _credentialProtector.Protect(request.RefreshToken);
                 oneDrive.TokenExpiresAt = DateTime.Now.AddHours(1); // Los tokens de Microsoft duran ~1 hora
                 oneDrive.LastModifiedAt = DateTime.Now;
 
@@ -206,6 +218,7 @@ namespace BackupPro.Controllers.StorageTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al guardar tokens de OneDrive");
                 return Json(new { success = false, message = $"Error al guardar tokens: {ex.Message}" });
             }
         }
@@ -225,13 +238,19 @@ namespace BackupPro.Controllers.StorageTypes
                     return BadRequest("OneDrive OAuth configuration is missing");
                 }
 
+                // Parámetro state anti-CSRF: se guarda en la sesión del usuario que inició el flujo y
+                // se valida en el callback para que un atacante no pueda inyectar su propia cuenta.
+                var state = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+                HttpContext.Session.SetString("OneDrive_OAuthState", state);
+
                 var authUrl = $"https://login.microsoftonline.com/common/oauth2/v2.0/authorize?" +
                               $"client_id={clientId}" +
                               $"&redirect_uri={Uri.EscapeDataString(redirectUri)}" +
                               $"&response_type=code" +
                               $"&scope={Uri.EscapeDataString("Files.ReadWrite.All offline_access User.Read")}" +
                               $"&response_mode=query" +
-                              $"&prompt=consent";
+                              $"&prompt=consent" +
+                              $"&state={Uri.EscapeDataString(state)}";
 
                 return Redirect(authUrl);
             }
@@ -242,8 +261,16 @@ namespace BackupPro.Controllers.StorageTypes
         }
 
         [HttpGet]
-        public async Task<IActionResult> OneDriveCallback(string code)
+        public async Task<IActionResult> OneDriveCallback(string code, string? state)
         {
+            var expectedState = HttpContext.Session.GetString("OneDrive_OAuthState");
+            HttpContext.Session.Remove("OneDrive_OAuthState");
+
+            if (string.IsNullOrEmpty(expectedState) || !string.Equals(expectedState, state, StringComparison.Ordinal))
+            {
+                return Content("<html><body><p>Solicitud de autenticación inválida o expirada. Cierra esta ventana e inténtalo de nuevo.</p></body></html>", "text/html");
+            }
+
             if (string.IsNullOrEmpty(code))
             {
                 var errorScript = @"
@@ -403,48 +430,13 @@ namespace BackupPro.Controllers.StorageTypes
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> ListOneDriveFolders([FromBody] OneDriveListRequest request)
         {
             try
             {
-                using var httpClient = new HttpClient();
-                httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {request.AccessToken}");
-
-                // Construir la URL base
-                var url = string.IsNullOrEmpty(request.ItemId)
-                    ? "https://graph.microsoft.com/v1.0/me/drive/root/children"
-                    : $"https://graph.microsoft.com/v1.0/me/drive/items/{request.ItemId}/children";
-
-                // Filtrar solo carpetas
-                url += "?$filter=folder ne null&$select=id,name,lastModifiedDateTime,folder&$orderby=name";
-
-                var response = await httpClient.GetAsync(url);
-                var json = await response.Content.ReadAsStringAsync();
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    return Json(new { success = false, message = $"Error al listar carpetas: {json}" });
-                }
-
-                var data = System.Text.Json.JsonDocument.Parse(json);
-                var folders = new List<OneDriveFolderInfo>();
-
-                if (data.RootElement.TryGetProperty("value", out var valuesElement))
-                {
-                    foreach (var item in valuesElement.EnumerateArray())
-                    {
-                        folders.Add(new OneDriveFolderInfo
-                        {
-                            Id = item.GetProperty("id").GetString()!,
-                            Name = item.GetProperty("name").GetString()!,
-                            LastModifiedDateTime = item.TryGetProperty("lastModifiedDateTime", out var modTime)
-                                ? DateTime.Parse(modTime.GetString()!)
-                                : DateTime.MinValue
-                        });
-                    }
-                }
-
-                return Json(new { success = true, folders = folders });
+                var (success, folders, message) = await ListOneDriveFoldersInternal(request.AccessToken, request.ItemId);
+                return success ? Json(new { success = true, folders }) : Json(new { success = false, message });
             }
             catch (Exception ex)
             {
@@ -453,44 +445,150 @@ namespace BackupPro.Controllers.StorageTypes
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateOneDriveFolder([FromBody] OneDriveCreateFolderRequest request)
         {
             try
             {
-                using var httpClient = new HttpClient();
-                httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {request.AccessToken}");
-
-                // Construir la URL base
-                var url = string.IsNullOrEmpty(request.ParentId)
-                    ? "https://graph.microsoft.com/v1.0/me/drive/root/children"
-                    : $"https://graph.microsoft.com/v1.0/me/drive/items/{request.ParentId}/children";
-
-                // Crear el JSON manualmente para incluir @microsoft.graph.conflictBehavior
-                var jsonBody = $@"{{
-                    ""name"": ""{request.FolderName}"",
-                    ""folder"": {{}},
-                    ""@microsoft.graph.conflictBehavior"": ""fail""
-                }}";
-
-                var content = new StringContent(jsonBody, System.Text.Encoding.UTF8, "application/json");
-
-                var response = await httpClient.PostAsync(url, content);
-                var responseJson = await response.Content.ReadAsStringAsync();
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    return Json(new { success = false, message = $"Error al crear carpeta: {responseJson}" });
-                }
-
-                var data = System.Text.Json.JsonDocument.Parse(responseJson);
-                var folderId = data.RootElement.GetProperty("id").GetString();
-
-                return Json(new { success = true, folderId = folderId, message = "Carpeta creada exitosamente" });
+                var (success, folderId, message) = await CreateOneDriveFolderInternal(request.AccessToken, request.ParentId, request.FolderName);
+                return success
+                    ? Json(new { success = true, folderId, message = "Carpeta creada exitosamente" })
+                    : Json(new { success = false, message });
             }
             catch (Exception ex)
             {
                 return Json(new { success = false, message = $"Error: {ex.Message}" });
             }
+        }
+
+        /// <summary>
+        /// Lista carpetas de OneDrive para una configuración ya guardada, usando el token almacenado
+        /// (descifrado y refrescado en el servidor). El AccessToken nunca llega al cliente.
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ListOneDriveFoldersById([FromBody] OneDriveListByIdRequest request)
+        {
+            try
+            {
+                var oneDrive = await _context.OneDriveStorages.FindAsync(request.Id);
+                if (oneDrive == null || !await EnsureValidToken(oneDrive))
+                {
+                    return Json(new { success = false, message = "No hay un token de acceso válido para OneDrive. Por favor, autentícate primero." });
+                }
+
+                string accessToken = _credentialProtector.Unprotect(oneDrive.AccessToken) ?? string.Empty;
+                var (success, folders, message) = await ListOneDriveFoldersInternal(accessToken, request.ItemId);
+                return success ? Json(new { success = true, folders }) : Json(new { success = false, message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al listar carpetas de OneDrive para {Id}", request.Id);
+                return Json(new { success = false, message = $"Error: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
+        /// Crea una carpeta en OneDrive para una configuración ya guardada, usando el token
+        /// almacenado (descifrado y refrescado en el servidor). El AccessToken nunca llega al cliente.
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreateOneDriveFolderById([FromBody] OneDriveCreateFolderByIdRequest request)
+        {
+            try
+            {
+                var oneDrive = await _context.OneDriveStorages.FindAsync(request.Id);
+                if (oneDrive == null || !await EnsureValidToken(oneDrive))
+                {
+                    return Json(new { success = false, message = "No hay un token de acceso válido para OneDrive. Por favor, autentícate primero." });
+                }
+
+                string accessToken = _credentialProtector.Unprotect(oneDrive.AccessToken) ?? string.Empty;
+                var (success, folderId, message) = await CreateOneDriveFolderInternal(accessToken, request.ParentId, request.FolderName);
+                return success
+                    ? Json(new { success = true, folderId, message = "Carpeta creada exitosamente" })
+                    : Json(new { success = false, message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al crear carpeta de OneDrive para {Id}", request.Id);
+                return Json(new { success = false, message = $"Error: {ex.Message}" });
+            }
+        }
+
+        private static async Task<(bool success, List<OneDriveFolderInfo> folders, string message)> ListOneDriveFoldersInternal(string accessToken, string? itemId)
+        {
+            using var httpClient = new HttpClient();
+            httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
+
+            var url = string.IsNullOrEmpty(itemId)
+                ? "https://graph.microsoft.com/v1.0/me/drive/root/children"
+                : $"https://graph.microsoft.com/v1.0/me/drive/items/{itemId}/children";
+
+            // Filtrar solo carpetas
+            url += "?$filter=folder ne null&$select=id,name,lastModifiedDateTime,folder&$orderby=name";
+
+            var response = await httpClient.GetAsync(url);
+            var json = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return (false, new List<OneDriveFolderInfo>(), $"Error al listar carpetas: {json}");
+            }
+
+            var data = System.Text.Json.JsonDocument.Parse(json);
+            var folders = new List<OneDriveFolderInfo>();
+
+            if (data.RootElement.TryGetProperty("value", out var valuesElement))
+            {
+                foreach (var item in valuesElement.EnumerateArray())
+                {
+                    folders.Add(new OneDriveFolderInfo
+                    {
+                        Id = item.GetProperty("id").GetString()!,
+                        Name = item.GetProperty("name").GetString()!,
+                        LastModifiedDateTime = item.TryGetProperty("lastModifiedDateTime", out var modTime)
+                            ? DateTime.Parse(modTime.GetString()!)
+                            : DateTime.MinValue
+                    });
+                }
+            }
+
+            return (true, folders, string.Empty);
+        }
+
+        private static async Task<(bool success, string? folderId, string message)> CreateOneDriveFolderInternal(string accessToken, string? parentId, string folderName)
+        {
+            using var httpClient = new HttpClient();
+            httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
+
+            var url = string.IsNullOrEmpty(parentId)
+                ? "https://graph.microsoft.com/v1.0/me/drive/root/children"
+                : $"https://graph.microsoft.com/v1.0/me/drive/items/{parentId}/children";
+
+            // Se usa un Dictionary para poder incluir la clave "@microsoft.graph.conflictBehavior"
+            // (no es un identificador C# válido) y para que folderName quede correctamente escapado.
+            var payload = new Dictionary<string, object>
+            {
+                ["name"] = folderName,
+                ["folder"] = new { },
+                ["@microsoft.graph.conflictBehavior"] = "fail"
+            };
+            var jsonBody = System.Text.Json.JsonSerializer.Serialize(payload);
+
+            var content = new StringContent(jsonBody, System.Text.Encoding.UTF8, "application/json");
+
+            var response = await httpClient.PostAsync(url, content);
+            var responseJson = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return (false, null, $"Error al crear carpeta: {responseJson}");
+            }
+
+            var data = System.Text.Json.JsonDocument.Parse(responseJson);
+            return (true, data.RootElement.GetProperty("id").GetString(), string.Empty);
         }
 
         // ========== TOKEN REFRESH ==========
@@ -507,9 +605,10 @@ namespace BackupPro.Controllers.StorageTypes
                     return false;
                 }
 
+                string plainRefreshToken = _credentialProtector.Unprotect(oneDriveStorage.RefreshToken) ?? string.Empty;
                 var tokenRequest = new Dictionary<string, string>
                 {
-                    {"refresh_token", oneDriveStorage.RefreshToken},
+                    {"refresh_token", plainRefreshToken},
                     {"client_id", _oneDriveSettings.ClientId!},
                     {"client_secret", _oneDriveSettings.ClientSecret!},
                     {"grant_type", "refresh_token"}
@@ -528,13 +627,13 @@ namespace BackupPro.Controllers.StorageTypes
                 var tokenData = System.Text.Json.JsonDocument.Parse(tokenJson);
                 var newAccessToken = tokenData.RootElement.GetProperty("access_token").GetString();
 
-                // Actualizar el token en la base de datos
-                oneDriveStorage.AccessToken = newAccessToken;
+                // Actualizar el token en la base de datos (cifrado)
+                oneDriveStorage.AccessToken = _credentialProtector.Protect(newAccessToken);
 
                 // Actualizar refresh token si viene uno nuevo
                 if (tokenData.RootElement.TryGetProperty("refresh_token", out var newRefreshToken))
                 {
-                    oneDriveStorage.RefreshToken = newRefreshToken.GetString();
+                    oneDriveStorage.RefreshToken = _credentialProtector.Protect(newRefreshToken.GetString());
                 }
 
                 oneDriveStorage.TokenExpiresAt = DateTime.Now.AddHours(1);
@@ -545,8 +644,9 @@ namespace BackupPro.Controllers.StorageTypes
 
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al renovar el token de OneDrive");
                 return false;
             }
         }
@@ -659,8 +759,9 @@ namespace BackupPro.Controllers.StorageTypes
                 }
 
                 // Subir a OneDrive usando Microsoft Graph API
+                string accessToken = _credentialProtector.Unprotect(oneDriveStorage.AccessToken) ?? string.Empty;
                 using var httpClient = new HttpClient();
-                httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {oneDriveStorage.AccessToken}");
+                httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
 
                 // Determinar la URL de upload
                 string uploadUrl;
@@ -757,6 +858,7 @@ namespace BackupPro.Controllers.StorageTypes
                 }
                 catch { /* Ignorar errores al registrar */ }
 
+                _logger.LogError(ex, "Error al guardar backup en OneDrive {OneDriveStorageId}", oneDriveStorageId);
                 return (false, string.Empty, 0, errorMessage);
             }
         }
@@ -791,6 +893,19 @@ namespace BackupPro.Controllers.StorageTypes
         public string AccessToken { get; set; }
         public string ParentId { get; set; }
         public string FolderName { get; set; }
+    }
+
+    public class OneDriveListByIdRequest
+    {
+        public int Id { get; set; }
+        public string? ItemId { get; set; }
+    }
+
+    public class OneDriveCreateFolderByIdRequest
+    {
+        public int Id { get; set; }
+        public string? ParentId { get; set; }
+        public string FolderName { get; set; } = string.Empty;
     }
 
     public class OneDriveFolderInfo

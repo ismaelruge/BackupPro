@@ -28,7 +28,7 @@ namespace BackupPro.Models
         public string AccountName { get; set; } = string.Empty;
 
         /// <summary>
-        /// Connection String de Azure Blob Storage (encriptado en base de datos).
+        /// Connection String de Azure Blob Storage (cifrado con AES-256-GCM antes de guardarse, ver <see cref="Services.CredentialProtector"/>).
         /// </summary>
         [Required(ErrorMessage = "La cadena de conexión es obligatoria")]
         [MaxLength(2000)]

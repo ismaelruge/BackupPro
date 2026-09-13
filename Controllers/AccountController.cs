@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using BackupPro.ViewModels;
+using System.Net;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 
@@ -13,16 +14,39 @@ namespace BackupPro.Controllers
     {
         private readonly UserManager<IdentityUser> _userManager;
         private readonly SignInManager<IdentityUser> _signInManager;
+        private readonly ILogger<AccountController> _logger;
 
         /// <summary>
         /// Inicializa una nueva instancia del <see cref="AccountController"/>.
         /// </summary>
         /// <param name="userManager">Gestor de usuarios de identidad.</param>
         /// <param name="signInManager">Gestor de inicio de sesión de identidad.</param>
-        public AccountController(UserManager<IdentityUser> userManager, SignInManager<IdentityUser> signInManager)
+        /// <param name="logger">Logger.</param>
+        public AccountController(UserManager<IdentityUser> userManager, SignInManager<IdentityUser> signInManager, ILogger<AccountController> logger)
         {
             _userManager = userManager;
             _signInManager = signInManager;
+            _logger = logger;
+        }
+
+        /// <summary>
+        /// Indica si la petición actual proviene del propio equipo donde corre la aplicación.
+        /// </summary>
+        private bool IsLocalRequest()
+        {
+            var remoteIp = HttpContext.Connection.RemoteIpAddress;
+            if (remoteIp == null)
+            {
+                return false;
+            }
+
+            if (IPAddress.IsLoopback(remoteIp))
+            {
+                return true;
+            }
+
+            var localIp = HttpContext.Connection.LocalIpAddress;
+            return localIp != null && remoteIp.Equals(localIp);
         }
 
         /// <summary>
@@ -52,9 +76,19 @@ namespace BackupPro.Controllers
             // Verificar si no hay usuarios registrados
             var totalUsuarios = _userManager.Users.Count();
 
-            // Si no hay usuarios y se intenta acceder con admin/admin, crear usuario temporal y redirigir a SetupAdmin
+            // Si no hay usuarios y se intenta acceder con admin/admin, crear usuario temporal y redirigir a SetupAdmin.
+            // Restringido a peticiones desde el propio equipo: como Kestrel escucha en todas las
+            // interfaces de red, sin esta restricción cualquiera que llegue a la app antes que el
+            // operador complete la configuración inicial podría tomar la cuenta de administrador.
             if (totalUsuarios == 0 && model.Email?.Equals("admin", StringComparison.OrdinalIgnoreCase) == true && model.Password == "admin")
             {
+                if (!IsLocalRequest())
+                {
+                    _logger.LogWarning("Intento de usar el usuario admin/admin de configuración inicial desde una IP no local: {RemoteIp}", HttpContext.Connection.RemoteIpAddress);
+                    ModelState.AddModelError(string.Empty, "Usuario o contraseña incorrectos.");
+                    return View(model);
+                }
+
                 // Crear usuario admin temporal
                 var tempAdmin = new IdentityUser
                 {
@@ -193,14 +227,11 @@ namespace BackupPro.Controllers
         [ValidateAntiForgeryToken]
         public IActionResult ExternalLogin(string provider)
         {
-            Console.WriteLine($"[DEBUG] ExternalLogin llamado con provider: {provider}");
+            _logger.LogDebug("ExternalLogin llamado con provider: {Provider}", provider);
 
             // Solicitar redirección al proveedor externo
             var redirectUrl = Url.Action(nameof(ExternalLoginCallback), "Account");
-            Console.WriteLine($"[DEBUG] Redirect URL: {redirectUrl}");
-
             var properties = _signInManager.ConfigureExternalAuthenticationProperties(provider, redirectUrl);
-            Console.WriteLine($"[DEBUG] Redirigiendo a {provider}...");
 
             return Challenge(properties, provider);
         }
@@ -213,28 +244,26 @@ namespace BackupPro.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> ExternalLoginCallback(string? returnUrl = null, string? remoteError = null)
         {
-            Console.WriteLine($"[DEBUG] ExternalLoginCallback llamado. remoteError: {remoteError}");
             returnUrl ??= Url.Content("~/");
 
             if (remoteError != null)
             {
-                Console.WriteLine($"[ERROR] Error del proveedor: {remoteError}");
+                _logger.LogWarning("Error del proveedor externo de autenticación: {RemoteError}", remoteError);
                 TempData["LoginError"] = $"Error del proveedor externo: {remoteError}";
                 return RedirectToAction(nameof(Login));
             }
 
             // Obtener información del login externo
             var info = await _signInManager.GetExternalLoginInfoAsync();
-            Console.WriteLine($"[DEBUG] GetExternalLoginInfoAsync - info: {(info != null ? "OK" : "NULL")}");
 
             if (info == null)
             {
-                Console.WriteLine($"[ERROR] No se pudo obtener información del login externo");
+                _logger.LogWarning("No se pudo obtener información del login externo");
                 TempData["LoginError"] = "Error al cargar información del proveedor externo.";
                 return RedirectToAction(nameof(Login));
             }
 
-            Console.WriteLine($"[DEBUG] Provider: {info.LoginProvider}, Email: {info.Principal.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value}");
+            _logger.LogDebug("Login externo: Provider={Provider}, Email={Email}", info.LoginProvider, info.Principal.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value);
 
             // Intentar iniciar sesión con el proveedor externo
             var result = await _signInManager.ExternalLoginSignInAsync(info.LoginProvider, info.ProviderKey, isPersistent: true, bypassTwoFactor: true);

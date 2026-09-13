@@ -41,15 +41,15 @@ namespace BackupPro.Models
         public string FolderPath { get; set; } = string.Empty;
 
         /// <summary>
-        /// Access Token (encriptado en base de datos).
+        /// Access Token (cifrado con AES-256-GCM antes de guardarse, ver <see cref="Services.CredentialProtector"/>).
         /// </summary>
-        [MaxLength(2000)]
+        [MaxLength(4000)]
         public string? AccessToken { get; set; }
 
         /// <summary>
-        /// Refresh Token (encriptado en base de datos).
+        /// Refresh Token (cifrado con AES-256-GCM antes de guardarse, ver <see cref="Services.CredentialProtector"/>).
         /// </summary>
-        [MaxLength(2000)]
+        [MaxLength(4000)]
         public string? RefreshToken { get; set; }
 
         /// <summary>

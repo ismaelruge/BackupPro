@@ -12,6 +12,7 @@ namespace BackupPro.Controllers
     public class TaskSchedulerController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly ILogger<TaskSchedulerController> _logger;
         private readonly DataBasesTypes.SqlServerDataBaseController _sqlServerController;
         private readonly DataBasesTypes.MySqlDataBaseController _mySqlController;
         private readonly DataBasesTypes.PostgresSqlDataBaseController _postgresSqlController;
@@ -24,6 +25,7 @@ namespace BackupPro.Controllers
 
         public TaskSchedulerController(
             ApplicationDbContext context,
+            ILogger<TaskSchedulerController> logger,
             DataBasesTypes.SqlServerDataBaseController sqlServerController,
             DataBasesTypes.MySqlDataBaseController mySqlController,
             DataBasesTypes.PostgresSqlDataBaseController postgresSqlController,
@@ -35,6 +37,7 @@ namespace BackupPro.Controllers
             StorageTypes.GoogleDriveStorageController googleDriveStorageController)
         {
             _context = context;
+            _logger = logger;
             _sqlServerController = sqlServerController;
             _mySqlController = mySqlController;
             _postgresSqlController = postgresSqlController;
@@ -320,6 +323,7 @@ namespace BackupPro.Controllers
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al crear tarea programada");
                 var errorMessage = $"Error al crear tarea: {ex.Message}";
 
                 if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || Request.Headers["Accept"].ToString().Contains("application/json"))
@@ -476,6 +480,7 @@ namespace BackupPro.Controllers
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al actualizar tarea programada");
                 var errorMessage = $"Error al actualizar tarea: {ex.Message}";
 
                 if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || Request.Headers["Accept"].ToString().Contains("application/json"))
@@ -512,6 +517,7 @@ namespace BackupPro.Controllers
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al eliminar tarea programada");
                 TempData["Error"] = $"Error al eliminar tarea: {ex.Message}";
                 return RedirectToAction(nameof(Index));
             }
@@ -611,109 +617,48 @@ namespace BackupPro.Controllers
         /// <summary>
         /// Ejecuta el backup según el tipo de base de datos y almacenamiento
         /// </summary>
+        /// <summary>
+        /// Mapa (tipo de base de datos, tipo de almacenamiento) -> función que ejecuta ese backup.
+        /// Reemplaza una cadena if/else de 20 ramas por una búsqueda directa, evitando el riesgo de
+        /// una combinación mal escrita al agregar/editar una rama.
+        /// </summary>
+        private Dictionary<(string DatabaseType, string StorageType), Func<int, int, Task<string>>> BuildBackupDispatch() => new()
+        {
+            [("SqlServer", "Local")] = ExecuteBackupSqlServerLocal,
+            [("SqlServer", "Ftp")] = ExecuteBackupSqlServerFtp,
+            [("SqlServer", "AzureBlob")] = ExecuteBackupSqlServerBlob,
+            [("SqlServer", "OneDrive")] = ExecuteBackupSqlServerOneDrive,
+            [("SqlServer", "GoogleDrive")] = ExecuteBackupSqlServerGoogleDrive,
+
+            [("MySQL", "Local")] = ExecuteBackupMySqlLocal,
+            [("MySQL", "Ftp")] = ExecuteBackupMySqlFtp,
+            [("MySQL", "AzureBlob")] = ExecuteBackupMySqlBlob,
+            [("MySQL", "OneDrive")] = ExecuteBackupMySqlOneDrive,
+            [("MySQL", "GoogleDrive")] = ExecuteBackupMySqlGoogleDrive,
+
+            [("PostgreSQL", "Local")] = ExecuteBackupPostgreSqlLocal,
+            [("PostgreSQL", "Ftp")] = ExecuteBackupPostgreSqlFtp,
+            [("PostgreSQL", "AzureBlob")] = ExecuteBackupPostgreSqlBlob,
+            [("PostgreSQL", "OneDrive")] = ExecuteBackupPostgreSqlOneDrive,
+            [("PostgreSQL", "GoogleDrive")] = ExecuteBackupPostgreSqlGoogleDrive,
+
+            [("MongoDB", "Local")] = ExecuteBackupMongoDBLocal,
+            [("MongoDB", "Ftp")] = ExecuteBackupMongoDBFtp,
+            [("MongoDB", "AzureBlob")] = ExecuteBackupMongoDBBlob,
+            [("MongoDB", "OneDrive")] = ExecuteBackupMongoDBOneDrive,
+            [("MongoDB", "GoogleDrive")] = ExecuteBackupMongoDBGoogleDrive,
+        };
+
         private async Task<string> ExecuteBackupByType(Models.TaskScheduler task)
         {
-            // Validar combinación de base de datos y almacenamiento
-            if (task.DatabaseType == "SqlServer" && task.StorageType == "Local")
+            var dispatch = BuildBackupDispatch();
+
+            if (dispatch.TryGetValue((task.DatabaseType, task.StorageType), out var executeBackup))
             {
-                return await ExecuteBackupSqlServerLocal(task.DatabaseId, task.StorageId);
+                return await executeBackup(task.DatabaseId, task.StorageId);
             }
-            else if (task.DatabaseType == "SqlServer" && task.StorageType == "Ftp")
-            {
-                return await ExecuteBackupSqlServerFtp(task.DatabaseId, task.StorageId);
-            }
-            else if (task.DatabaseType == "SqlServer" && task.StorageType == "AzureBlob")
-            {
-                return await ExecuteBackupSqlServerBlob(task.DatabaseId, task.StorageId);
-            }
-            else if (task.DatabaseType == "SqlServer" && task.StorageType == "OneDrive")
-            {
-                return await ExecuteBackupSqlServerOneDrive(task.DatabaseId, task.StorageId);
-            }
-            else if (task.DatabaseType == "SqlServer" && task.StorageType == "GoogleDrive")
-            {
-                return await ExecuteBackupSqlServerGoogleDrive(task.DatabaseId, task.StorageId);
-            }
-            // MySQL combinaciones
-            else if (task.DatabaseType == "MySQL" && task.StorageType == "Local")
-            {
-                return await ExecuteBackupMySqlLocal(task.DatabaseId, task.StorageId);
-            }
-            else if (task.DatabaseType == "MySQL" && task.StorageType == "Ftp")
-            {
-                return await ExecuteBackupMySqlFtp(task.DatabaseId, task.StorageId);
-            }
-            else if (task.DatabaseType == "MySQL" && task.StorageType == "AzureBlob")
-            {
-                return await ExecuteBackupMySqlBlob(task.DatabaseId, task.StorageId);
-            }
-            else if (task.DatabaseType == "MySQL" && task.StorageType == "OneDrive")
-            {
-                return await ExecuteBackupMySqlOneDrive(task.DatabaseId, task.StorageId);
-            }
-            else if (task.DatabaseType == "MySQL" && task.StorageType == "GoogleDrive")
-            {
-                return await ExecuteBackupMySqlGoogleDrive(task.DatabaseId, task.StorageId);
-            }
-            // PostgreSQL combinaciones
-            else if (task.DatabaseType == "PostgreSQL" && task.StorageType == "Local")
-            {
-                return await ExecuteBackupPostgreSqlLocal(task.DatabaseId, task.StorageId);
-            }
-            else if (task.DatabaseType == "PostgreSQL" && task.StorageType == "Ftp")
-            {
-                return await ExecuteBackupPostgreSqlFtp(task.DatabaseId, task.StorageId);
-            }
-            else if (task.DatabaseType == "PostgreSQL" && task.StorageType == "AzureBlob")
-            {
-                return await ExecuteBackupPostgreSqlBlob(task.DatabaseId, task.StorageId);
-            }
-            else if (task.DatabaseType == "PostgreSQL" && task.StorageType == "OneDrive")
-            {
-                return await ExecuteBackupPostgreSqlOneDrive(task.DatabaseId, task.StorageId);
-            }
-            else if (task.DatabaseType == "PostgreSQL" && task.StorageType == "GoogleDrive")
-            {
-                return await ExecuteBackupPostgreSqlGoogleDrive(task.DatabaseId, task.StorageId);
-            }
-            // Otras combinaciones que aún no están implementadas
-            else if (task.DatabaseType == "SqlServer")
-            {
-                return $"Backup de SQL Server a {task.StorageType} aún no implementado.";
-            }
-            else if (task.DatabaseType == "MySQL")
-            {
-                return $"Backup de MySQL a {task.StorageType} aún no implementado.";
-            }
-            else if (task.DatabaseType == "PostgreSQL")
-            {
-                return $"Backup de PostgreSQL a {task.StorageType} aún no implementado.";
-            }
-            // MongoDB combinaciones
-            else if (task.DatabaseType == "MongoDB" && task.StorageType == "Local")
-            {
-                return await ExecuteBackupMongoDBLocal(task.DatabaseId, task.StorageId);
-            }
-            else if (task.DatabaseType == "MongoDB" && task.StorageType == "Ftp")
-            {
-                return await ExecuteBackupMongoDBFtp(task.DatabaseId, task.StorageId);
-            }
-            else if (task.DatabaseType == "MongoDB" && task.StorageType == "AzureBlob")
-            {
-                return await ExecuteBackupMongoDBBlob(task.DatabaseId, task.StorageId);
-            }
-            else if (task.DatabaseType == "MongoDB" && task.StorageType == "OneDrive")
-            {
-                return await ExecuteBackupMongoDBOneDrive(task.DatabaseId, task.StorageId);
-            }
-            else if (task.DatabaseType == "MongoDB" && task.StorageType == "GoogleDrive")
-            {
-                return await ExecuteBackupMongoDBGoogleDrive(task.DatabaseId, task.StorageId);
-            }
-            else
-            {
-                return $"Combinación no soportada: {task.DatabaseType} a {task.StorageType}";
-            }
+
+            return $"Combinación no soportada o aún no implementada: {task.DatabaseType} a {task.StorageType}";
         }
 
         /// <summary>
@@ -1774,6 +1719,7 @@ namespace BackupPro.Controllers
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al ejecutar tarea {TaskId}", id);
                 return Json(new { success = false, message = $"Error al ejecutar tarea: {ex.Message}" });
             }
         }
@@ -1815,6 +1761,7 @@ namespace BackupPro.Controllers
                     }
                     catch (Exception ex)
                     {
+                        _logger.LogError(ex, "Error al ejecutar tarea {TaskName} ({TaskId})", task.TaskName, task.Id);
                         errorCount++;
                         results.Add($"{task.TaskName}: Error - {ex.Message}");
                     }

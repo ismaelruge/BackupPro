@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using BackupPro.Data;
 using BackupPro.Models;
+using BackupPro.Services;
 using BackupPro.ViewModels;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.SqlClient;
@@ -15,10 +16,14 @@ namespace BackupPro.Controllers.DataBasesTypes
     public class SqlServerDataBaseController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly CredentialProtector _credentialProtector;
+        private readonly ILogger<SqlServerDataBaseController> _logger;
 
-        public SqlServerDataBaseController(ApplicationDbContext context)
+        public SqlServerDataBaseController(ApplicationDbContext context, CredentialProtector credentialProtector, ILogger<SqlServerDataBaseController> logger)
         {
             _context = context;
+            _credentialProtector = credentialProtector;
+            _logger = logger;
         }
 
         public async Task<IActionResult> Index()
@@ -158,7 +163,7 @@ namespace BackupPro.Controllers.DataBasesTypes
                     Port = model.Port,
                     DatabaseName = model.DatabaseName,
                     Username = model.Username ?? string.Empty,
-                    Password = model.Password ?? string.Empty, // TODO: Encriptar en producción
+                    Password = _credentialProtector.Protect(model.Password) ?? string.Empty,
                     IntegratedSecurity = model.IntegratedSecurity,
                     TrustServerCertificate = model.TrustServerCertificate,
                     CreatedAt = DateTime.Now,
@@ -180,6 +185,7 @@ namespace BackupPro.Controllers.DataBasesTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al crear configuración de SQL Server");
                 var errorMessage = $"Error al crear configuración: {ex.Message}";
 
                 if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || Request.Headers["Accept"].ToString().Contains("application/json"))
@@ -276,10 +282,11 @@ namespace BackupPro.Controllers.DataBasesTypes
                     return RedirectToAction(nameof(Index));
                 }
 
-                // Si no se proporciona contraseña, mantener la actual
-                if (string.IsNullOrWhiteSpace(model.Password))
+                // Si no se proporciona contraseña, mantener la actual (descifrada solo para probar la conexión)
+                bool passwordProvided = !string.IsNullOrWhiteSpace(model.Password);
+                if (!passwordProvided)
                 {
-                    model.Password = sqlServer.Password;
+                    model.Password = _credentialProtector.Unprotect(sqlServer.Password);
                 }
 
                 // Validar la conexión antes de actualizar
@@ -304,9 +311,9 @@ namespace BackupPro.Controllers.DataBasesTypes
                 sqlServer.Username = model.Username ?? string.Empty;
 
                 // Solo actualizar la contraseña si se proporciona una nueva
-                if (!string.IsNullOrWhiteSpace(model.Password))
+                if (passwordProvided)
                 {
-                    sqlServer.Password = model.Password; // TODO: Encriptar en producción
+                    sqlServer.Password = _credentialProtector.Protect(model.Password) ?? string.Empty;
                 }
 
                 sqlServer.IntegratedSecurity = model.IntegratedSecurity;
@@ -328,6 +335,7 @@ namespace BackupPro.Controllers.DataBasesTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al actualizar configuración de SQL Server");
                 var errorMessage = $"Error al actualizar configuración: {ex.Message}";
 
                 if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || Request.Headers["Accept"].ToString().Contains("application/json"))
@@ -364,6 +372,7 @@ namespace BackupPro.Controllers.DataBasesTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al eliminar configuración de SQL Server");
                 TempData["Error"] = $"Error al eliminar configuración: {ex.Message}";
                 return RedirectToAction(nameof(Index));
             }
@@ -391,7 +400,7 @@ namespace BackupPro.Controllers.DataBasesTypes
                     Port = sqlServer.Port,
                     DatabaseName = sqlServer.DatabaseName,
                     Username = sqlServer.Username,
-                    Password = sqlServer.Password, // TODO: En producción, no enviar la contraseña o enviarla parcialmente
+                    Password = string.Empty, // La contraseña nunca se envía al cliente; dejar en blanco para no cambiarla
                     IntegratedSecurity = sqlServer.IntegratedSecurity,
                     TrustServerCertificate = sqlServer.TrustServerCertificate
                 };
@@ -407,7 +416,12 @@ namespace BackupPro.Controllers.DataBasesTypes
         // ========== BACKUP OPERATIONS ==========
 
         /// <summary>
-        /// Configura permisos de escritura completos en la carpeta
+        /// Otorga permiso de escritura en la carpeta temporal de backups únicamente a las cuentas de
+        /// servicio de SQL Server que realmente necesitan escribir el archivo .bak (el motor de SQL
+        /// Server, no el proceso de esta aplicación, es quien escribe ese archivo). No se otorgan
+        /// permisos a "Everyone" ni a "BUILTIN\Users": ampliar el acceso a cualquier usuario local de
+        /// la máquina a una carpeta que contiene backups completos de bases de datos es un riesgo
+        /// innecesario.
         /// </summary>
         private bool EnsureFolderWritePermissions(string folderPath)
         {
@@ -416,16 +430,13 @@ namespace BackupPro.Controllers.DataBasesTypes
                 var directoryInfo = new DirectoryInfo(folderPath);
                 var directorySecurity = directoryInfo.GetAccessControl();
 
-                // Lista de cuentas a las que daremos permisos
+                // Cuentas de servicio de SQL Server que pueden necesitar escribir en esta carpeta
                 string[] accounts = new[]
                 {
-                    "Everyone",
                     @"NT Service\MSSQLSERVER",
                     @"NT Service\SQLEXPRESS",
                     @"NT AUTHORITY\NETWORK SERVICE",
-                    @"NT AUTHORITY\SYSTEM",
-                    @"BUILTIN\Users",
-                    @"BUILTIN\Administrators"
+                    @"NT AUTHORITY\SYSTEM"
                 };
 
                 foreach (var account in accounts)
@@ -515,7 +526,8 @@ namespace BackupPro.Controllers.DataBasesTypes
                 }
                 else
                 {
-                    connectionString = $"Server={sqlServerConfig.Host},{sqlServerConfig.Port};Database={sqlServerConfig.DatabaseName};User Id={sqlServerConfig.Username};Password={sqlServerConfig.Password};TrustServerCertificate={sqlServerConfig.TrustServerCertificate};";
+                    string plainPassword = _credentialProtector.Unprotect(sqlServerConfig.Password) ?? string.Empty;
+                    connectionString = $"Server={sqlServerConfig.Host},{sqlServerConfig.Port};Database={sqlServerConfig.DatabaseName};User Id={sqlServerConfig.Username};Password={plainPassword};TrustServerCertificate={sqlServerConfig.TrustServerCertificate};";
                 }
 
                 // Ejecutar backup a archivo temporal
@@ -523,9 +535,11 @@ namespace BackupPro.Controllers.DataBasesTypes
                 {
                     await connection.OpenAsync();
 
-                    // Comando para realizar el backup
+                    // Comando para realizar el backup. El nombre de la base de datos es un identificador,
+                    // no puede parametrizarse con @param; se escapa duplicando los corchetes de cierre.
+                    string escapedDatabaseName = sqlServerConfig.DatabaseName.Replace("]", "]]");
                     string backupCommand = $@"
-                        BACKUP DATABASE [{sqlServerConfig.DatabaseName}]
+                        BACKUP DATABASE [{escapedDatabaseName}]
                         TO DISK = @backupPath
                         WITH FORMAT,
                              INIT,
@@ -572,6 +586,8 @@ namespace BackupPro.Controllers.DataBasesTypes
             }
             catch (SqlException sqlEx)
             {
+                _logger.LogError(sqlEx, "Error de SQL Server al crear backup de {DatabaseId}", sqlServerDatabaseId);
+
                 // Limpiar archivo temporal si existe
                 if (!string.IsNullOrEmpty(tempBackupPath) && System.IO.File.Exists(tempBackupPath))
                 {
@@ -586,6 +602,8 @@ namespace BackupPro.Controllers.DataBasesTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al crear backup de SQL Server {DatabaseId}", sqlServerDatabaseId);
+
                 // Limpiar archivo temporal si existe
                 if (!string.IsNullOrEmpty(tempBackupPath) && System.IO.File.Exists(tempBackupPath))
                 {

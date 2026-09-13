@@ -10,10 +10,12 @@ namespace BackupPro.Controllers
     public class BackupHistoryController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly ILogger<BackupHistoryController> _logger;
 
-        public BackupHistoryController(ApplicationDbContext context)
+        public BackupHistoryController(ApplicationDbContext context, ILogger<BackupHistoryController> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         /// <summary>
@@ -66,6 +68,7 @@ namespace BackupPro.Controllers
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al cargar el historial de backups");
                 return View(new List<BackupHistory>());
             }
         }
@@ -109,6 +112,7 @@ namespace BackupPro.Controllers
         /// Elimina un registro del historial
         /// </summary>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Delete(int id)
         {
             try
@@ -127,6 +131,7 @@ namespace BackupPro.Controllers
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al eliminar registro {Id} del historial de backups", id);
                 return Json(new { success = false, message = $"Error: {ex.Message}" });
             }
         }
@@ -135,6 +140,7 @@ namespace BackupPro.Controllers
         /// Limpia todo el historial
         /// </summary>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> ClearAll()
         {
             try
@@ -147,6 +153,7 @@ namespace BackupPro.Controllers
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al limpiar el historial de backups");
                 return Json(new { success = false, message = $"Error: {ex.Message}" });
             }
         }

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using BackupPro.Data;
 using BackupPro.Models;
+using BackupPro.Services;
 using BackupPro.ViewModels;
 using Microsoft.EntityFrameworkCore;
 using System.IO.Compression;
@@ -16,10 +17,14 @@ namespace BackupPro.Controllers.StorageTypes
     public class FtpStorageController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly CredentialProtector _credentialProtector;
+        private readonly ILogger<FtpStorageController> _logger;
 
-        public FtpStorageController(ApplicationDbContext context)
+        public FtpStorageController(ApplicationDbContext context, CredentialProtector credentialProtector, ILogger<FtpStorageController> logger)
         {
             _context = context;
+            _credentialProtector = credentialProtector;
+            _logger = logger;
         }
 
         #region Métodos CRUD
@@ -40,6 +45,7 @@ namespace BackupPro.Controllers.StorageTypes
         /// <param name="model">Datos de la configuración a crear.</param>
         /// <returns>Resultado JSON con éxito o error.</returns>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create([FromBody] FtpStorageViewModel model)
         {
             try
@@ -60,7 +66,7 @@ namespace BackupPro.Controllers.StorageTypes
                         Host = model.Host,
                         Port = model.Port,
                         Username = model.Username,
-                        Password = model.Password, // TODO: Encriptar en producción
+                        Password = _credentialProtector.Protect(model.Password) ?? string.Empty,
                         RemotePath = model.RemotePath,
                         CreatedAt = DateTime.Now,
                         CreatedBy = User.Identity?.Name
@@ -76,6 +82,7 @@ namespace BackupPro.Controllers.StorageTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al crear configuración FTP");
                 return Json(new { success = false, message = $"Error al crear configuración: {ex.Message}" });
             }
         }
@@ -86,6 +93,7 @@ namespace BackupPro.Controllers.StorageTypes
         /// <param name="model">Datos editados de la configuración.</param>
         /// <returns>Resultado JSON con éxito o error.</returns>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit([FromBody] FtpStorageViewModel model)
         {
             try
@@ -112,7 +120,14 @@ namespace BackupPro.Controllers.StorageTypes
                 ftpStorage.Host = model.Host;
                 ftpStorage.Port = model.Port;
                 ftpStorage.Username = model.Username;
-                ftpStorage.Password = model.Password; // TODO: Encriptar en producción
+
+                // Solo actualizar la contraseña si se proporciona una nueva (el cliente nunca recibe la
+                // contraseña real, así que un valor en blanco significa "no cambiar")
+                if (!string.IsNullOrWhiteSpace(model.Password))
+                {
+                    ftpStorage.Password = _credentialProtector.Protect(model.Password) ?? string.Empty;
+                }
+
                 ftpStorage.RemotePath = model.RemotePath;
                 ftpStorage.LastModifiedAt = DateTime.Now;
 
@@ -123,6 +138,7 @@ namespace BackupPro.Controllers.StorageTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al actualizar configuración FTP");
                 return Json(new { success = false, message = $"Error al actualizar configuración: {ex.Message}" });
             }
         }
@@ -133,6 +149,7 @@ namespace BackupPro.Controllers.StorageTypes
         /// <param name="id">Id de la configuración a eliminar.</param>
         /// <returns>Resultado JSON con éxito o error.</returns>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Delete(int id)
         {
             try
@@ -150,6 +167,7 @@ namespace BackupPro.Controllers.StorageTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al eliminar configuración FTP");
                 return Json(new { success = false, message = $"Error al eliminar configuración: {ex.Message}" });
             }
         }
@@ -177,7 +195,7 @@ namespace BackupPro.Controllers.StorageTypes
                     Host = ftpStorage.Host,
                     Port = ftpStorage.Port,
                     Username = ftpStorage.Username,
-                    Password = ftpStorage.Password, // En edición se puede mostrar u ocultar
+                    Password = string.Empty, // La contraseña nunca se envía al cliente; dejar en blanco para no cambiarla
                     RemotePath = ftpStorage.RemotePath
                 };
 
@@ -199,6 +217,7 @@ namespace BackupPro.Controllers.StorageTypes
         /// <param name="request">Datos de conexión FTP.</param>
         /// <returns>Resultado JSON con lista de directorios.</returns>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> ListFtpDirectories([FromBody] FtpConnectionRequest request)
         {
             try
@@ -259,6 +278,7 @@ namespace BackupPro.Controllers.StorageTypes
         /// <param name="request">Datos para la creación del directorio.</param>
         /// <returns>Resultado JSON con éxito o error.</returns>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateFtpDirectory([FromBody] FtpCreateDirectoryRequest request)
         {
             try
@@ -380,7 +400,8 @@ namespace BackupPro.Controllers.StorageTypes
                 }
 
                 // Conectar al servidor FTP y subir el archivo
-                var client = new AsyncFtpClient(ftpStorage.Host, ftpStorage.Username, ftpStorage.Password, ftpStorage.Port);
+                string plainPassword = _credentialProtector.Unprotect(ftpStorage.Password) ?? string.Empty;
+                var client = new AsyncFtpClient(ftpStorage.Host, ftpStorage.Username, plainPassword, ftpStorage.Port);
 
                 try
                 {
@@ -437,6 +458,7 @@ namespace BackupPro.Controllers.StorageTypes
             catch (Exception ex)
             {
                 // Error general
+                _logger.LogError(ex, "Error al guardar backup en FTP {FtpStorageId}", ftpStorageId);
                 var errorMessage = $"Error al guardar backup en FTP: {ex.Message}";
 
                 // Eliminar archivo temporal local si existe

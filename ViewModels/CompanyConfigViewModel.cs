@@ -23,6 +23,9 @@ namespace BackupPro.ViewModels
         /// <summary>Contraseña del administrador (opcional, solo para actualización).</summary>
         public string? AdminPassword { get; set; }
 
+        /// <summary>Contraseña actual del administrador, requerida para poder cambiar <see cref="AdminPassword"/>.</summary>
+        public string? CurrentPassword { get; set; }
+
         /// <summary>Correos adicionales para notificaciones (separados por punto y coma en BD).</summary>
         public string? AdditionalEmails { get; set; }
 

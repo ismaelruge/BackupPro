@@ -309,6 +309,14 @@ paket-files/
 # FAKE - F# Make
 .fake/
 
+# BackupPro: archivos de configuración con secretos reales (no deben commitearse)
+appsettings.Local.json
+appsettings.Production.json
+appsettings.*.local.json
+
+# BackupPro: clave maestra autogenerada para cifrar credenciales (ver Services/CredentialProtector.cs)
+master.key
+
 # CodeRush personal settings
 .cr/personal
 

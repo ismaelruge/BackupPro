@@ -45,37 +45,40 @@
     }
 
     /// <summary>
-    /// Configuración de SMTP para envío de correos
-    /// TODO: En producción, encriptar estos valores
+    /// Configuración de SMTP para envío de correos.
+    /// Los valores reales se cargan desde appsettings.json / variables de entorno
+    /// (p.ej. Smtp__Password); nunca deben hardcodearse aquí. Ver appsettings.Example.json.
     /// </summary>
     public class SmtpSettings
     {
         public string Host { get; set; } = "smtp.gmail.com";
         public int Port { get; set; } = 587;
         public bool EnableSSL { get; set; } = true;
-        public string Email { get; set; } = "ismaelruge@gmail.com";
-        public string Password { get; set; } = "hpxd ysty yoxm flsw";
+        public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
     }
 
     /// <summary>
-    /// Configuración de Google OAuth para Google Drive
-    /// TODO: En producción, almacenar en Azure Key Vault o similar
+    /// Configuración de Google OAuth para Google Drive.
+    /// Los valores reales se cargan desde appsettings.json / variables de entorno
+    /// (p.ej. GoogleOAuth__ClientSecret); nunca deben hardcodearse aquí. Ver appsettings.Example.json.
     /// </summary>
     public class GoogleOAuthSettings
     {
-        public string ClientId { get; set; } = "755574195575-srs84155tqd4r9t6lle8gnadllkde180.apps.googleusercontent.com";
-        public string ClientSecret { get; set; } = "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";
+        public string ClientId { get; set; } = string.Empty;
+        public string ClientSecret { get; set; } = string.Empty;
         public string RedirectUri { get; set; } = "http://localhost:5070/GoogleDriveStorage/GoogleDriveCallback";
     }
 
     /// <summary>
-    /// Configuración de OneDrive OAuth
-    /// TODO: En producción, almacenar en Azure Key Vault o similar
+    /// Configuración de OneDrive OAuth.
+    /// Los valores reales se cargan desde appsettings.json / variables de entorno
+    /// (p.ej. OneDrive__ClientSecret); nunca deben hardcodearse aquí. Ver appsettings.Example.json.
     /// </summary>
     public class OneDriveSettings
     {
-        public string ClientId { get; set; } = "d10f66e3-b422-4402-9735-d58d8a462a9b";
-        public string ClientSecret { get; set; } = "YqF8Q~PgQpHktbNxlhCiRCP7E1S.5S8~KuGpYadU";
+        public string ClientId { get; set; } = string.Empty;
+        public string ClientSecret { get; set; } = string.Empty;
         public string RedirectUri { get; set; } = "http://localhost:5070/OneDriveStorage/OneDriveCallback";
         public string Authority { get; set; } = "https://login.microsoftonline.com/common";
         public string AuthorizeUrl { get; set; } = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
@@ -96,7 +99,7 @@
     /// </summary>
     public class SchedulerSettings
     {
-        public string SecureToken { get; set; } = "TuTokenSeguro123";
+        public string SecureToken { get; set; } = string.Empty;
         public bool UseSystemScheduler { get; set; } = false;
         public int IntervalMinutes { get; set; } = 60;
     }

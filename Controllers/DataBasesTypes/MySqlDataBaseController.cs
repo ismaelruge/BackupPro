@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using BackupPro.Data;
 using BackupPro.Models;
+using BackupPro.Services;
 using BackupPro.ViewModels;
 using Microsoft.EntityFrameworkCore;
 using MySqlConnector;
@@ -13,10 +14,14 @@ namespace BackupPro.Controllers.DataBasesTypes
     public class MySqlDataBaseController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly CredentialProtector _credentialProtector;
+        private readonly ILogger<MySqlDataBaseController> _logger;
 
-        public MySqlDataBaseController(ApplicationDbContext context)
+        public MySqlDataBaseController(ApplicationDbContext context, CredentialProtector credentialProtector, ILogger<MySqlDataBaseController> logger)
         {
             _context = context;
+            _credentialProtector = credentialProtector;
+            _logger = logger;
         }
 
         public async Task<IActionResult> Index()
@@ -146,7 +151,7 @@ namespace BackupPro.Controllers.DataBasesTypes
                     Port = model.Port,
                     DatabaseName = model.DatabaseName,
                     Username = model.Username ?? string.Empty,
-                    Password = model.Password ?? string.Empty, // TODO: Encriptar en producción
+                    Password = _credentialProtector.Protect(model.Password) ?? string.Empty,
                     SslMode = model.SslMode,
                     CreatedAt = DateTime.Now,
                     CreatedBy = User.Identity?.Name
@@ -167,6 +172,7 @@ namespace BackupPro.Controllers.DataBasesTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al crear configuración de MySQL");
                 var errorMessage = $"Error al crear configuración: {ex.Message}";
 
                 if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || Request.Headers["Accept"].ToString().Contains("application/json"))
@@ -222,7 +228,8 @@ namespace BackupPro.Controllers.DataBasesTypes
                 }
 
                 // Si no hay contraseña nueva y no hay contraseña guardada, es un error
-                if (string.IsNullOrWhiteSpace(model.Password) && string.IsNullOrWhiteSpace(mysql.Password))
+                bool passwordProvided = !string.IsNullOrWhiteSpace(model.Password);
+                if (!passwordProvided && string.IsNullOrWhiteSpace(mysql.Password))
                 {
                     ModelState.AddModelError("Password", "La contraseña es requerida");
                 }
@@ -260,10 +267,10 @@ namespace BackupPro.Controllers.DataBasesTypes
                     return RedirectToAction(nameof(Index));
                 }
 
-                // Si no se proporciona contraseña, mantener la actual
-                if (string.IsNullOrWhiteSpace(model.Password))
+                // Si no se proporciona contraseña, mantener la actual (descifrada solo para probar la conexión)
+                if (!passwordProvided)
                 {
-                    model.Password = mysql.Password;
+                    model.Password = _credentialProtector.Unprotect(mysql.Password);
                 }
 
                 // Validar la conexión antes de actualizar
@@ -288,9 +295,9 @@ namespace BackupPro.Controllers.DataBasesTypes
                 mysql.Username = model.Username ?? string.Empty;
 
                 // Solo actualizar la contraseña si se proporciona una nueva
-                if (!string.IsNullOrWhiteSpace(model.Password))
+                if (passwordProvided)
                 {
-                    mysql.Password = model.Password; // TODO: Encriptar en producción
+                    mysql.Password = _credentialProtector.Protect(model.Password) ?? string.Empty;
                 }
 
                 mysql.SslMode = model.SslMode;
@@ -311,6 +318,7 @@ namespace BackupPro.Controllers.DataBasesTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al actualizar configuración de MySQL");
                 var errorMessage = $"Error al actualizar configuración: {ex.Message}";
 
                 if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || Request.Headers["Accept"].ToString().Contains("application/json"))
@@ -347,6 +355,7 @@ namespace BackupPro.Controllers.DataBasesTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al eliminar configuración de MySQL");
                 TempData["Error"] = $"Error al eliminar configuración: {ex.Message}";
                 return RedirectToAction(nameof(Index));
             }
@@ -374,7 +383,7 @@ namespace BackupPro.Controllers.DataBasesTypes
                     Port = mysql.Port,
                     DatabaseName = mysql.DatabaseName,
                     Username = mysql.Username,
-                    Password = mysql.Password, // TODO: En producción, no enviar la contraseña o enviarla parcialmente
+                    Password = string.Empty, // La contraseña nunca se envía al cliente; dejar en blanco para no cambiarla
                     SslMode = mysql.SslMode
                 };
 
@@ -436,50 +445,73 @@ namespace BackupPro.Controllers.DataBasesTypes
                     return (false, null, string.Empty, string.Empty, "No se encontró mysqldump. Asegúrate de que MySQL esté instalado y mysqldump esté en el PATH del sistema.");
                 }
 
-                // Construir argumentos para mysqldump
-                string arguments = $"--host={mysqlConfig.Host} " +
-                                 $"--port={mysqlConfig.Port} " +
-                                 $"--user={mysqlConfig.Username} " +
-                                 $"--password={mysqlConfig.Password} " +
-                                 $"--databases {mysqlConfig.DatabaseName} " +
-                                 $"--result-file=\"{tempBackupPath}\" " +
-                                 "--single-transaction " +
-                                 "--routines " +
-                                 "--triggers";
+                // La contraseña se pasa a mysqldump mediante un archivo de opciones temporal
+                // (--defaults-extra-file) en vez de --password en la línea de comandos, para que no
+                // quede expuesta en la lista de procesos del sistema (ps/Task Manager).
+                string plainPassword = _credentialProtector.Unprotect(mysqlConfig.Password) ?? string.Empty;
+                string credentialsFilePath = Path.Combine(Path.GetTempPath(), $"mysqldump_{Guid.NewGuid():N}.cnf");
+                await System.IO.File.WriteAllTextAsync(credentialsFilePath,
+                    $"[client]\nuser={mysqlConfig.Username}\npassword={plainPassword}\n");
 
-                // Ejecutar mysqldump
-                var processStartInfo = new System.Diagnostics.ProcessStartInfo
+                if (!OperatingSystem.IsWindows())
                 {
-                    FileName = mysqldumpPath,
-                    Arguments = arguments,
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
-                };
+                    System.IO.File.SetUnixFileMode(credentialsFilePath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+                }
 
-                using (var process = System.Diagnostics.Process.Start(processStartInfo))
+                try
                 {
-                    if (process == null)
+                    // --defaults-extra-file debe ser el primer argumento para que mysqldump lo reconozca
+                    string arguments = $"--defaults-extra-file=\"{credentialsFilePath}\" " +
+                                     $"--host={mysqlConfig.Host} " +
+                                     $"--port={mysqlConfig.Port} " +
+                                     $"--databases {mysqlConfig.DatabaseName} " +
+                                     $"--result-file=\"{tempBackupPath}\" " +
+                                     "--single-transaction " +
+                                     "--routines " +
+                                     "--triggers";
+
+                    // Ejecutar mysqldump
+                    var processStartInfo = new System.Diagnostics.ProcessStartInfo
                     {
-                        return (false, null, string.Empty, string.Empty, "No se pudo iniciar el proceso mysqldump");
-                    }
+                        FileName = mysqldumpPath,
+                        Arguments = arguments,
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true
+                    };
 
-                    // Esperar a que termine el proceso (máximo 5 minutos)
-                    bool exited = await Task.Run(() => process.WaitForExit(300000)); // 5 minutos
-
-                    if (!exited)
+                    using (var process = System.Diagnostics.Process.Start(processStartInfo))
                     {
-                        process.Kill();
-                        return (false, null, string.Empty, string.Empty, "El proceso mysqldump excedió el tiempo límite de 5 minutos");
+                        if (process == null)
+                        {
+                            return (false, null, string.Empty, string.Empty, "No se pudo iniciar el proceso mysqldump");
+                        }
+
+                        // Esperar a que termine el proceso (máximo 5 minutos)
+                        bool exited = await Task.Run(() => process.WaitForExit(300000)); // 5 minutos
+
+                        if (!exited)
+                        {
+                            process.Kill();
+                            return (false, null, string.Empty, string.Empty, "El proceso mysqldump excedió el tiempo límite de 5 minutos");
+                        }
+
+                        string errorOutput = await process.StandardError.ReadToEndAsync();
+
+                        if (process.ExitCode != 0)
+                        {
+                            return (false, null, string.Empty, string.Empty, $"Error al ejecutar mysqldump: {errorOutput}");
+                        }
                     }
-
-                    string errorOutput = await process.StandardError.ReadToEndAsync();
-
-                    if (process.ExitCode != 0)
+                }
+                finally
+                {
+                    try
                     {
-                        return (false, null, string.Empty, string.Empty, $"Error al ejecutar mysqldump: {errorOutput}");
+                        System.IO.File.Delete(credentialsFilePath);
                     }
+                    catch { /* Ignorar errores al eliminar el archivo de credenciales temporal */ }
                 }
 
                 // Verificar que el archivo se creó correctamente
@@ -522,6 +554,7 @@ namespace BackupPro.Controllers.DataBasesTypes
                     catch { /* Ignorar errores al eliminar */ }
                 }
 
+                _logger.LogError(ex, "Error al crear backup de MySQL {DatabaseId}", mysqlDatabaseId);
                 return (false, null, string.Empty, string.Empty, $"Error al crear backup: {ex.Message}");
             }
         }

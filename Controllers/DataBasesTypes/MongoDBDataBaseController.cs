@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using BackupPro.Data;
 using BackupPro.Models;
+using BackupPro.Services;
 using BackupPro.ViewModels;
 using Microsoft.EntityFrameworkCore;
 using MongoDB.Driver;
@@ -13,10 +14,14 @@ namespace BackupPro.Controllers.DataBasesTypes
     public class MongoDBDataBaseController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly CredentialProtector _credentialProtector;
+        private readonly ILogger<MongoDBDataBaseController> _logger;
 
-        public MongoDBDataBaseController(ApplicationDbContext context)
+        public MongoDBDataBaseController(ApplicationDbContext context, CredentialProtector credentialProtector, ILogger<MongoDBDataBaseController> logger)
         {
             _context = context;
+            _credentialProtector = credentialProtector;
+            _logger = logger;
         }
 
         public async Task<IActionResult> Index()
@@ -170,7 +175,7 @@ namespace BackupPro.Controllers.DataBasesTypes
                     Port = model.Port,
                     DatabaseName = model.DatabaseName,
                     Username = model.Username,
-                    Password = model.Password, // TODO: Encriptar en producción
+                    Password = _credentialProtector.Protect(model.Password),
                     SslEnabled = model.SslEnabled,
                     CreatedAt = DateTime.Now,
                     CreatedBy = User.Identity?.Name
@@ -191,6 +196,7 @@ namespace BackupPro.Controllers.DataBasesTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al crear configuración de MongoDB");
                 var errorMessage = $"Error al crear configuración: {ex.Message}";
 
                 if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || Request.Headers["Accept"].ToString().Contains("application/json"))
@@ -272,10 +278,11 @@ namespace BackupPro.Controllers.DataBasesTypes
                     return RedirectToAction(nameof(Index));
                 }
 
-                // Si no se proporciona contraseña, mantener la actual
-                if (string.IsNullOrWhiteSpace(model.Password))
+                // Si no se proporciona contraseña, mantener la actual (descifrada solo para probar la conexión)
+                bool passwordProvided = !string.IsNullOrWhiteSpace(model.Password);
+                if (!passwordProvided)
                 {
-                    model.Password = mongodb.Password;
+                    model.Password = _credentialProtector.Unprotect(mongodb.Password);
                 }
 
                 // Si no se proporciona usuario, mantener el actual
@@ -306,9 +313,9 @@ namespace BackupPro.Controllers.DataBasesTypes
                 mongodb.Username = model.Username;
 
                 // Solo actualizar la contraseña si se proporciona una nueva
-                if (!string.IsNullOrWhiteSpace(model.Password))
+                if (passwordProvided)
                 {
-                    mongodb.Password = model.Password; // TODO: Encriptar en producción
+                    mongodb.Password = _credentialProtector.Protect(model.Password);
                 }
 
                 mongodb.SslEnabled = model.SslEnabled;
@@ -329,6 +336,7 @@ namespace BackupPro.Controllers.DataBasesTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al actualizar configuración de MongoDB");
                 var errorMessage = $"Error al actualizar configuración: {ex.Message}";
 
                 if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || Request.Headers["Accept"].ToString().Contains("application/json"))
@@ -365,6 +373,7 @@ namespace BackupPro.Controllers.DataBasesTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al eliminar configuración de MongoDB");
                 TempData["Error"] = $"Error al eliminar configuración: {ex.Message}";
                 return RedirectToAction(nameof(Index));
             }
@@ -392,7 +401,7 @@ namespace BackupPro.Controllers.DataBasesTypes
                     Port = mongodb.Port,
                     DatabaseName = mongodb.DatabaseName,
                     Username = mongodb.Username,
-                    Password = mongodb.Password, // TODO: En producción, no enviar la contraseña o enviarla parcialmente
+                    Password = string.Empty, // La contraseña nunca se envía al cliente; dejar en blanco para no cambiarla
                     SslEnabled = mongodb.SslEnabled,
                 };
 
@@ -457,20 +466,38 @@ namespace BackupPro.Controllers.DataBasesTypes
                     return (false, null, string.Empty, string.Empty, "No se encontró mongodump. Asegúrate de que MongoDB Database Tools esté instalado y mongodump esté en el PATH del sistema.");
                 }
 
+                string? plainPassword = _credentialProtector.Unprotect(mongodbConfig.Password);
+                bool hasCredentials = !string.IsNullOrWhiteSpace(mongodbConfig.Username) && !string.IsNullOrWhiteSpace(plainPassword);
+
                 // Construir argumentos para mongodump
                 var arguments = new System.Text.StringBuilder();
+
+                // Las credenciales, si existen, se pasan mediante un archivo de configuración temporal
+                // (--config) en vez de --username/--password en la línea de comandos, para que no
+                // queden expuestas en la lista de procesos del sistema (ps/Task Manager).
+                string? credentialsFilePath = null;
+                if (hasCredentials)
+                {
+                    // El archivo de configuración de mongodump usa claves planas (no anidadas) que
+                    // corresponden a los nombres largos de los flags de línea de comandos.
+                    credentialsFilePath = Path.Combine(Path.GetTempPath(), $"mongodump_{Guid.NewGuid():N}.yaml");
+                    string yaml = $"username: \"{mongodbConfig.Username}\"\n" +
+                                  $"password: \"{plainPassword}\"\n" +
+                                  "authenticationDatabase: \"admin\"\n";
+                    await System.IO.File.WriteAllTextAsync(credentialsFilePath, yaml);
+
+                    if (!OperatingSystem.IsWindows())
+                    {
+                        System.IO.File.SetUnixFileMode(credentialsFilePath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+                    }
+
+                    arguments.Append($"--config=\"{credentialsFilePath}\" ");
+                }
+
                 arguments.Append($"--host={mongodbConfig.Host} ");
                 arguments.Append($"--port={mongodbConfig.Port} ");
                 arguments.Append($"--db={mongodbConfig.DatabaseName} ");
                 arguments.Append($"--out=\"{tempBackupPath}\" ");
-
-                // Agregar credenciales si están configuradas
-                if (!string.IsNullOrWhiteSpace(mongodbConfig.Username) && !string.IsNullOrWhiteSpace(mongodbConfig.Password))
-                {
-                    arguments.Append($"--username={mongodbConfig.Username} ");
-                    arguments.Append($"--password={mongodbConfig.Password} ");
-                    arguments.Append("--authenticationDatabase=admin ");
-                }
 
                 // Agregar SSL si está habilitado
                 if (mongodbConfig.SslEnabled)
@@ -478,38 +505,52 @@ namespace BackupPro.Controllers.DataBasesTypes
                     arguments.Append("--ssl ");
                 }
 
-                // Ejecutar mongodump
-                var processStartInfo = new System.Diagnostics.ProcessStartInfo
+                try
                 {
-                    FileName = mongoDumpPath,
-                    Arguments = arguments.ToString(),
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
-                };
+                    // Ejecutar mongodump
+                    var processStartInfo = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = mongoDumpPath,
+                        Arguments = arguments.ToString(),
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true
+                    };
 
-                using (var process = System.Diagnostics.Process.Start(processStartInfo))
+                    using (var process = System.Diagnostics.Process.Start(processStartInfo))
+                    {
+                        if (process == null)
+                        {
+                            return (false, null, string.Empty, string.Empty, "No se pudo iniciar el proceso mongodump");
+                        }
+
+                        // Esperar a que termine el proceso (máximo 5 minutos)
+                        bool exited = await Task.Run(() => process.WaitForExit(300000)); // 5 minutos
+
+                        if (!exited)
+                        {
+                            process.Kill();
+                            return (false, null, string.Empty, string.Empty, "El proceso mongodump excedió el tiempo límite de 5 minutos");
+                        }
+
+                        string errorOutput = await process.StandardError.ReadToEndAsync();
+
+                        if (process.ExitCode != 0)
+                        {
+                            return (false, null, string.Empty, string.Empty, $"Error al ejecutar mongodump: {errorOutput}");
+                        }
+                    }
+                }
+                finally
                 {
-                    if (process == null)
+                    if (credentialsFilePath != null)
                     {
-                        return (false, null, string.Empty, string.Empty, "No se pudo iniciar el proceso mongodump");
-                    }
-
-                    // Esperar a que termine el proceso (máximo 5 minutos)
-                    bool exited = await Task.Run(() => process.WaitForExit(300000)); // 5 minutos
-
-                    if (!exited)
-                    {
-                        process.Kill();
-                        return (false, null, string.Empty, string.Empty, "El proceso mongodump excedió el tiempo límite de 5 minutos");
-                    }
-
-                    string errorOutput = await process.StandardError.ReadToEndAsync();
-
-                    if (process.ExitCode != 0)
-                    {
-                        return (false, null, string.Empty, string.Empty, $"Error al ejecutar mongodump: {errorOutput}");
+                        try
+                        {
+                            System.IO.File.Delete(credentialsFilePath);
+                        }
+                        catch { /* Ignorar errores al eliminar el archivo de credenciales temporal */ }
                     }
                 }
 
@@ -573,6 +614,7 @@ namespace BackupPro.Controllers.DataBasesTypes
                 }
                 catch { /* Ignorar errores al eliminar */ }
 
+                _logger.LogError(ex, "Error al crear backup de MongoDB {DatabaseId}", mongodbDatabaseId);
                 return (false, null, string.Empty, string.Empty, $"Error al crear backup: {ex.Message}");
             }
         }

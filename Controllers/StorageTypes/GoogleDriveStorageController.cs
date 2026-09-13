@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using BackupPro.Data;
 using BackupPro.Models;
+using BackupPro.Services;
 using BackupPro.ViewModels;
 using Microsoft.EntityFrameworkCore;
 using System.IO.Compression;
@@ -14,11 +15,15 @@ namespace BackupPro.Controllers.StorageTypes
     {
         private readonly ApplicationDbContext _context;
         private readonly GoogleOAuthSettings _googleOAuthSettings;
+        private readonly CredentialProtector _credentialProtector;
+        private readonly ILogger<GoogleDriveStorageController> _logger;
 
-        public GoogleDriveStorageController(ApplicationDbContext context, GoogleOAuthSettings googleOAuthSettings)
+        public GoogleDriveStorageController(ApplicationDbContext context, GoogleOAuthSettings googleOAuthSettings, CredentialProtector credentialProtector, ILogger<GoogleDriveStorageController> logger)
         {
             _context = context;
             _googleOAuthSettings = googleOAuthSettings;
+            _credentialProtector = credentialProtector;
+            _logger = logger;
         }
 
         public async Task<IActionResult> Index()
@@ -33,6 +38,7 @@ namespace BackupPro.Controllers.StorageTypes
         /// Crea una nueva configuración de Google Drive.
         /// </summary>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create([FromBody] GoogleDriveStorageViewModel model)
         {
             try
@@ -69,6 +75,7 @@ namespace BackupPro.Controllers.StorageTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al crear configuración de Google Drive");
                 return Json(new { success = false, message = $"Error al crear configuración: {ex.Message}" });
             }
         }
@@ -77,6 +84,7 @@ namespace BackupPro.Controllers.StorageTypes
         /// Actualiza una configuración de Google Drive existente.
         /// </summary>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit([FromBody] GoogleDriveStorageViewModel model)
         {
             try
@@ -112,6 +120,7 @@ namespace BackupPro.Controllers.StorageTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al actualizar configuración de Google Drive");
                 return Json(new { success = false, message = $"Error al actualizar configuración: {ex.Message}" });
             }
         }
@@ -120,6 +129,7 @@ namespace BackupPro.Controllers.StorageTypes
         /// Elimina una configuración de Google Drive.
         /// </summary>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Delete(int id)
         {
             try
@@ -137,6 +147,7 @@ namespace BackupPro.Controllers.StorageTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al eliminar configuración de Google Drive");
                 return Json(new { success = false, message = $"Error al eliminar configuración: {ex.Message}" });
             }
         }
@@ -165,17 +176,18 @@ namespace BackupPro.Controllers.StorageTypes
                     TokenExpiresAt = googleDrive.TokenExpiresAt
                 };
 
-                // Incluir AccessToken para permitir exploración sin reconectar
-                // TODO: En producción, verificar expiración antes de enviar
+                // El AccessToken NUNCA se envía al cliente. Para explorar carpetas de una configuración
+                // ya guardada, el frontend debe usar ListDriveFoldersById/CreateDriveFolderById, que
+                // resuelven y refrescan el token en el servidor.
                 return Json(new {
                     success = true,
                     data = viewModel,
-                    accessToken = googleDrive.AccessToken, // Para usar el explorador sin reconectar
                     hasValidToken = !string.IsNullOrEmpty(googleDrive.AccessToken)
                 });
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al obtener configuración de Google Drive {Id}", id);
                 return Json(new { success = false, message = $"Error al obtener configuración: {ex.Message}" });
             }
         }
@@ -184,6 +196,7 @@ namespace BackupPro.Controllers.StorageTypes
         /// Guarda los tokens de Google Drive para una configuración.
         /// </summary>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> SaveTokens([FromBody] GoogleDriveSaveTokensRequest request)
         {
             try
@@ -194,9 +207,8 @@ namespace BackupPro.Controllers.StorageTypes
                     return Json(new { success = false, message = "Configuración no encontrada." });
                 }
 
-                // TODO: En producción, encriptar los tokens antes de guardarlos
-                googleDrive.AccessToken = request.AccessToken;
-                googleDrive.RefreshToken = request.RefreshToken;
+                googleDrive.AccessToken = _credentialProtector.Protect(request.AccessToken);
+                googleDrive.RefreshToken = _credentialProtector.Protect(request.RefreshToken);
                 googleDrive.TokenExpiresAt = DateTime.Now.AddHours(1); // Los tokens de Google duran ~1 hora
                 googleDrive.LastModifiedAt = DateTime.Now;
 
@@ -207,6 +219,7 @@ namespace BackupPro.Controllers.StorageTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al guardar tokens de Google Drive");
                 return Json(new { success = false, message = $"Error al guardar tokens: {ex.Message}" });
             }
         }
@@ -226,13 +239,19 @@ namespace BackupPro.Controllers.StorageTypes
                     return BadRequest("Google OAuth configuration is missing");
                 }
 
+                // Parámetro state anti-CSRF: se guarda en la sesión del usuario que inició el flujo y
+                // se valida en el callback para que un atacante no pueda inyectar su propia cuenta.
+                var state = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+                HttpContext.Session.SetString("GoogleDrive_OAuthState", state);
+
                 var authUrl = $"https://accounts.google.com/o/oauth2/v2/auth?" +
                               $"client_id={clientId}" +
                               $"&redirect_uri={Uri.EscapeDataString(redirectUri)}" +
                               $"&response_type=code" +
                               $"&scope={Uri.EscapeDataString("https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email")}" +
                               $"&access_type=offline" +
-                              $"&prompt=consent";
+                              $"&prompt=consent" +
+                              $"&state={Uri.EscapeDataString(state)}";
 
                 return Redirect(authUrl);
             }
@@ -243,8 +262,16 @@ namespace BackupPro.Controllers.StorageTypes
         }
 
         [HttpGet]
-        public async Task<IActionResult> GoogleDriveCallback(string code)
+        public async Task<IActionResult> GoogleDriveCallback(string code, string? state)
         {
+            var expectedState = HttpContext.Session.GetString("GoogleDrive_OAuthState");
+            HttpContext.Session.Remove("GoogleDrive_OAuthState");
+
+            if (string.IsNullOrEmpty(expectedState) || !string.Equals(expectedState, state, StringComparison.Ordinal))
+            {
+                return Content("<html><body><p>Solicitud de autenticación inválida o expirada. Cierra esta ventana e inténtalo de nuevo.</p></body></html>", "text/html");
+            }
+
             if (string.IsNullOrEmpty(code))
             {
                 var errorScript = @"
@@ -404,6 +431,7 @@ namespace BackupPro.Controllers.StorageTypes
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> ListDriveFolders([FromBody] DriveListRequest request)
         {
             try
@@ -423,25 +451,7 @@ namespace BackupPro.Controllers.StorageTypes
                     return Json(new { success = false, message = $"Error al listar carpetas: {json}" });
                 }
 
-                var data = System.Text.Json.JsonDocument.Parse(json);
-                var folders = new List<DriveFolderInfo>();
-
-                if (data.RootElement.TryGetProperty("files", out var filesElement))
-                {
-                    foreach (var file in filesElement.EnumerateArray())
-                    {
-                        folders.Add(new DriveFolderInfo
-                        {
-                            Id = file.GetProperty("id").GetString()!,
-                            Name = file.GetProperty("name").GetString()!,
-                            ModifiedTime = file.TryGetProperty("modifiedTime", out var modTime)
-                                ? DateTime.Parse(modTime.GetString()!)
-                                : DateTime.MinValue
-                        });
-                    }
-                }
-
-                return Json(new { success = true, folders = folders });
+                return Json(new { success = true, folders = ParseDriveFolders(json) });
             }
             catch (Exception ex)
             {
@@ -450,41 +460,142 @@ namespace BackupPro.Controllers.StorageTypes
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateDriveFolder([FromBody] DriveCreateFolderRequest request)
         {
             try
             {
-                using var httpClient = new HttpClient();
-                httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {request.AccessToken}");
-
-                var parentId = string.IsNullOrEmpty(request.ParentId) ? "root" : request.ParentId;
-                var folderMetadata = new
-                {
-                    name = request.FolderName,
-                    mimeType = "application/vnd.google-apps.folder",
-                    parents = new[] { parentId }
-                };
-
-                var jsonContent = System.Text.Json.JsonSerializer.Serialize(folderMetadata);
-                var content = new StringContent(jsonContent, System.Text.Encoding.UTF8, "application/json");
-
-                var response = await httpClient.PostAsync("https://www.googleapis.com/drive/v3/files", content);
-                var responseJson = await response.Content.ReadAsStringAsync();
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    return Json(new { success = false, message = $"Error al crear carpeta: {responseJson}" });
-                }
-
-                var data = System.Text.Json.JsonDocument.Parse(responseJson);
-                var folderId = data.RootElement.GetProperty("id").GetString();
-
-                return Json(new { success = true, folderId = folderId, message = "Carpeta creada exitosamente" });
+                var (success, folderId, message) = await CreateDriveFolderInternal(request.AccessToken, request.ParentId, request.FolderName);
+                return success
+                    ? Json(new { success = true, folderId, message = "Carpeta creada exitosamente" })
+                    : Json(new { success = false, message });
             }
             catch (Exception ex)
             {
                 return Json(new { success = false, message = $"Error: {ex.Message}" });
             }
+        }
+
+        /// <summary>
+        /// Lista carpetas de Google Drive para una configuración ya guardada, usando el token
+        /// almacenado (descifrado y refrescado en el servidor). El AccessToken nunca llega al cliente.
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ListDriveFoldersById([FromBody] DriveListByIdRequest request)
+        {
+            try
+            {
+                var googleDrive = await _context.GoogleDriveStorages.FindAsync(request.Id);
+                if (googleDrive == null || !await EnsureValidToken(googleDrive))
+                {
+                    return Json(new { success = false, message = "No hay un token de acceso válido para Google Drive. Por favor, autentícate primero." });
+                }
+
+                string accessToken = _credentialProtector.Unprotect(googleDrive.AccessToken) ?? string.Empty;
+
+                using var httpClient = new HttpClient();
+                httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
+
+                var parentId = string.IsNullOrEmpty(request.ParentId) ? "root" : request.ParentId;
+                var query = $"'{parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false";
+                var url = $"https://www.googleapis.com/drive/v3/files?q={Uri.EscapeDataString(query)}&fields=files(id,name,modifiedTime)&orderBy=name";
+
+                var response = await httpClient.GetAsync(url);
+                var json = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    return Json(new { success = false, message = $"Error al listar carpetas: {json}" });
+                }
+
+                return Json(new { success = true, folders = ParseDriveFolders(json) });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al listar carpetas de Google Drive para {Id}", request.Id);
+                return Json(new { success = false, message = $"Error: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
+        /// Crea una carpeta en Google Drive para una configuración ya guardada, usando el token
+        /// almacenado (descifrado y refrescado en el servidor). El AccessToken nunca llega al cliente.
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreateDriveFolderById([FromBody] DriveCreateFolderByIdRequest request)
+        {
+            try
+            {
+                var googleDrive = await _context.GoogleDriveStorages.FindAsync(request.Id);
+                if (googleDrive == null || !await EnsureValidToken(googleDrive))
+                {
+                    return Json(new { success = false, message = "No hay un token de acceso válido para Google Drive. Por favor, autentícate primero." });
+                }
+
+                string accessToken = _credentialProtector.Unprotect(googleDrive.AccessToken) ?? string.Empty;
+                var (success, folderId, message) = await CreateDriveFolderInternal(accessToken, request.ParentId, request.FolderName);
+                return success
+                    ? Json(new { success = true, folderId, message = "Carpeta creada exitosamente" })
+                    : Json(new { success = false, message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al crear carpeta de Google Drive para {Id}", request.Id);
+                return Json(new { success = false, message = $"Error: {ex.Message}" });
+            }
+        }
+
+        private static List<DriveFolderInfo> ParseDriveFolders(string json)
+        {
+            var data = System.Text.Json.JsonDocument.Parse(json);
+            var folders = new List<DriveFolderInfo>();
+
+            if (data.RootElement.TryGetProperty("files", out var filesElement))
+            {
+                foreach (var file in filesElement.EnumerateArray())
+                {
+                    folders.Add(new DriveFolderInfo
+                    {
+                        Id = file.GetProperty("id").GetString()!,
+                        Name = file.GetProperty("name").GetString()!,
+                        ModifiedTime = file.TryGetProperty("modifiedTime", out var modTime)
+                            ? DateTime.Parse(modTime.GetString()!)
+                            : DateTime.MinValue
+                    });
+                }
+            }
+
+            return folders;
+        }
+
+        private static async Task<(bool success, string? folderId, string message)> CreateDriveFolderInternal(string accessToken, string? parentId, string folderName)
+        {
+            using var httpClient = new HttpClient();
+            httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
+
+            var effectiveParentId = string.IsNullOrEmpty(parentId) ? "root" : parentId;
+            var folderMetadata = new
+            {
+                name = folderName,
+                mimeType = "application/vnd.google-apps.folder",
+                parents = new[] { effectiveParentId }
+            };
+
+            var jsonContent = System.Text.Json.JsonSerializer.Serialize(folderMetadata);
+            var content = new StringContent(jsonContent, System.Text.Encoding.UTF8, "application/json");
+
+            var response = await httpClient.PostAsync("https://www.googleapis.com/drive/v3/files", content);
+            var responseJson = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return (false, null, $"Error al crear carpeta: {responseJson}");
+            }
+
+            var data = System.Text.Json.JsonDocument.Parse(responseJson);
+            return (true, data.RootElement.GetProperty("id").GetString(), string.Empty);
         }
 
         // ========== TOKEN REFRESH ==========
@@ -501,9 +612,10 @@ namespace BackupPro.Controllers.StorageTypes
                     return false;
                 }
 
+                string plainRefreshToken = _credentialProtector.Unprotect(googleDriveStorage.RefreshToken) ?? string.Empty;
                 var tokenRequest = new Dictionary<string, string>
                 {
-                    {"refresh_token", googleDriveStorage.RefreshToken},
+                    {"refresh_token", plainRefreshToken},
                     {"client_id", _googleOAuthSettings.ClientId!},
                     {"client_secret", _googleOAuthSettings.ClientSecret!},
                     {"grant_type", "refresh_token"}
@@ -516,6 +628,7 @@ namespace BackupPro.Controllers.StorageTypes
                 if (!tokenResponse.IsSuccessStatusCode)
                 {
                     var errorContent = await tokenResponse.Content.ReadAsStringAsync();
+                    _logger.LogWarning("No se pudo renovar el token de Google Drive: {Error}", errorContent);
                     return false;
                 }
 
@@ -523,8 +636,8 @@ namespace BackupPro.Controllers.StorageTypes
                 var tokenData = System.Text.Json.JsonDocument.Parse(tokenJson);
                 var newAccessToken = tokenData.RootElement.GetProperty("access_token").GetString();
 
-                // Actualizar el token en la base de datos
-                googleDriveStorage.AccessToken = newAccessToken;
+                // Actualizar el token en la base de datos (cifrado)
+                googleDriveStorage.AccessToken = _credentialProtector.Protect(newAccessToken);
 
                 // Google generalmente no devuelve un nuevo refresh_token en la renovación
                 // El refresh_token original sigue siendo válido
@@ -539,6 +652,7 @@ namespace BackupPro.Controllers.StorageTypes
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al renovar el token de Google Drive");
                 return false;
             }
         }
@@ -650,8 +764,9 @@ namespace BackupPro.Controllers.StorageTypes
                 }
 
                 // Subir a Google Drive usando Google Drive API v3
+                string accessToken = _credentialProtector.Unprotect(googleDriveStorage.AccessToken) ?? string.Empty;
                 using var httpClient = new HttpClient();
-                httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {googleDriveStorage.AccessToken}");
+                httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
 
                 // Preparar metadata del archivo
                 var parentId = string.IsNullOrEmpty(googleDriveStorage.FolderId) ? "root" : googleDriveStorage.FolderId;
@@ -771,6 +886,7 @@ namespace BackupPro.Controllers.StorageTypes
                 }
                 catch { /* Ignorar errores al registrar */ }
 
+                _logger.LogError(ex, "Error al guardar backup en Google Drive {GoogleDriveStorageId}", googleDriveStorageId);
                 return (false, string.Empty, 0, errorMessage);
             }
         }
@@ -804,6 +920,19 @@ namespace BackupPro.Controllers.StorageTypes
         public string AccessToken { get; set; }
         public string ParentId { get; set; }
         public string FolderName { get; set; }
+    }
+
+    public class DriveListByIdRequest
+    {
+        public int Id { get; set; }
+        public string? ParentId { get; set; }
+    }
+
+    public class DriveCreateFolderByIdRequest
+    {
+        public int Id { get; set; }
+        public string? ParentId { get; set; }
+        public string FolderName { get; set; } = string.Empty;
     }
 
     public class DriveFolderInfo

@@ -11,8 +11,6 @@ using LocalStorageModel = BackupPro.Models.LocalStorage;
 using Microsoft.Data.SqlClient;
 using BackupPro.Models;
 using System.IO.Compression;
-using System.Security.AccessControl;
-using System.Security.Principal;
 
 namespace BackupPro.Controllers.StorageTypes
 {
@@ -20,10 +18,12 @@ namespace BackupPro.Controllers.StorageTypes
     public class LocalStorageController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly ILogger<LocalStorageController> _logger;
 
-        public LocalStorageController(ApplicationDbContext context)
+        public LocalStorageController(ApplicationDbContext context, ILogger<LocalStorageController> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         // GET: LocalStorage
@@ -103,7 +103,7 @@ namespace BackupPro.Controllers.StorageTypes
             }
             catch (Exception ex)
             {
-                //_logger.LogError(ex, "Error al crear configuración de almacenamiento local");
+                _logger.LogError(ex, "Error al crear configuración de almacenamiento local");
                 return Json(new { success = false, message = $"Error: {ex.Message}" });
             }
         }
@@ -184,7 +184,7 @@ namespace BackupPro.Controllers.StorageTypes
             }
             catch (Exception ex)
             {
-                //_logger.LogError(ex, "Error al actualizar configuración de almacenamiento local");
+                _logger.LogError(ex, "Error al actualizar configuración de almacenamiento local");
                 return Json(new { success = false, message = $"Error: {ex.Message}" });
             }
         }
@@ -223,35 +223,6 @@ namespace BackupPro.Controllers.StorageTypes
             catch (Exception ex)
             {
                 return Json(new { success = false, message = $"Error: {ex.Message}" });
-            }
-        }
-
-        /// <summary>
-        /// Configura permisos de escritura completos en la carpeta
-        /// </summary>
-        private bool EnsureFolderWritePermissions(string folderPath)
-        {
-            try
-            {
-                var directoryInfo = new DirectoryInfo(folderPath);
-                var directorySecurity = directoryInfo.GetAccessControl();
-
-                // Agregar permisos de escritura completos para Everyone
-                var fileSystemRule = new FileSystemAccessRule(
-                    "Everyone",
-                    FileSystemRights.FullControl,
-                    InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
-                    PropagationFlags.None,
-                    AccessControlType.Allow);
-
-                directorySecurity.AddAccessRule(fileSystemRule);
-                directoryInfo.SetAccessControl(directorySecurity);
-
-                return true;
-            }
-            catch
-            {
-                return false;
             }
         }
 
@@ -321,9 +292,6 @@ namespace BackupPro.Controllers.StorageTypes
                     }
                 }
 
-                // Configurar permisos de escritura en la carpeta de destino
-                EnsureFolderWritePermissions(localStorage.FolderPath);
-
                 // Cambiar extensión a .zip
                 string zipFileName = Path.ChangeExtension(fileName, ".zip");
                 backupFilePath = Path.Combine(localStorage.FolderPath, zipFileName);
@@ -371,6 +339,7 @@ namespace BackupPro.Controllers.StorageTypes
             catch (Exception ex)
             {
                 // Error general
+                _logger.LogError(ex, "Error al guardar backup en almacenamiento local {LocalStorageId}", localStorageId);
                 var errorMessage = $"Error al guardar backup: {ex.Message}";
 
                 // Intentar eliminar archivo de backup incompleto si existe
