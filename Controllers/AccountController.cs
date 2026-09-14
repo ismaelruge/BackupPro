@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Net;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace BackupPro.Controllers
 {
@@ -74,6 +75,7 @@ namespace BackupPro.Controllers
         /// <returns>Redirige al panel principal si es exitoso, de lo contrario retorna la vista de Login con errores.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [EnableRateLimiting("login")]
         public async Task<IActionResult> Login(LoginViewModel model)
         {
             if (!ModelState.IsValid)
@@ -126,9 +128,14 @@ namespace BackupPro.Controllers
                 user = await _userManager.FindByNameAsync(model.Email);
             }
 
+            string errorMessage = "Usuario o contraseña incorrectos.";
+
             if (user != null)
             {
-                var result = await _signInManager.PasswordSignInAsync(user, model.Password, true, false);
+                // lockoutOnFailure: true para que los intentos fallidos cuenten para el bloqueo
+                // temporal configurado en Program.cs (Lockout.MaxFailedAccessAttempts); antes se
+                // pasaba false y la cuenta nunca se bloqueaba sin importar cuántos intentos fallaran.
+                var result = await _signInManager.PasswordSignInAsync(user, model.Password, true, true);
                 if (result.Succeeded)
                 {
                     // Si es el usuario por defecto y es el único existente, forzar configuración de admin
@@ -139,10 +146,15 @@ namespace BackupPro.Controllers
                     }
                     return RedirectToAction("Index", "Home");
                 }
+
+                if (result.IsLockedOut)
+                {
+                    errorMessage = "Cuenta bloqueada temporalmente por demasiados intentos fallidos. Intenta de nuevo en unos minutos.";
+                }
             }
 
-            // Mensaje genérico para evitar revelar si el usuario existe
-            ModelState.AddModelError(string.Empty, "Usuario o contraseña incorrectos.");
+            // Mensaje genérico (salvo bloqueo) para evitar revelar si el usuario existe
+            ModelState.AddModelError(string.Empty, errorMessage);
 
             // Si la petición viene del modal de login (mostrado en páginas distintas a
             // /Account/Login), redirigir de vuelta a esa página para que el modal muestre el error
@@ -153,7 +165,7 @@ namespace BackupPro.Controllers
             var referer = Request.Headers["Referer"].ToString();
             if (!string.IsNullOrEmpty(referer) && Url.IsLocalUrl(referer) && !referer.Contains("/Account"))
             {
-                TempData["LoginError"] = "Usuario o contraseña incorrectos.";
+                TempData["LoginError"] = errorMessage;
                 return Redirect(referer);
             }
 

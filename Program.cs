@@ -4,8 +4,11 @@ using BackupPro.Services;
 using BackupPro.Services.Backup;
 using BackupPro.Services.OAuth;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
+using System.Threading.RateLimiting;
 
 namespace BackupPro
 {
@@ -67,11 +70,23 @@ namespace BackupPro
             builder.Services.AddIdentity<IdentityUser, IdentityRole>(options =>
             {
                 options.SignIn.RequireConfirmedAccount = false;
-                options.Password.RequireDigit = false;
-                options.Password.RequireLowercase = false;
-                options.Password.RequireUppercase = false;
-                options.Password.RequireNonAlphanumeric = false;
-                options.Password.RequiredLength = 6;
+
+                // Política de contraseñas (antes: mínimo 6 caracteres, sin ningún otro requisito).
+                // Longitud mínima 12 (más determinante para resistir fuerza bruta que la
+                // complejidad, según las guías vigentes de NIST) combinada con exigir los cuatro
+                // tipos de carácter, para no depender de un solo criterio.
+                options.Password.RequiredLength = 12;
+                options.Password.RequireDigit = true;
+                options.Password.RequireLowercase = true;
+                options.Password.RequireUppercase = true;
+                options.Password.RequireNonAlphanumeric = true;
+                options.Password.RequiredUniqueChars = 4;
+
+                // Bloqueo tras intentos fallidos (además del rate limiting a nivel de endpoint en
+                // Login, que frena los intentos antes de que lleguen a Identity).
+                options.Lockout.MaxFailedAccessAttempts = 5;
+                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
+                options.Lockout.AllowedForNewUsers = true;
             })
             .AddEntityFrameworkStores<ApplicationDbContext>()
             .AddDefaultTokenProviders();
@@ -115,6 +130,43 @@ namespace BackupPro
             builder.Services.AddAntiforgery(options =>
             {
                 options.HeaderName = "RequestVerificationToken";
+            });
+
+            // Rate limiting para el login: máximo 5 intentos por minuto por IP. Frena la fuerza
+            // bruta antes de que los intentos siquiera lleguen a Identity (que además bloquea la
+            // cuenta tras 5 fallos consecutivos, ver Lockout arriba); las dos protecciones son
+            // independientes, esta por IP y esa por cuenta. Partición por IP (no un límite global
+            // único) para que un atacante no pueda bloquear el login de todos los demás.
+            builder.Services.AddRateLimiter(options =>
+            {
+                options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+                options.AddPolicy("login", httpContext =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                        factory: _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = 5,
+                            Window = TimeSpan.FromMinutes(1),
+                            QueueLimit = 0
+                        }));
+
+                options.OnRejected = (context, cancellationToken) =>
+                {
+                    context.HttpContext.Response.Headers.RetryAfter = "60";
+
+                    // Redirige con el mismo mecanismo que un login fallido normal (TempData +
+                    // redirect a /Account/Login), en vez de dejar la respuesta 429 en blanco.
+                    var tempData = context.HttpContext.RequestServices
+                        .GetRequiredService<ITempDataDictionaryFactory>()
+                        .GetTempData(context.HttpContext);
+                    tempData["LoginError"] = "Demasiados intentos de inicio de sesión. Espera un minuto e intenta de nuevo.";
+
+                    context.HttpContext.Response.StatusCode = StatusCodes.Status302Found;
+                    context.HttpContext.Response.Headers.Location = "/Account/Login";
+
+                    return ValueTask.CompletedTask;
+                };
             });
 
             // Agregar MVC y servicios
@@ -193,6 +245,8 @@ namespace BackupPro
             app.UseStaticFiles();
 
             app.UseRouting();
+
+            app.UseRateLimiter();
 
             app.UseSession(); // Habilitar sesiones
 

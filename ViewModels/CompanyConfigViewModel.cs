@@ -21,6 +21,7 @@ namespace BackupPro.ViewModels
         public string AdminUserName { get; set; } = string.Empty;
 
         /// <summary>Contraseña del administrador (opcional, solo para actualización).</summary>
+        [MinLength(12, ErrorMessage = "La contraseña debe tener al menos 12 caracteres, con mayúsculas, minúsculas, números y símbolos")]
         public string? AdminPassword { get; set; }
 
         /// <summary>Contraseña actual del administrador, requerida para poder cambiar <see cref="AdminPassword"/>.</summary>
