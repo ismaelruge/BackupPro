@@ -1,0 +1,618 @@
+@model IEnumerable<BackupPro.Models.S3Storage>
+@{
+    ViewData["Title"] = "Amazon S3";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-10">
+            <!-- Card principal -->
+            <div class="card shadow-lg border-0 rounded-4">
+                <!-- Header -->
+                <div class="card-header bg-primary text-white border-0 rounded-top-4 py-4">
+                    <div class="text-center">
+                        <i class="bi bi-cloud-arrow-up fs-1 mb-3"></i>
+                        <h3 class="fw-bold mb-2">Tipos de Almacenamiento</h3>
+                        <p class="mb-0 opacity-75">Configura múltiples destinos donde se guardarán tus backups</p>
+                    </div>
+                </div>
+
+                <!-- Cuerpo con pestañas -->
+                <div class="card-body p-4">
+                    <!-- Nav Tabs -->
+                    <ul class="nav nav-pills nav-fill mb-4" id="storageTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="google-tab" role="tab" asp-area="" asp-controller="GoogleDriveStorage" asp-action="Index">
+                                <i class="bi bi-google me-2"></i>Google Drive
+                            </a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="onedrive-tab" role="tab" asp-area="" asp-controller="OneDriveStorage" asp-action="Index">
+                                <i class="bi bi-microsoft me-2"></i>OneDrive
+                            </a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="blob-tab" role="tab" asp-area="" asp-controller="BlobStorage" asp-action="Index">
+                                <i class="bi bi-cloud me-2"></i>Azure Blob
+                            </a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="ftp-tab" role="tab" asp-area="" asp-controller="FtpStorage" asp-action="Index">
+                                <i class="bi bi-hdd-network me-2"></i>FTP
+                            </a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="local-tab" role="tab" asp-area="" asp-controller="LocalStorage" asp-action="Index">
+                                <i class="bi bi-folder me-2"></i>Local
+                            </a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link active" id="s3-tab" role="tab" asp-area="" asp-controller="S3Storage" asp-action="Index">
+                                <i class="bi bi-bucket me-2"></i>Amazon S3
+                            </a>
+                        </li>
+                    </ul>
+
+                    <!-- Tab Content -->
+                    <div class="tab-content" id="storageTabContent">
+
+                        <!-- Amazon S3 -->
+                        <div class="tab-pane fade show active" id="s3" role="tabpanel">
+                            <div class="text-center mb-4">
+                                <i class="bi bi-bucket text-primary" style="font-size: 3rem;"></i>
+                                <h4 class="mt-3">Amazon S3</h4>
+                                <p class="text-muted">Configura múltiples buckets de Amazon S3</p>
+                            </div>
+
+                            <!-- Lista de configuraciones -->
+                            <div class="mb-4">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h6 class="fw-semibold mb-0">
+                                        <i class="bi bi-gear-fill me-2 text-primary"></i>Configuraciones Activas
+                                    </h6>
+                                    <span class="badge bg-primary rounded-pill">@Model.Count() configuradas</span>
+                                </div>
+
+                                @if (!Model.Any())
+                                {
+                                    <div class="alert alert-info" role="alert">
+                                        <i class="bi bi-info-circle me-2"></i>
+                                        No hay configuraciones de Amazon S3 registradas. Haz clic en "Agregar Nuevo Bucket" para comenzar.
+                                    </div>
+                                }
+                                else
+                                {
+                                    @foreach (var config in Model)
+                                    {
+                                        <!-- Configuración -->
+                                        <div class="card mb-3 border-0 shadow-sm">
+                                            <div class="card-body">
+                                                <div class="d-flex justify-content-between align-items-start">
+                                                    <div class="flex-grow-1">
+                                                        <h6 class="mb-2 fw-semibold">
+                                                            <span class="text-primary">@config.ConfigurationName</span>
+                                                            <span class="text-muted fw-normal"> - @config.BucketName</span>
+                                                        </h6>
+                                                        <div class="ms-4">
+                                                            <div class="mb-1">
+                                                                <i class="bi bi-geo-alt me-2 text-muted"></i>
+                                                                <small class="text-muted">Región: @config.Region</small>
+                                                            </div>
+                                                            <div class="mb-1">
+                                                                <i class="bi bi-key me-2 text-muted"></i>
+                                                                <small class="text-muted">Access Key: @config.AccessKeyId</small>
+                                                            </div>
+                                                            <div class="mb-1">
+                                                                <i class="bi bi-folder me-2 text-muted"></i>
+                                                                <span class="text-muted">Prefijo:</span>
+                                                                <code class="ms-1">@(string.IsNullOrEmpty(config.Prefix) ? "/" : config.Prefix)</code>
+                                                            </div>
+                                                            <span class="badge bg-success mt-1">
+                                                                <i class="bi bi-check-circle me-1"></i>Activo
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <button class="btn btn-sm btn-outline-primary rounded-pill me-2"
+                                                                onclick="openEditModal(@config.Id)"
+                                                                aria-label="Editar configuración S3">
+                                                            <i class="bi bi-pencil"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-danger rounded-pill"
+                                                                onclick="openDeleteModal(@config.Id, '@config.ConfigurationName', '@config.BucketName', '@(string.IsNullOrEmpty(config.Prefix) ? "/" : config.Prefix)')"
+                                                                aria-label="Eliminar configuración S3">
+                                                            <i class="bi bi-trash"></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                }
+                            </div>
+
+                            <!-- Botón agregar nueva configuración -->
+                            <div class="d-grid">
+                                <button type="button" class="btn btn-outline-primary btn-lg rounded-pill" data-bs-toggle="modal" data-bs-target="#addS3Modal">
+                                    <i class="bi bi-plus-circle me-2"></i>Agregar Nuevo Bucket
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- Información adicional -->
+            <div class="alert alert-info rounded-4 mt-4 shadow-sm" role="alert">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-info-circle-fill fs-3 me-3"></i>
+                    <div>
+                        <h6 class="mb-1 fw-semibold">Múltiples destinos</h6>
+                        <p class="mb-0">Puedes configurar múltiples destinos del mismo tipo. Los backups se copiarán a todos los destinos configurados como activos.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Agregar Amazon S3 -->
+<div class="modal fade" id="addS3Modal" tabindex="-1" aria-labelledby="addS3ModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white border-0">
+                <h5 class="modal-title" id="addS3ModalLabel">
+                    <i class="bi bi-bucket me-2"></i>Agregar Amazon S3
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="addS3Form">
+                    <div class="mb-3">
+                        <label for="s3ConfigName" class="form-label fw-semibold">
+                            <i class="bi bi-tag me-2 text-primary"></i>Nombre de Configuración
+                        </label>
+                        <input type="text" class="form-control" id="s3ConfigName" placeholder="Ej: S3 Principal" required>
+                        <div class="form-text">Dale un nombre descriptivo a esta configuración</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="s3AccessKeyId" class="form-label fw-semibold">
+                            <i class="bi bi-person-circle me-2 text-primary"></i>Access Key Id
+                        </label>
+                        <input type="text" class="form-control" id="s3AccessKeyId" placeholder="AKIAIOSFODNN7EXAMPLE" required>
+                        <div class="form-text">Access Key Id de la credencial de AWS</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="s3SecretAccessKey" class="form-label fw-semibold">
+                            <i class="bi bi-key me-2 text-primary"></i>Secret Access Key
+                        </label>
+                        <input type="password" class="form-control" id="s3SecretAccessKey" placeholder="••••••••••••••••••••" required>
+                        <div class="form-text">Secret Access Key de la credencial de AWS</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="s3BucketName" class="form-label fw-semibold">
+                            <i class="bi bi-box me-2 text-primary"></i>Nombre del Bucket
+                        </label>
+                        <input type="text" class="form-control" id="s3BucketName" placeholder="mi-bucket-backups" required>
+                        <div class="form-text">Nombre del bucket en Amazon S3</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="s3Region" class="form-label fw-semibold">
+                            <i class="bi bi-geo-alt me-2 text-primary"></i>Región
+                        </label>
+                        <input type="text" class="form-control" id="s3Region" placeholder="us-east-1" required>
+                        <div class="form-text">Región de AWS donde vive el bucket</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="s3Prefix" class="form-label fw-semibold">
+                            <i class="bi bi-folder me-2 text-primary"></i>Prefijo
+                        </label>
+                        <input type="text" class="form-control" id="s3Prefix" placeholder="folder/subfolder">
+                        <div class="form-text">Prefijo/"carpeta" dentro del bucket (opcional)</div>
+                    </div>
+                    <div class="alert alert-warning rounded-3 mb-0" role="alert">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <small><strong>Nota:</strong> Asegúrate de que la credencial de AWS tenga permisos sobre el bucket.</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0 bg-light">
+                <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>Cancelar
+                </button>
+                <button type="submit" form="addS3Form" class="btn btn-primary rounded-pill">
+                    <i class="bi bi-bucket me-2"></i>Conectar Amazon S3
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Editar Amazon S3 -->
+<div class="modal fade" id="editS3Modal" tabindex="-1" aria-labelledby="editS3ModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-warning text-dark border-0">
+                <h5 class="modal-title" id="editS3ModalLabel">
+                    <i class="bi bi-pencil-square me-2"></i>Editar Amazon S3
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="editS3Form">
+                    <input type="hidden" id="editS3Id">
+                    <div class="mb-3">
+                        <label for="editS3ConfigName" class="form-label fw-semibold">
+                            <i class="bi bi-tag me-2 text-warning"></i>Nombre de Configuración
+                        </label>
+                        <input type="text" class="form-control" id="editS3ConfigName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editS3AccessKeyId" class="form-label fw-semibold">
+                            <i class="bi bi-person-circle me-2 text-warning"></i>Access Key Id
+                        </label>
+                        <input type="text" class="form-control" id="editS3AccessKeyId" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editS3SecretAccessKey" class="form-label fw-semibold">
+                            <i class="bi bi-key me-2 text-warning"></i>Secret Access Key
+                        </label>
+                        <input type="password" class="form-control" id="editS3SecretAccessKey" placeholder="Dejar vacío para mantener el actual">
+                        <div class="form-text">Dejar vacío para mantener el Secret Access Key actual</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editS3BucketName" class="form-label fw-semibold">
+                            <i class="bi bi-box me-2 text-warning"></i>Nombre del Bucket
+                        </label>
+                        <input type="text" class="form-control" id="editS3BucketName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editS3Region" class="form-label fw-semibold">
+                            <i class="bi bi-geo-alt me-2 text-warning"></i>Región
+                        </label>
+                        <input type="text" class="form-control" id="editS3Region" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editS3Prefix" class="form-label fw-semibold">
+                            <i class="bi bi-folder me-2 text-warning"></i>Prefijo
+                        </label>
+                        <input type="text" class="form-control" id="editS3Prefix">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0 bg-light">
+                <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>Cancelar
+                </button>
+                <button type="submit" form="editS3Form" class="btn btn-warning rounded-pill">
+                    <i class="bi bi-save me-2"></i>Guardar Cambios
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Eliminar Amazon S3 -->
+<div class="modal fade" id="deleteS3Modal" tabindex="-1" aria-labelledby="deleteS3ModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-danger text-white border-0">
+                <h5 class="modal-title" id="deleteS3ModalLabel">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Confirmar Eliminación
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="text-center mb-4">
+                    <div class="bg-danger bg-opacity-10 rounded-circle p-3 d-inline-flex mb-3">
+                        <i class="bi bi-trash text-danger" style="font-size: 3rem;"></i>
+                    </div>
+                    <h5 class="fw-semibold">¿Estás seguro de eliminar esta configuración?</h5>
+                </div>
+                <div class="bg-light rounded-3 p-3 mb-3">
+                    <div class="mb-2">
+                        <strong class="text-primary" id="deleteS3ConfigName"></strong>
+                        <span class="text-muted"> - <span id="deleteS3Bucket"></span></span>
+                    </div>
+                    <div class="text-muted">
+                        <small>
+                            <i class="bi bi-folder me-2"></i>
+                            Prefijo: <code id="deleteS3Prefix"></code>
+                        </small>
+                    </div>
+                </div>
+                <div class="alert alert-danger rounded-3 mb-0" role="alert">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>Advertencia:</strong> Esta acción no se puede deshacer. Los backups existentes en Amazon S3 no serán eliminados, solo se removerá la configuración de este sistema.
+                </div>
+            </div>
+            <div class="modal-footer border-0 bg-light">
+                <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-danger rounded-pill" id="btnConfirmDeleteS3">
+                    <i class="bi bi-trash me-2"></i>Sí, Eliminar Configuración
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .nav-pills .nav-link {
+        border-radius: 50rem;
+        padding: 0.75rem 1.5rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+        .nav-pills .nav-link:hover {
+            background-color: rgba(13, 110, 253, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .nav-pills .nav-link.active {
+            background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+            box-shadow: 0 4px 6px rgba(13, 110, 253, 0.3);
+        }
+
+    .tab-pane {
+        animation: fadeIn 0.3s ease-in;
+    }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .rounded-circle {
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+</style>
+
+<!-- Contenedor de toasts -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 2000;">
+    <div id="successToast" class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="bi bi-check-circle me-2"></i>
+                <span id="successToastMessage"></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+    <div id="errorToast" class="toast align-items-center text-white bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <span id="errorToastMessage"></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+    <div id="warningToast" class="toast align-items-center text-white bg-warning border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="bi bi-info-circle me-2"></i>
+                <span id="warningToastMessage"></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Función helper para mostrar toasts
+    function showToast(type, message) {
+        const toastElement = document.getElementById(type + 'Toast');
+        const messageElement = document.getElementById(type + 'ToastMessage');
+        messageElement.textContent = message;
+
+        const toast = new bootstrap.Toast(toastElement, {
+            autohide: true,
+            delay: 3000
+        });
+        toast.show();
+    }
+
+    // ========== CRUD OPERATIONS ==========
+
+    // Variables globales para eliminar
+    let deleteS3Id = null;
+
+    // Agregar nueva configuración de S3
+    document.getElementById('addS3Form')?.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const configName = document.getElementById('s3ConfigName').value.trim();
+        const accessKeyId = document.getElementById('s3AccessKeyId').value.trim();
+        const secretAccessKey = document.getElementById('s3SecretAccessKey').value.trim();
+        const bucketName = document.getElementById('s3BucketName').value.trim();
+        const region = document.getElementById('s3Region').value.trim();
+        const prefix = document.getElementById('s3Prefix').value.trim();
+
+        if (!configName || !accessKeyId || !secretAccessKey || !bucketName || !region) {
+            showToast('warning', 'Por favor, completa todos los campos requeridos.');
+            return;
+        }
+
+        try {
+            const response = await fetch('/S3Storage/Create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
+                },
+                body: JSON.stringify({
+                    ConfigurationName: configName,
+                    AccessKeyId: accessKeyId,
+                    SecretAccessKey: secretAccessKey,
+                    BucketName: bucketName,
+                    Region: region,
+                    Prefix: prefix
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showToast('success', data.message || 'Configuración creada exitosamente.');
+
+                // Cerrar modal
+                const addModal = bootstrap.Modal.getInstance(document.getElementById('addS3Modal'));
+                addModal.hide();
+
+                // Limpiar formulario
+                document.getElementById('addS3Form').reset();
+
+                // Recargar página para mostrar la nueva configuración
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast('error', data.message || 'Error al crear la configuración.');
+            }
+        } catch (error) {
+            showToast('error', 'Error de conexión: ' + error.message);
+        }
+    });
+
+    // Abrir modal de edición
+    async function openEditModal(id) {
+        try {
+            const response = await fetch(`/S3Storage/GetById?id=${id}`);
+            const data = await response.json();
+
+            if (data.success) {
+                const config = data.data;
+
+                // Cargar datos en el formulario
+                document.getElementById('editS3Id').value = config.id;
+                document.getElementById('editS3ConfigName').value = config.configurationName;
+                document.getElementById('editS3AccessKeyId').value = config.accessKeyId;
+                document.getElementById('editS3SecretAccessKey').value = ''; // Dejar vacío por seguridad
+                document.getElementById('editS3BucketName').value = config.bucketName;
+                document.getElementById('editS3Region').value = config.region;
+                document.getElementById('editS3Prefix').value = config.prefix || '';
+
+                // Abrir modal
+                const editModal = new bootstrap.Modal(document.getElementById('editS3Modal'));
+                editModal.show();
+            } else {
+                showToast('error', 'Error al cargar la configuración.');
+            }
+        } catch (error) {
+            showToast('error', 'Error de conexión: ' + error.message);
+        }
+    }
+
+    // Actualizar configuración de S3
+    document.getElementById('editS3Form')?.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const id = document.getElementById('editS3Id').value;
+        const configName = document.getElementById('editS3ConfigName').value.trim();
+        const accessKeyId = document.getElementById('editS3AccessKeyId').value.trim();
+        const secretAccessKey = document.getElementById('editS3SecretAccessKey').value.trim();
+        const bucketName = document.getElementById('editS3BucketName').value.trim();
+        const region = document.getElementById('editS3Region').value.trim();
+        const prefix = document.getElementById('editS3Prefix').value.trim();
+
+        if (!configName || !accessKeyId || !bucketName || !region) {
+            showToast('warning', 'Por favor, completa todos los campos requeridos.');
+            return;
+        }
+
+        try {
+            const response = await fetch('/S3Storage/Edit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
+                },
+                body: JSON.stringify({
+                    Id: parseInt(id),
+                    ConfigurationName: configName,
+                    AccessKeyId: accessKeyId,
+                    SecretAccessKey: secretAccessKey,
+                    BucketName: bucketName,
+                    Region: region,
+                    Prefix: prefix
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showToast('success', data.message || 'Configuración actualizada exitosamente.');
+
+                // Cerrar modal
+                const editModal = bootstrap.Modal.getInstance(document.getElementById('editS3Modal'));
+                editModal.hide();
+
+                // Recargar página
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast('error', data.message || 'Error al actualizar la configuración.');
+            }
+        } catch (error) {
+            showToast('error', 'Error de conexión: ' + error.message);
+        }
+    });
+
+    // Abrir modal de eliminación
+    function openDeleteModal(id, name, bucket, prefix) {
+        deleteS3Id = id;
+        document.getElementById('deleteS3ConfigName').textContent = name;
+        document.getElementById('deleteS3Bucket').textContent = bucket;
+        document.getElementById('deleteS3Prefix').textContent = prefix;
+
+        const deleteModal = new bootstrap.Modal(document.getElementById('deleteS3Modal'));
+        deleteModal.show();
+    }
+
+    // Confirmar eliminación
+    document.getElementById('btnConfirmDeleteS3')?.addEventListener('click', async function() {
+        if (!deleteS3Id) {
+            showToast('error', 'ID de configuración no válido.');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/S3Storage/Delete?id=${deleteS3Id}`, {
+                method: 'POST',
+                headers: {
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showToast('success', data.message || 'Configuración eliminada exitosamente.');
+
+                // Cerrar modal
+                const deleteModal = bootstrap.Modal.getInstance(document.getElementById('deleteS3Modal'));
+                deleteModal.hide();
+
+                // Recargar página
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast('error', data.message || 'Error al eliminar la configuración.');
+            }
+        } catch (error) {
+            showToast('error', 'Error de conexión: ' + error.message);
+        }
+    });
+
+</script>

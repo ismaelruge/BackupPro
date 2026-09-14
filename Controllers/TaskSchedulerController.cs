@@ -147,6 +147,13 @@ namespace BackupPro.Controllers
                     names[("Local", s.Id)] = s.ConfigurationName;
             }
 
+            var s3Ids = IdsFor(tasks, "S3", task => task.StorageType, task => task.StorageId);
+            if (s3Ids.Count > 0)
+            {
+                await foreach (var s in _context.S3Storages.Where(s => s3Ids.Contains(s.Id)).AsAsyncEnumerable())
+                    names[("S3", s.Id)] = s.ConfigurationName;
+            }
+
             return names;
         }
 
@@ -220,6 +227,9 @@ namespace BackupPro.Controllers
                         .Select(s => new { id = s.Id, name = s.ConfigurationName })
                         .ToListAsync(),
                     "Local" => await _context.LocalStorages
+                        .Select(s => new { id = s.Id, name = s.ConfigurationName })
+                        .ToListAsync(),
+                    "S3" => await _context.S3Storages
                         .Select(s => new { id = s.Id, name = s.ConfigurationName })
                         .ToListAsync(),
                     _ => new List<object>()
@@ -311,6 +321,7 @@ namespace BackupPro.Controllers
                     "AzureBlob" => await _context.AzureBlobStorages.AnyAsync(s => s.Id == model.StorageId),
                     "Ftp" => await _context.FtpStorages.AnyAsync(s => s.Id == model.StorageId),
                     "Local" => await _context.LocalStorages.AnyAsync(s => s.Id == model.StorageId),
+                    "S3" => await _context.S3Storages.AnyAsync(s => s.Id == model.StorageId),
                     _ => false
                 };
 
@@ -472,6 +483,7 @@ namespace BackupPro.Controllers
                     "AzureBlob" => await _context.AzureBlobStorages.AnyAsync(s => s.Id == model.StorageId),
                     "Ftp" => await _context.FtpStorages.AnyAsync(s => s.Id == model.StorageId),
                     "Local" => await _context.LocalStorages.AnyAsync(s => s.Id == model.StorageId),
+                    "S3" => await _context.S3Storages.AnyAsync(s => s.Id == model.StorageId),
                     _ => false
                 };
 

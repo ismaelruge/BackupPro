@@ -207,6 +207,7 @@ namespace BackupPro
             builder.Services.AddScoped<IStorageProvider, BlobStorageProvider>();
             builder.Services.AddScoped<IStorageProvider, GoogleDriveStorageProvider>();
             builder.Services.AddScoped<IStorageProvider, OneDriveStorageProvider>();
+            builder.Services.AddScoped<IStorageProvider, S3StorageProvider>();
 
             builder.Services.AddScoped<BackupProviderRegistry>();
             builder.Services.AddScoped<BackupExecutionService>();

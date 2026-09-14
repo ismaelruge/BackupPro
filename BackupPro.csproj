@@ -30,6 +30,7 @@
 
 
   <ItemGroup>
+    <PackageReference Include="AWSSDK.S3" Version="4.0.103.2" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.26.0" />
     <PackageReference Include="FluentFTP" Version="53.0.2" />
     <PackageReference Include="Google.Apis.Auth" Version="1.70.0" />
