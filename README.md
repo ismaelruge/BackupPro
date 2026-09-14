@@ -6,8 +6,9 @@ distintos destinos de almacenamiento.
 - **Bases de datos soportadas:** SQL Server, MySQL, PostgreSQL, MongoDB.
 - **Destinos de almacenamiento soportados:** disco local, FTP, Azure Blob Storage, Google Drive,
   OneDrive.
-- **Programación de tareas:** ejecución manual o programada (por minutos/horas/días) desde la
-  interfaz web, con historial de resultados.
+- **Programación de tareas:** ejecución manual desde la interfaz web, o automática (por
+  minutos/horas/días) mediante un servicio en segundo plano que revisa las tareas vencidas cada
+  minuto — no requiere que alguien entre a la app para que corran. Historial de resultados incluido.
 
 ## Requisitos
 
@@ -57,7 +58,7 @@ secciones anidadas, siguiendo la convención estándar de configuración de ASP.
 | `Smtp__Host`, `Smtp__Port`, `Smtp__EnableSSL`, `Smtp__Email`, `Smtp__Password` | Credenciales SMTP para el envío de notificaciones y recuperación de contraseña. |
 | `GoogleOAuth__ClientId`, `GoogleOAuth__ClientSecret` | Credenciales de la app OAuth de Google (para conectar Google Drive como destino). |
 | `OneDrive__ClientId`, `OneDrive__ClientSecret` | Credenciales de la app OAuth de Microsoft/Azure AD (para conectar OneDrive como destino). |
-| `Kestrel__HttpsPort` | Puerto HTTPS opcional (ver [HTTPS](#https-y-despliegue)). |
+| `Kestrel__HttpsPort` | Puerto HTTPS opcional (ver [Notas de seguridad](#notas-de-seguridad)). |
 
 ## Cifrado de credenciales
 
@@ -95,20 +96,58 @@ credenciales cifradas quedan irrecuperables y habrá que volver a introducirlas.
 
 ## Arquitectura
 
-- `Controllers/DataBasesTypes/*`: CRUD + prueba de conexión + generación de backup para cada motor
-  de base de datos soportado.
-- `Controllers/StorageTypes/*`: CRUD + subida de backups para cada destino de almacenamiento.
-- `Controllers/TaskSchedulerController.cs`: programación y ejecución de tareas; despacha el backup
-  correspondiente mediante un diccionario `(tipo de BD, tipo de almacenamiento) -> función`, en vez
-  de una cadena larga de `if/else`.
-- `Services/CredentialProtector.cs`: cifrado/descifrado de credenciales (ver arriba).
-- `Services/EmailService.cs`: envío de notificaciones por correo.
+El proyecto es un único proyecto ASP.NET Core MVC (no está separado en varias capas físicas/DLLs),
+organizado en capas lógicas por carpeta:
 
-Los controladores de BD y de storage comparten un mismo patrón CRUD (crear/editar/eliminar/obtener
-+ operación de backup), duplicado entre los 4 tipos de BD y los 5 tipos de storage. Consolidarlo
-detrás de interfaces (`IDatabaseBackupProvider`, `IStorageProvider`) es la siguiente mejora de
-arquitectura pendiente, pero no se abordó en esta pasada por el alcance que implica tocar los 9
-controladores y sus vistas a la vez.
+- **Presentación** — `Controllers/` + `Views/` + `ViewModels/` + `wwwroot/`.
+  - `Controllers/DataBasesTypes/*` y `Controllers/StorageTypes/*`: CRUD (crear/editar/eliminar/listar)
+    de cada configuración de base de datos y de almacenamiento.
+  - `Controllers/TaskSchedulerController.cs`: CRUD de tareas programadas y disparo de ejecución
+    manual ("Ejecutar"/"Ejecutar todas"); delega la ejecución real en `BackupExecutionService`.
+- **Dominio** — `Models/` (entidades que EF Core mapea a tablas).
+- **Persistencia** — `Data/ApplicationDbContext.cs` + `Migrations/` (EF Core + SQLite).
+- **Servicios / lógica de negocio** — `Services/`:
+  - `Services/Backup/IDatabaseBackupProvider.cs` / `IStorageProvider.cs`: una implementación por
+    motor de base de datos (`SqlServerBackupProvider`, `MySqlBackupProvider`,
+    `PostgresBackupProvider`, `MongoDbBackupProvider`) y por destino de almacenamiento
+    (`LocalStorageProvider`, `FtpStorageProvider`, `BlobStorageProvider`,
+    `GoogleDriveStorageProvider`, `OneDriveStorageProvider`). Agregar un motor o destino nuevo es
+    escribir la clase correspondiente e inscribirla en `Program.cs`; no requiere tocar el resto de
+    la aplicación.
+  - `BackupProviderRegistry`: resuelve el provider correspondiente al tipo de una tarea.
+  - `BackupExecutionService`: orquesta generar el backup y subirlo, usado tanto por el botón
+    "Ejecutar" manual como por el servicio de ejecución automática.
+  - `BackupSchedulerBackgroundService`: `BackgroundService` que revisa cada minuto las tareas
+    activas vencidas (`NextRunAt <= ahora`) y las ejecuta automáticamente con
+    `BackupExecutionService`, sin intervención manual.
+  - `BackupFrequencyCalculator`: calcula la próxima fecha de ejecución según la frecuencia de la
+    tarea (minutos/horas/días); compartido entre `TaskSchedulerController` y
+    `BackupSchedulerBackgroundService`.
+  - `ExecutableLocator` / `StorageProviderBase`: utilidades compartidas (buscar `mysqldump`/
+    `pg_dump`/`mongodump` en el PATH, registrar el histórico de resultados, formatear tamaños).
+  - `Services/OAuth/GoogleDriveTokenService.cs` / `OneDriveTokenService.cs`: refresco y validación
+    de tokens OAuth, compartido entre los controladores (explorar carpetas) y los storage providers
+    (subir un backup).
+  - `CredentialProtector.cs`: cifrado/descifrado de credenciales (ver [arriba](#cifrado-de-credenciales)).
+  - `EmailService.cs`: envío de notificaciones por correo.
+- **Composición** — `Program.cs` (registro de servicios en el contenedor de DI, pipeline HTTP).
+
+Un matiz honesto: no es una arquitectura N-Tier estricta. Los 9 controladores de
+`DataBasesTypes/`+`StorageTypes/` siguen accediendo a `ApplicationDbContext` directamente para su
+propio CRUD, en vez de pasar por una capa de servicio — el refactor a providers se enfocó en la
+lógica de *ejecutar* un backup (que sí estaba duplicada 20 veces), no en el CRUD de cada
+configuración.
+
+## Pruebas
+
+```bash
+dotnet test
+```
+
+`BackupPro.Tests/` (xUnit + Moq + EF Core InMemory) cubre la lógica de negocio en `Services/`:
+`BackupFrequencyCalculator`, `BackupProviderRegistry`, `BackupExecutionService` (casos de éxito y de
+error, con providers simulados) y `CredentialProtector` (cifrado/descifrado, valores legados sin
+cifrar). No hay pruebas de controladores ni de vistas todavía.
 
 ## Licencia
 
