@@ -91,6 +91,13 @@ namespace BackupPro.Controllers
                     names[("MongoDB", d.Id)] = d.ConfigurationName;
             }
 
+            var sqliteIds = IdsFor(tasks, "SQLite");
+            if (sqliteIds.Count > 0)
+            {
+                await foreach (var d in _context.SqliteDataBases.Where(d => sqliteIds.Contains(d.Id)).AsAsyncEnumerable())
+                    names[("SQLite", d.Id)] = d.ConfigurationName;
+            }
+
             return names;
         }
 
@@ -164,6 +171,9 @@ namespace BackupPro.Controllers
                         .Select(d => new { id = d.Id, name = d.ConfigurationName })
                         .ToListAsync(),
                     "MongoDB" => await _context.MongoDBDataBases
+                        .Select(d => new { id = d.Id, name = d.ConfigurationName })
+                        .ToListAsync(),
+                    "SQLite" => await _context.SqliteDataBases
                         .Select(d => new { id = d.Id, name = d.ConfigurationName })
                         .ToListAsync(),
                     _ => new List<object>()
@@ -265,6 +275,7 @@ namespace BackupPro.Controllers
                     "PostgreSQL" => await _context.PostgresSqlDataBases.AnyAsync(d => d.Id == model.DatabaseId),
                     "MySQL" => await _context.MySqlDataBases.AnyAsync(d => d.Id == model.DatabaseId),
                     "MongoDB" => await _context.MongoDBDataBases.AnyAsync(d => d.Id == model.DatabaseId),
+                    "SQLite" => await _context.SqliteDataBases.AnyAsync(d => d.Id == model.DatabaseId),
                     _ => false
                 };
 
@@ -424,6 +435,7 @@ namespace BackupPro.Controllers
                     "PostgreSQL" => await _context.PostgresSqlDataBases.AnyAsync(d => d.Id == model.DatabaseId),
                     "MySQL" => await _context.MySqlDataBases.AnyAsync(d => d.Id == model.DatabaseId),
                     "MongoDB" => await _context.MongoDBDataBases.AnyAsync(d => d.Id == model.DatabaseId),
+                    "SQLite" => await _context.SqliteDataBases.AnyAsync(d => d.Id == model.DatabaseId),
                     _ => false
                 };
 
