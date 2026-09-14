@@ -98,6 +98,13 @@ namespace BackupPro.Controllers
                     names[("SQLite", d.Id)] = d.ConfigurationName;
             }
 
+            var mariaDbIds = IdsFor(tasks, "MariaDB");
+            if (mariaDbIds.Count > 0)
+            {
+                await foreach (var d in _context.MariaDbDataBases.Where(d => mariaDbIds.Contains(d.Id)).AsAsyncEnumerable())
+                    names[("MariaDB", d.Id)] = d.ConfigurationName;
+            }
+
             return names;
         }
 
@@ -174,6 +181,9 @@ namespace BackupPro.Controllers
                         .Select(d => new { id = d.Id, name = d.ConfigurationName })
                         .ToListAsync(),
                     "SQLite" => await _context.SqliteDataBases
+                        .Select(d => new { id = d.Id, name = d.ConfigurationName })
+                        .ToListAsync(),
+                    "MariaDB" => await _context.MariaDbDataBases
                         .Select(d => new { id = d.Id, name = d.ConfigurationName })
                         .ToListAsync(),
                     _ => new List<object>()
@@ -276,6 +286,7 @@ namespace BackupPro.Controllers
                     "MySQL" => await _context.MySqlDataBases.AnyAsync(d => d.Id == model.DatabaseId),
                     "MongoDB" => await _context.MongoDBDataBases.AnyAsync(d => d.Id == model.DatabaseId),
                     "SQLite" => await _context.SqliteDataBases.AnyAsync(d => d.Id == model.DatabaseId),
+                    "MariaDB" => await _context.MariaDbDataBases.AnyAsync(d => d.Id == model.DatabaseId),
                     _ => false
                 };
 
@@ -436,6 +447,7 @@ namespace BackupPro.Controllers
                     "MySQL" => await _context.MySqlDataBases.AnyAsync(d => d.Id == model.DatabaseId),
                     "MongoDB" => await _context.MongoDBDataBases.AnyAsync(d => d.Id == model.DatabaseId),
                     "SQLite" => await _context.SqliteDataBases.AnyAsync(d => d.Id == model.DatabaseId),
+                    "MariaDB" => await _context.MariaDbDataBases.AnyAsync(d => d.Id == model.DatabaseId),
                     _ => false
                 };
 
