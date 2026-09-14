@@ -83,23 +83,12 @@ namespace BackupPro.Services
                 finally
                 {
                     task.LastRunAt = now;
-                    task.NextRunAt = CalculateNextRun(task.FrequencyType, task.FrequencyValue, now);
+                    task.NextRunAt = BackupFrequencyCalculator.CalculateNextRun(task.FrequencyType, task.FrequencyValue, now);
                     task.LastModifiedAt = now;
                 }
             }
 
             await context.SaveChangesAsync(stoppingToken);
-        }
-
-        private static DateTime CalculateNextRun(string frequencyType, int frequencyValue, DateTime lastRun)
-        {
-            return frequencyType.ToLower() switch
-            {
-                "minutes" => lastRun.AddMinutes(frequencyValue),
-                "hours" => lastRun.AddHours(frequencyValue),
-                "days" => lastRun.AddDays(frequencyValue),
-                _ => lastRun.AddHours(1)
-            };
         }
     }
 }

@@ -13,7 +13,16 @@
     <None Remove="nul" />
   </ItemGroup>
 
-  
+  <ItemGroup>
+    <!-- BackupPro.Tests vive en una subcarpeta de este proyecto; sin esto, el glob por defecto
+         del SDK compilaría sus archivos también dentro de BackupPro.csproj. -->
+    <Compile Remove="BackupPro.Tests/**/*.cs" />
+    <Content Remove="BackupPro.Tests/**/*" />
+    <EmbeddedResource Remove="BackupPro.Tests/**/*" />
+    <None Remove="BackupPro.Tests/**/*" />
+  </ItemGroup>
+
+
 
   <ItemGroup>
     <PackageReference Include="Azure.Storage.Blobs" Version="12.26.0" />

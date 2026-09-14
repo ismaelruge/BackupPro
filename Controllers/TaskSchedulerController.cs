@@ -142,24 +142,6 @@ namespace BackupPro.Controllers
         private static HashSet<int> IdsFor(List<Models.TaskScheduler> tasks, string type, Func<Models.TaskScheduler, string> typeSelector, Func<Models.TaskScheduler, int> idSelector) =>
             tasks.Where(t => typeSelector(t) == type).Select(idSelector).ToHashSet();
 
-        // ========== HELPER METHODS ==========
-
-        /// <summary>
-        /// Calcula la próxima fecha de ejecución basada en la frecuencia
-        /// </summary>
-        private DateTime CalculateNextRun(string frequencyType, int frequencyValue, DateTime? lastRun = null)
-        {
-            var baseTime = lastRun ?? DateTime.Now;
-
-            return frequencyType.ToLower() switch
-            {
-                "minutes" => baseTime.AddMinutes(frequencyValue),
-                "hours" => baseTime.AddHours(frequencyValue),
-                "days" => baseTime.AddDays(frequencyValue),
-                _ => baseTime.AddHours(1) // Default: 1 hour
-            };
-        }
-
         // ========== AJAX ENDPOINTS ==========
 
         /// <summary>
@@ -333,7 +315,7 @@ namespace BackupPro.Controllers
                     FrequencyType = model.FrequencyType,
                     FrequencyValue = model.FrequencyValue,
                     IsActive = model.IsActive,
-                    NextRunAt = CalculateNextRun(model.FrequencyType, model.FrequencyValue),
+                    NextRunAt = BackupFrequencyCalculator.CalculateNextRun(model.FrequencyType, model.FrequencyValue, DateTime.Now),
                     CreatedAt = DateTime.Now,
                     CreatedBy = User.Identity?.Name
                 };
@@ -492,7 +474,7 @@ namespace BackupPro.Controllers
                 task.IsActive = model.IsActive;
 
                 // Recalcular NextRunAt si cambió la frecuencia
-                task.NextRunAt = CalculateNextRun(model.FrequencyType, model.FrequencyValue, task.LastRunAt);
+                task.NextRunAt = BackupFrequencyCalculator.CalculateNextRun(model.FrequencyType, model.FrequencyValue, task.LastRunAt ?? DateTime.Now);
                 task.LastModifiedAt = DateTime.Now;
 
                 _context.TaskSchedulers.Update(task);
@@ -643,9 +625,10 @@ namespace BackupPro.Controllers
                 string backupResult = await _backupExecutionService.ExecuteAsync(task);
 
                 // Actualizar fechas de la tarea
-                task.LastRunAt = DateTime.Now;
-                task.NextRunAt = CalculateNextRun(task.FrequencyType, task.FrequencyValue, task.LastRunAt);
-                task.LastModifiedAt = DateTime.Now;
+                var now = DateTime.Now;
+                task.LastRunAt = now;
+                task.NextRunAt = BackupFrequencyCalculator.CalculateNextRun(task.FrequencyType, task.FrequencyValue, now);
+                task.LastModifiedAt = now;
 
                 _context.TaskSchedulers.Update(task);
                 await _context.SaveChangesAsync();
@@ -687,9 +670,10 @@ namespace BackupPro.Controllers
                         string backupResult = await _backupExecutionService.ExecuteAsync(task);
 
                         // Actualizar fechas de la tarea
-                        task.LastRunAt = DateTime.Now;
-                        task.NextRunAt = CalculateNextRun(task.FrequencyType, task.FrequencyValue, task.LastRunAt);
-                        task.LastModifiedAt = DateTime.Now;
+                        var now = DateTime.Now;
+                        task.LastRunAt = now;
+                        task.NextRunAt = BackupFrequencyCalculator.CalculateNextRun(task.FrequencyType, task.FrequencyValue, now);
+                        task.LastModifiedAt = now;
 
                         successCount++;
                         results.Add($"{task.TaskName}: {backupResult}");
