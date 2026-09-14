@@ -71,7 +71,7 @@ namespace BackupPro.Tests.Services.Backup
             Assert.Equal("MiBaseDeDatos", history.DatabaseName);
             Assert.Equal("No se encontró sqlcmd", history.Message);
 
-            storageProvider.Verify(p => p.SaveBackupAsync(It.IsAny<int>(), It.IsAny<MemoryStream>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>()), Times.Never);
+            storageProvider.Verify(p => p.SaveBackupAsync(It.IsAny<int>(), It.IsAny<MemoryStream>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>()), Times.Never);
         }
 
         [Fact]
@@ -86,7 +86,7 @@ namespace BackupPro.Tests.Services.Backup
             var storageProvider = new Mock<IStorageProvider>();
             storageProvider.Setup(p => p.StorageType).Returns("Local");
             storageProvider
-                .Setup(p => p.SaveBackupAsync(It.IsAny<int>(), It.IsAny<MemoryStream>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>()))
+                .Setup(p => p.SaveBackupAsync(It.IsAny<int>(), It.IsAny<MemoryStream>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>()))
                 .ReturnsAsync((false, string.Empty, 0L, "Disco lleno"));
 
             var registry = new BackupProviderRegistry(
@@ -116,7 +116,7 @@ namespace BackupPro.Tests.Services.Backup
             var storageProvider = new Mock<IStorageProvider>();
             storageProvider.Setup(p => p.StorageType).Returns("Local");
             storageProvider
-                .Setup(p => p.SaveBackupAsync(It.IsAny<int>(), It.IsAny<MemoryStream>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>()))
+                .Setup(p => p.SaveBackupAsync(It.IsAny<int>(), It.IsAny<MemoryStream>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>()))
                 .ReturnsAsync((true, "/backups/backup.bak", 2048L, string.Empty));
 
             var registry = new BackupProviderRegistry(

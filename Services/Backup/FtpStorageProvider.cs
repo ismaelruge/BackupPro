@@ -20,7 +20,7 @@ namespace BackupPro.Services.Backup
             _logger = logger;
         }
 
-        public async Task<(bool success, string filePath, long fileSize, string errorMessage)> SaveBackupAsync(int storageId, MemoryStream backupStream, string fileName, string databaseName, int databaseId)
+        public async Task<(bool success, string filePath, long fileSize, string errorMessage)> SaveBackupAsync(int storageId, MemoryStream backupStream, string fileName, string databaseName, int databaseId, string databaseType)
         {
             var startTime = DateTime.Now;
             string remoteFilePath = string.Empty;
@@ -74,7 +74,7 @@ namespace BackupPro.Services.Backup
                     var duration = DateTime.Now - startTime;
                     await LogBackupSuccessAsync(databaseId, databaseName, startTime,
                         $"Backup guardado exitosamente en FTP. Tamaño: {FormatBytes(remoteFileSize)}. Duración: {duration.TotalSeconds:F2} segundos.",
-                        remoteFilePath, StorageType, storageId);
+                        remoteFilePath, StorageType, storageId, databaseType);
 
                     TryDeleteFile(localTempPath);
 
@@ -134,6 +134,42 @@ namespace BackupPro.Services.Backup
             {
                 _logger.LogError(ex, "Error al borrar backup en FTP {BackupPath} (storage {FtpStorageId})", backupPath, storageId);
                 return false;
+            }
+            finally
+            {
+                client?.Dispose();
+            }
+        }
+
+        public async Task<(bool success, MemoryStream? stream, string errorMessage)> DownloadBackupAsync(int storageId, string backupPath, string? storageFileId)
+        {
+            var ftpStorage = await Context.FtpStorages.FindAsync(storageId);
+            if (ftpStorage == null)
+            {
+                return (false, null, "Configuración de almacenamiento FTP no encontrada");
+            }
+
+            AsyncFtpClient? client = null;
+            try
+            {
+                string plainPassword = _credentialProtector.Unprotect(ftpStorage.Password) ?? string.Empty;
+                client = new AsyncFtpClient(ftpStorage.Host, ftpStorage.Username, plainPassword, ftpStorage.Port);
+                await client.Connect();
+
+                var stream = new MemoryStream();
+                bool ok = await client.DownloadStream(stream, backupPath);
+                if (!ok)
+                {
+                    return (false, null, "No se pudo descargar el archivo del FTP.");
+                }
+
+                stream.Position = 0;
+                return (true, stream, string.Empty);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al descargar backup de FTP {BackupPath} (storage {FtpStorageId})", backupPath, storageId);
+                return (false, null, $"Error al descargar de FTP: {ex.Message}");
             }
             finally
             {

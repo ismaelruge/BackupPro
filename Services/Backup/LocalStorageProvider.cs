@@ -16,7 +16,7 @@ namespace BackupPro.Services.Backup
             _logger = logger;
         }
 
-        public async Task<(bool success, string filePath, long fileSize, string errorMessage)> SaveBackupAsync(int storageId, MemoryStream backupStream, string fileName, string databaseName, int databaseId)
+        public async Task<(bool success, string filePath, long fileSize, string errorMessage)> SaveBackupAsync(int storageId, MemoryStream backupStream, string fileName, string databaseName, int databaseId, string databaseType)
         {
             var startTime = DateTime.Now;
             string backupFilePath = string.Empty;
@@ -72,7 +72,7 @@ namespace BackupPro.Services.Backup
 
                 await LogBackupSuccessAsync(databaseId, databaseName, startTime,
                     $"Backup guardado exitosamente. Tamaño: {FormatBytes(fileInfo.Length)}. Duración: {duration.TotalSeconds:F2} segundos.",
-                    backupFilePath, StorageType, storageId);
+                    backupFilePath, StorageType, storageId, databaseType);
 
                 return (true, backupFilePath, fileInfo.Length, string.Empty);
             }
@@ -110,6 +110,25 @@ namespace BackupPro.Services.Backup
             {
                 _logger.LogError(ex, "Error al borrar backup local {BackupPath}", backupPath);
                 return Task.FromResult(false);
+            }
+        }
+
+        public Task<(bool success, MemoryStream? stream, string errorMessage)> DownloadBackupAsync(int storageId, string backupPath, string? storageFileId)
+        {
+            try
+            {
+                if (!File.Exists(backupPath))
+                {
+                    return Task.FromResult<(bool, MemoryStream?, string)>((false, null, "El archivo de backup ya no existe en disco."));
+                }
+
+                var stream = new MemoryStream(File.ReadAllBytes(backupPath));
+                return Task.FromResult<(bool, MemoryStream?, string)>((true, stream, string.Empty));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al leer backup local {BackupPath}", backupPath);
+                return Task.FromResult<(bool, MemoryStream?, string)>((false, null, $"Error al leer el backup: {ex.Message}"));
             }
         }
     }

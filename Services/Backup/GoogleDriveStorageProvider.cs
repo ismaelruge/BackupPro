@@ -22,7 +22,7 @@ namespace BackupPro.Services.Backup
             _logger = logger;
         }
 
-        public async Task<(bool success, string filePath, long fileSize, string errorMessage)> SaveBackupAsync(int storageId, MemoryStream backupStream, string fileName, string databaseName, int databaseId)
+        public async Task<(bool success, string filePath, long fileSize, string errorMessage)> SaveBackupAsync(int storageId, MemoryStream backupStream, string fileName, string databaseName, int databaseId, string databaseType)
         {
             var startTime = DateTime.Now;
             string googleDrivePath = string.Empty;
@@ -116,7 +116,7 @@ namespace BackupPro.Services.Backup
                 var duration = DateTime.Now - startTime;
                 await LogBackupSuccessAsync(databaseId, databaseName, startTime,
                     $"Backup guardado exitosamente en Google Drive. Tamaño: {FormatBytes(fileSize)}. Duración: {duration.TotalSeconds:F2} segundos.",
-                    googleDrivePath, StorageType, storageId, uploadedFileId);
+                    googleDrivePath, StorageType, storageId, databaseType, uploadedFileId);
 
                 TryDeleteFile(localTempPath);
 
@@ -178,6 +178,41 @@ namespace BackupPro.Services.Backup
             {
                 _logger.LogError(ex, "Error al borrar backup en Google Drive {StorageFileId} (storage {GoogleDriveStorageId})", storageFileId, storageId);
                 return false;
+            }
+        }
+
+        public async Task<(bool success, MemoryStream? stream, string errorMessage)> DownloadBackupAsync(int storageId, string backupPath, string? storageFileId)
+        {
+            if (string.IsNullOrEmpty(storageFileId))
+            {
+                return (false, null, "Este backup no tiene un id de archivo de Google Drive registrado; no se puede descargar automáticamente.");
+            }
+
+            var googleDriveStorage = await Context.GoogleDriveStorages.FindAsync(storageId);
+            if (googleDriveStorage == null || !await _tokenService.EnsureValidTokenAsync(googleDriveStorage))
+            {
+                return (false, null, "No hay un token de acceso válido para Google Drive. Por favor, autentícate primero.");
+            }
+
+            try
+            {
+                string accessToken = _tokenService.GetPlainAccessToken(googleDriveStorage);
+                using var httpClient = new HttpClient();
+                httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
+
+                var response = await httpClient.GetAsync($"https://www.googleapis.com/drive/v3/files/{storageFileId}?alt=media");
+                if (!response.IsSuccessStatusCode)
+                {
+                    return (false, null, $"Error al descargar de Google Drive: {response.StatusCode}");
+                }
+
+                var bytes = await response.Content.ReadAsByteArrayAsync();
+                return (true, new MemoryStream(bytes), string.Empty);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al descargar backup de Google Drive {StorageFileId} (storage {GoogleDriveStorageId})", storageFileId, storageId);
+                return (false, null, $"Error al descargar de Google Drive: {ex.Message}");
             }
         }
     }

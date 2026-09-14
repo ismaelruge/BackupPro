@@ -11,8 +11,13 @@ namespace BackupPro.Services.Backup
         /// <summary>Identificador del tipo de almacenamiento (debe coincidir con TaskScheduler.StorageType).</summary>
         string StorageType { get; }
 
-        /// <summary>Sube <paramref name="backupStream"/> al destino de almacenamiento indicado.</summary>
-        Task<(bool success, string filePath, long fileSize, string errorMessage)> SaveBackupAsync(int storageId, MemoryStream backupStream, string fileName, string databaseName, int databaseId);
+        /// <summary>
+        /// Sube <paramref name="backupStream"/> al destino de almacenamiento indicado.
+        /// <paramref name="databaseType"/> (p.ej. "SqlServer") se guarda en el histórico junto con el
+        /// resto de metadatos del backup, para que <see cref="BackupRestoreService"/> sepa después
+        /// con qué motor restaurarlo.
+        /// </summary>
+        Task<(bool success, string filePath, long fileSize, string errorMessage)> SaveBackupAsync(int storageId, MemoryStream backupStream, string fileName, string databaseName, int databaseId, string databaseType);
 
         /// <summary>
         /// Borra un backup ya subido, identificado por <paramref name="backupPath"/> (y, en destinos
@@ -23,5 +28,12 @@ namespace BackupPro.Services.Backup
         /// registro en el histórico y reintente más adelante.
         /// </summary>
         Task<bool> DeleteBackupAsync(int storageId, string backupPath, string? storageFileId);
+
+        /// <summary>
+        /// Descarga un backup ya subido, identificado igual que en <see cref="DeleteBackupAsync"/>.
+        /// Usado por <see cref="BackupRestoreService"/> para traer de vuelta el .zip antes de
+        /// restaurarlo. El llamador es responsable de liberar el stream devuelto.
+        /// </summary>
+        Task<(bool success, MemoryStream? stream, string errorMessage)> DownloadBackupAsync(int storageId, string backupPath, string? storageFileId);
     }
 }

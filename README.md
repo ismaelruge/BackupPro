@@ -11,6 +11,7 @@ autoría (ver [Licencia](#licencia)).
   minutos/horas/días) mediante un servicio en segundo plano que revisa las tareas vencidas cada
   minuto — no requiere que alguien entre a la app para que corran. Historial de resultados incluido.
 - **Retención automática de backups ("3x6"):** ver [Retención de backups](#retención-de-backups).
+- **Restauración de backups:** ver [Restauración de backups](#restauración-de-backups).
 
 ## Requisitos
 
@@ -173,6 +174,44 @@ guardado el destino de almacenamiento exacto en su fila del histórico, así que
 retención los ignora por completo (no se borran automáticamente; hay que hacerlo a mano si se
 quiere). Solo los backups generados después de este cambio participan de la retención automática.
 
+## Restauración de backups
+
+Desde **Historial de Backups**, cualquier backup exitoso (generado después de este cambio, ver
+limitación más abajo) tiene un botón "Restaurar" que lleva a `/Restore/Confirm/{id}`. Es una
+operación **destructiva e irreversible**: reemplaza todos los datos actuales de esa base de datos
+por los del backup. Por eso exige, antes de ejecutarla:
+
+1. Escribir el nombre exacto de la base de datos que se va a sobrescribir (confirmación explícita,
+   más allá de solo apretar un botón).
+2. Volver a ingresar la contraseña actual del usuario.
+
+`BackupRestoreService` orquesta el proceso: descarga el .zip del destino de almacenamiento
+correspondiente (`IStorageProvider.DownloadBackupAsync`) y lo restaura sobre la base de datos con el
+motor correspondiente (`IDatabaseBackupProvider.RestoreBackupAsync`):
+
+- **SQL Server**: `RESTORE DATABASE ... WITH REPLACE` (pone la base en modo `SINGLE_USER` antes y la
+  regresa a `MULTI_USER` después, incluso si la restauración falla).
+- **MySQL**: el dump se alimenta por stdin al cliente `mysql` (igual que `mysql db < dump.sql`).
+- **PostgreSQL**: `psql -f dump.sql` (el backup se genera con `--format=plain`, compatible con psql).
+- **MongoDB**: `mongorestore --drop` sobre la carpeta que generó `mongodump` (el .zip que sube el
+  storage contiene, como única entrada, el .zip que ya arma `mongodump`+`ZipFile`, así que hace
+  falta descomprimir dos veces).
+
+Cada intento de restauración (exitoso o no) queda registrado en el **Historial de Restauraciones**
+(link desde Historial de Backups), que a diferencia del historial de backups nunca se borra
+automáticamente — es un registro de auditoría de quién restauró qué y cuándo.
+
+**Limitaciones conocidas:**
+- Igual que con la retención, los backups guardados antes de este cambio no tienen registrado el
+  motor de base de datos ni el destino de almacenamiento exactos, así que no se pueden restaurar
+  desde acá (el botón aparece deshabilitado).
+- Requiere que las herramientas de línea de comandos correspondientes (`mysql`, `psql`,
+  `mongorestore`) estén instaladas en el servidor, igual que sus equivalentes de backup.
+- No se probó contra motores de base de datos reales en este entorno de desarrollo (no había SQL
+  Server/MySQL/PostgreSQL/MongoDB disponibles); sí se probó de punta a punta el resto del flujo
+  (descarga, extracción del .zip, resolución de providers, confirmación con nombre/contraseña,
+  registro en auditoría).
+
 ## Pruebas
 
 ```bash
@@ -183,8 +222,11 @@ dotnet test
 `BackupFrequencyCalculator`, `BackupProviderRegistry`, `BackupExecutionService` (casos de éxito y de
 error, con providers simulados), `BackupRetentionService` (los distintos escenarios de la política
 "3x6": nada que borrar, mínimo no cubierto, borrado exitoso, fallo al borrar el archivo, backups sin
-destino registrado, series independientes), `CredentialProtector` (cifrado/descifrado, valores
-legados sin cifrar) y `SetupState` (detección del estado "recién instalado"). No hay pruebas de
+destino registrado, series independientes), `BackupRestoreService` (backup inexistente, con error,
+sin motor/destino registrado, fallo al descargar, éxito de punta a punta, combinación no soportada —
+todo con providers simulados, sin depender de un motor de base de datos real), `CredentialProtector`
+(cifrado/descifrado, valores legados sin cifrar) y `SetupState` (detección del estado "recién
+instalado"). No hay pruebas de
 controladores ni de vistas todavía.
 
 ## Autor

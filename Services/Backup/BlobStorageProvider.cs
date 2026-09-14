@@ -20,7 +20,7 @@ namespace BackupPro.Services.Backup
             _logger = logger;
         }
 
-        public async Task<(bool success, string filePath, long fileSize, string errorMessage)> SaveBackupAsync(int storageId, MemoryStream backupStream, string fileName, string databaseName, int databaseId)
+        public async Task<(bool success, string filePath, long fileSize, string errorMessage)> SaveBackupAsync(int storageId, MemoryStream backupStream, string fileName, string databaseName, int databaseId, string databaseType)
         {
             var startTime = DateTime.Now;
             string blobPath = string.Empty;
@@ -74,7 +74,7 @@ namespace BackupPro.Services.Backup
                 var duration = DateTime.Now - startTime;
                 await LogBackupSuccessAsync(databaseId, databaseName, startTime,
                     $"Backup guardado exitosamente en Azure Blob Storage. Tamaño: {FormatBytes(blobSize)}. Duración: {duration.TotalSeconds:F2} segundos.",
-                    blobPath, StorageType, storageId);
+                    blobPath, StorageType, storageId, databaseType);
 
                 TryDeleteFile(localTempPath);
 
@@ -125,6 +125,33 @@ namespace BackupPro.Services.Backup
             {
                 _logger.LogError(ex, "Error al borrar blob {BackupPath} (storage {BlobStorageId})", backupPath, storageId);
                 return false;
+            }
+        }
+
+        public async Task<(bool success, MemoryStream? stream, string errorMessage)> DownloadBackupAsync(int storageId, string backupPath, string? storageFileId)
+        {
+            var blobStorage = await Context.AzureBlobStorages.FindAsync(storageId);
+            if (blobStorage == null)
+            {
+                return (false, null, "Configuración de Azure Blob Storage no encontrada");
+            }
+
+            try
+            {
+                string plainConnectionString = _credentialProtector.Unprotect(blobStorage.ConnectionString) ?? string.Empty;
+                var blobServiceClient = new BlobServiceClient(plainConnectionString);
+                var containerClient = blobServiceClient.GetBlobContainerClient(blobStorage.ContainerName);
+                var blobClient = containerClient.GetBlobClient(backupPath);
+
+                var stream = new MemoryStream();
+                await blobClient.DownloadToAsync(stream);
+                stream.Position = 0;
+                return (true, stream, string.Empty);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al descargar blob {BackupPath} (storage {BlobStorageId})", backupPath, storageId);
+                return (false, null, $"Error al descargar de Azure Blob Storage: {ex.Message}");
             }
         }
     }

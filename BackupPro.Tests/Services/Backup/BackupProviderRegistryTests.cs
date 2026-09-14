@@ -13,6 +13,9 @@ namespace BackupPro.Tests.Services.Backup
 
             public Task<(bool success, MemoryStream? backupStream, string fileName, string databaseName, string errorMessage)> CreateBackupAsync(int databaseId) =>
                 throw new NotImplementedException();
+
+            public Task<(bool success, string message)> RestoreBackupAsync(int databaseId, MemoryStream backupZipStream) =>
+                throw new NotImplementedException();
         }
 
         private class FakeStorageProvider : IStorageProvider
@@ -22,10 +25,13 @@ namespace BackupPro.Tests.Services.Backup
             public FakeStorageProvider(string storageType) => StorageType = storageType;
 
             public Task<(bool success, string filePath, long fileSize, string errorMessage)> SaveBackupAsync(
-                int storageId, MemoryStream backupStream, string fileName, string databaseName, int databaseId) =>
+                int storageId, MemoryStream backupStream, string fileName, string databaseName, int databaseId, string databaseType) =>
                 throw new NotImplementedException();
 
             public Task<bool> DeleteBackupAsync(int storageId, string backupPath, string? storageFileId) =>
+                throw new NotImplementedException();
+
+            public Task<(bool success, MemoryStream? stream, string errorMessage)> DownloadBackupAsync(int storageId, string backupPath, string? storageFileId) =>
                 throw new NotImplementedException();
         }
 

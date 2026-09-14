@@ -19,6 +19,18 @@ namespace BackupPro.Services.Backup
             @"C:\wamp64\bin\mysql\mysql8.0.27\bin\mysqldump.exe"
         };
 
+        private static readonly string[] MySqlClientWindowsCommonPaths =
+        {
+            @"C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe",
+            @"C:\Program Files\MySQL\MySQL Server 8.4\bin\mysql.exe",
+            @"C:\Program Files\MySQL\MySQL Server 9.0\bin\mysql.exe",
+            @"C:\Program Files (x86)\MySQL\MySQL Server 8.0\bin\mysql.exe",
+            @"C:\Program Files (x86)\MySQL\MySQL Server 8.4\bin\mysql.exe",
+            @"C:\xampp\mysql\bin\mysql.exe",
+            @"C:\wamp\bin\mysql\mysql8.0.27\bin\mysql.exe",
+            @"C:\wamp64\bin\mysql\mysql8.0.27\bin\mysql.exe"
+        };
+
         private readonly ApplicationDbContext _context;
         private readonly CredentialProtector _credentialProtector;
         private readonly ILogger<MySqlBackupProvider> _logger;
@@ -173,6 +185,96 @@ namespace BackupPro.Services.Backup
                 }
             }
             catch { /* Ignorar errores al eliminar archivo temporal */ }
+        }
+
+        public async Task<(bool success, string message)> RestoreBackupAsync(int databaseId, MemoryStream backupZipStream)
+        {
+            string? credentialsFilePath = null;
+
+            try
+            {
+                var mysqlConfig = await _context.MySqlDataBases.FindAsync(databaseId);
+                if (mysqlConfig == null)
+                {
+                    return (false, "Configuración de MySQL no encontrada");
+                }
+
+                byte[] dumpBytes = BackupZipHelper.ExtractSingleEntry(backupZipStream);
+
+                string mysqlPath = ExecutableLocator.Find("mysql", MySqlClientWindowsCommonPaths, "mysql");
+                if (string.IsNullOrEmpty(mysqlPath))
+                {
+                    return (false, "No se encontró el cliente mysql. Asegúrate de que MySQL esté instalado y mysql esté en el PATH del sistema.");
+                }
+
+                string plainPassword = _credentialProtector.Unprotect(mysqlConfig.Password) ?? string.Empty;
+                credentialsFilePath = Path.Combine(Path.GetTempPath(), $"mysql_restore_{Guid.NewGuid():N}.cnf");
+                await File.WriteAllTextAsync(credentialsFilePath, $"[client]\nuser={mysqlConfig.Username}\npassword={plainPassword}\n");
+
+                if (!OperatingSystem.IsWindows())
+                {
+                    File.SetUnixFileMode(credentialsFilePath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+                }
+
+                string arguments = $"--defaults-extra-file=\"{credentialsFilePath}\" " +
+                                    $"--host={mysqlConfig.Host} " +
+                                    $"--port={mysqlConfig.Port} " +
+                                    $"{mysqlConfig.DatabaseName}";
+
+                var processStartInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = mysqlPath,
+                    Arguments = arguments,
+                    UseShellExecute = false,
+                    RedirectStandardInput = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+
+                using var process = System.Diagnostics.Process.Start(processStartInfo);
+                if (process == null)
+                {
+                    return (false, "No se pudo iniciar el proceso mysql");
+                }
+
+                // El dump se alimenta por stdin, igual que "mysql db < dump.sql" en una terminal.
+                await process.StandardInput.BaseStream.WriteAsync(dumpBytes);
+                process.StandardInput.Close();
+
+                bool exited = await Task.Run(() => process.WaitForExit(300000)); // 5 minutos
+
+                if (!exited)
+                {
+                    process.Kill();
+                    return (false, "El proceso mysql excedió el tiempo límite de 5 minutos");
+                }
+
+                string errorOutput = await process.StandardError.ReadToEndAsync();
+
+                if (process.ExitCode != 0)
+                {
+                    return (false, $"Error al restaurar con mysql: {errorOutput}");
+                }
+
+                return (true, $"Base de datos '{mysqlConfig.DatabaseName}' restaurada exitosamente desde el backup.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al restaurar backup de MySQL {DatabaseId}", databaseId);
+                return (false, $"Error al restaurar backup: {ex.Message}");
+            }
+            finally
+            {
+                if (credentialsFilePath != null)
+                {
+                    try
+                    {
+                        File.Delete(credentialsFilePath);
+                    }
+                    catch { /* Ignorar errores al eliminar el archivo de credenciales temporal */ }
+                }
+            }
         }
     }
 }

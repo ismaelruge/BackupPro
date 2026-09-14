@@ -189,5 +189,108 @@ namespace BackupPro.Services.Backup
             }
             catch { /* Ignorar errores al eliminar archivo temporal */ }
         }
+
+        public async Task<(bool success, string message)> RestoreBackupAsync(int databaseId, MemoryStream backupZipStream)
+        {
+            string tempRestorePath = string.Empty;
+
+            try
+            {
+                var sqlServerConfig = await _context.SqlServerDataBases.FindAsync(databaseId);
+                if (sqlServerConfig == null)
+                {
+                    return (false, "Configuración de SQL Server no encontrada");
+                }
+
+                byte[] dumpBytes = BackupZipHelper.ExtractSingleEntry(backupZipStream);
+
+                var drives = DriveInfo.GetDrives()
+                    .Where(d => d.IsReady && d.DriveType == DriveType.Fixed)
+                    .OrderByDescending(d => d.AvailableFreeSpace)
+                    .ToList();
+
+                if (drives.Count == 0)
+                {
+                    return (false, "No se encontraron discos disponibles para restaurar el backup");
+                }
+
+                string tempFolder = Path.Combine(drives[0].Name, "Temp");
+                if (!Directory.Exists(tempFolder))
+                {
+                    Directory.CreateDirectory(tempFolder);
+                }
+
+                EnsureFolderWritePermissions(tempFolder);
+
+                tempRestorePath = Path.Combine(tempFolder, $"restore_{Guid.NewGuid():N}.bak");
+                await File.WriteAllBytesAsync(tempRestorePath, dumpBytes);
+
+                string escapedDatabaseName = sqlServerConfig.DatabaseName.Replace("]", "]]");
+
+                // Se conecta a master, no a la base de datos que se va a restaurar: no se puede
+                // reemplazar una base de datos mientras hay una conexión abierta contra ella.
+                string masterConnectionString;
+                if (sqlServerConfig.IntegratedSecurity)
+                {
+                    masterConnectionString = $"Server={sqlServerConfig.Host},{sqlServerConfig.Port};Database=master;Integrated Security=True;TrustServerCertificate={sqlServerConfig.TrustServerCertificate};";
+                }
+                else
+                {
+                    string plainPassword = _credentialProtector.Unprotect(sqlServerConfig.Password) ?? string.Empty;
+                    masterConnectionString = $"Server={sqlServerConfig.Host},{sqlServerConfig.Port};Database=master;User Id={sqlServerConfig.Username};Password={plainPassword};TrustServerCertificate={sqlServerConfig.TrustServerCertificate};";
+                }
+
+                using var connection = new SqlConnection(masterConnectionString);
+                await connection.OpenAsync();
+
+                // Modo de un solo usuario para poder reemplazar la base de datos aunque haya otras
+                // conexiones activas contra ella (se revierten con ROLLBACK IMMEDIATE).
+                using (var singleUserCmd = new SqlCommand($"ALTER DATABASE [{escapedDatabaseName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE", connection))
+                {
+                    singleUserCmd.CommandTimeout = 60;
+                    await singleUserCmd.ExecuteNonQueryAsync();
+                }
+
+                try
+                {
+                    string restoreCommand = $"RESTORE DATABASE [{escapedDatabaseName}] FROM DISK = @backupPath WITH REPLACE, STATS = 10";
+                    using var restoreCmd = new SqlCommand(restoreCommand, connection);
+                    restoreCmd.CommandTimeout = 600; // 10 minutos
+                    restoreCmd.Parameters.AddWithValue("@backupPath", tempRestorePath);
+                    await restoreCmd.ExecuteNonQueryAsync();
+                }
+                finally
+                {
+                    // Siempre se intenta volver a multi-usuario, incluso si el RESTORE falló, para no
+                    // dejar la base de datos inaccesible para el resto de la aplicación.
+                    try
+                    {
+                        using var multiUserCmd = new SqlCommand($"ALTER DATABASE [{escapedDatabaseName}] SET MULTI_USER", connection);
+                        multiUserCmd.CommandTimeout = 60;
+                        await multiUserCmd.ExecuteNonQueryAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "No se pudo volver a MULTI_USER la base de datos {DatabaseName} tras restaurar", sqlServerConfig.DatabaseName);
+                    }
+                }
+
+                return (true, $"Base de datos '{sqlServerConfig.DatabaseName}' restaurada exitosamente desde el backup.");
+            }
+            catch (SqlException sqlEx)
+            {
+                _logger.LogError(sqlEx, "Error de SQL Server al restaurar backup de {DatabaseId}", databaseId);
+                return (false, $"Error de SQL Server: {sqlEx.Message}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al restaurar backup de SQL Server {DatabaseId}", databaseId);
+                return (false, $"Error al restaurar backup: {ex.Message}");
+            }
+            finally
+            {
+                TryDeleteFile(tempRestorePath);
+            }
+        }
     }
 }

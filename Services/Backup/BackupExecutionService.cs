@@ -54,7 +54,7 @@ namespace BackupPro.Services.Backup
                 backupStream = stream;
 
                 var (saveSuccess, _, fileSize, saveError) = await storageProvider.SaveBackupAsync(
-                    task.StorageId, backupStream, fileName, databaseName, task.DatabaseId);
+                    task.StorageId, backupStream, fileName, databaseName, task.DatabaseId, task.DatabaseType);
 
                 if (!saveSuccess)
                 {

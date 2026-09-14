@@ -29,6 +29,26 @@ namespace BackupPro.Services.Backup
             @"C:\Program Files (x86)\MongoDB\Server\4.4\bin\mongodump.exe"
         };
 
+        private static readonly string[] RestoreWindowsCommonPaths =
+        {
+            @"C:\Program Files\MongoDB\Server\8.2\bin\mongorestore.exe",
+            @"C:\Program Files\MongoDB\Server\8.1\bin\mongorestore.exe",
+            @"C:\Program Files\MongoDB\Server\8.0\bin\mongorestore.exe",
+            @"C:\Program Files\MongoDB\Tools\100\bin\mongorestore.exe",
+            @"C:\Program Files\MongoDB\Server\7.0\bin\mongorestore.exe",
+            @"C:\Program Files\MongoDB\Server\6.0\bin\mongorestore.exe",
+            @"C:\Program Files\MongoDB\Server\5.0\bin\mongorestore.exe",
+            @"C:\Program Files\MongoDB\Server\4.4\bin\mongorestore.exe",
+            @"C:\Program Files (x86)\MongoDB\Server\8.2\bin\mongorestore.exe",
+            @"C:\Program Files (x86)\MongoDB\Server\8.1\bin\mongorestore.exe",
+            @"C:\Program Files (x86)\MongoDB\Server\8.0\bin\mongorestore.exe",
+            @"C:\Program Files (x86)\MongoDB\Tools\100\bin\mongorestore.exe",
+            @"C:\Program Files (x86)\MongoDB\Server\7.0\bin\mongorestore.exe",
+            @"C:\Program Files (x86)\MongoDB\Server\6.0\bin\mongorestore.exe",
+            @"C:\Program Files (x86)\MongoDB\Server\5.0\bin\mongorestore.exe",
+            @"C:\Program Files (x86)\MongoDB\Server\4.4\bin\mongorestore.exe"
+        };
+
         private readonly ApplicationDbContext _context;
         private readonly CredentialProtector _credentialProtector;
         private readonly ILogger<MongoDbBackupProvider> _logger;
@@ -213,6 +233,139 @@ namespace BackupPro.Services.Backup
                 }
             }
             catch { /* Ignorar errores al eliminar archivos temporales */ }
+        }
+
+        public async Task<(bool success, string message)> RestoreBackupAsync(int databaseId, MemoryStream backupZipStream)
+        {
+            string tempExtractFolder = string.Empty;
+            string? credentialsFilePath = null;
+
+            try
+            {
+                var mongodbConfig = await _context.MongoDBDataBases.FindAsync(databaseId);
+                if (mongodbConfig == null)
+                {
+                    return (false, "Configuración de MongoDB no encontrada");
+                }
+
+                // El .zip que sube el IStorageProvider contiene, como única entrada, el .zip que
+                // generó CreateBackupAsync (ZipFile.CreateFromDirectory sobre la carpeta de
+                // mongodump) — hace falta descomprimir dos veces para llegar a los .bson.
+                byte[] innerZipBytes = BackupZipHelper.ExtractSingleEntry(backupZipStream);
+
+                string mongoRestorePath = ExecutableLocator.Find("mongorestore", RestoreWindowsCommonPaths, "mongorestore");
+                if (string.IsNullOrEmpty(mongoRestorePath))
+                {
+                    return (false, "No se encontró mongorestore. Asegúrate de que MongoDB Database Tools esté instalado y mongorestore esté en el PATH del sistema.");
+                }
+
+                tempExtractFolder = Path.Combine(Path.GetTempPath(), $"mongorestore_{Guid.NewGuid():N}");
+                Directory.CreateDirectory(tempExtractFolder);
+
+                using (var innerZipStream = new MemoryStream(innerZipBytes))
+                using (var archive = new ZipArchive(innerZipStream, ZipArchiveMode.Read))
+                {
+                    archive.ExtractToDirectory(tempExtractFolder);
+                }
+
+                string dumpFolder = Path.Combine(tempExtractFolder, mongodbConfig.DatabaseName);
+                if (!Directory.Exists(dumpFolder))
+                {
+                    return (false, "El backup no tiene la estructura esperada de mongodump; no se puede restaurar.");
+                }
+
+                string? plainPassword = _credentialProtector.Unprotect(mongodbConfig.Password);
+                bool hasCredentials = !string.IsNullOrWhiteSpace(mongodbConfig.Username) && !string.IsNullOrWhiteSpace(plainPassword);
+
+                var arguments = new StringBuilder();
+
+                if (hasCredentials)
+                {
+                    credentialsFilePath = Path.Combine(Path.GetTempPath(), $"mongorestore_{Guid.NewGuid():N}.yaml");
+                    string yaml = $"username: \"{mongodbConfig.Username}\"\n" +
+                                  $"password: \"{plainPassword}\"\n" +
+                                  "authenticationDatabase: \"admin\"\n";
+                    await File.WriteAllTextAsync(credentialsFilePath, yaml);
+
+                    if (!OperatingSystem.IsWindows())
+                    {
+                        File.SetUnixFileMode(credentialsFilePath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+                    }
+
+                    arguments.Append($"--config=\"{credentialsFilePath}\" ");
+                }
+
+                arguments.Append($"--host={mongodbConfig.Host} ");
+                arguments.Append($"--port={mongodbConfig.Port} ");
+                arguments.Append($"--db={mongodbConfig.DatabaseName} ");
+                // --drop reemplaza las colecciones existentes con las del backup, en vez de
+                // combinarlas (que dejaría datos mezclados de antes y después del backup).
+                arguments.Append("--drop ");
+                arguments.Append($"\"{dumpFolder}\" ");
+
+                if (mongodbConfig.SslEnabled)
+                {
+                    arguments.Append("--ssl ");
+                }
+
+                var processStartInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = mongoRestorePath,
+                    Arguments = arguments.ToString(),
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+
+                using var process = System.Diagnostics.Process.Start(processStartInfo);
+                if (process == null)
+                {
+                    return (false, "No se pudo iniciar el proceso mongorestore");
+                }
+
+                bool exited = await Task.Run(() => process.WaitForExit(300000)); // 5 minutos
+
+                if (!exited)
+                {
+                    process.Kill();
+                    return (false, "El proceso mongorestore excedió el tiempo límite de 5 minutos");
+                }
+
+                string errorOutput = await process.StandardError.ReadToEndAsync();
+
+                if (process.ExitCode != 0)
+                {
+                    return (false, $"Error al ejecutar mongorestore: {errorOutput}");
+                }
+
+                return (true, $"Base de datos '{mongodbConfig.DatabaseName}' restaurada exitosamente desde el backup.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al restaurar backup de MongoDB {DatabaseId}", databaseId);
+                return (false, $"Error al restaurar backup: {ex.Message}");
+            }
+            finally
+            {
+                if (credentialsFilePath != null)
+                {
+                    try
+                    {
+                        File.Delete(credentialsFilePath);
+                    }
+                    catch { /* Ignorar errores al eliminar el archivo de credenciales temporal */ }
+                }
+
+                if (!string.IsNullOrEmpty(tempExtractFolder) && Directory.Exists(tempExtractFolder))
+                {
+                    try
+                    {
+                        Directory.Delete(tempExtractFolder, true);
+                    }
+                    catch { /* Ignorar errores al eliminar la carpeta temporal */ }
+                }
+            }
         }
     }
 }

@@ -25,6 +25,24 @@ namespace BackupPro.Services.Backup
             @"C:\Program Files (x86)\PostgreSQL\12\bin\pg_dump.exe"
         };
 
+        private static readonly string[] PsqlWindowsCommonPaths =
+        {
+            @"C:\Program Files\PostgreSQL\18\bin\psql.exe",
+            @"C:\Program Files\PostgreSQL\17\bin\psql.exe",
+            @"C:\Program Files\PostgreSQL\16\bin\psql.exe",
+            @"C:\Program Files\PostgreSQL\15\bin\psql.exe",
+            @"C:\Program Files\PostgreSQL\14\bin\psql.exe",
+            @"C:\Program Files\PostgreSQL\13\bin\psql.exe",
+            @"C:\Program Files\PostgreSQL\12\bin\psql.exe",
+            @"C:\Program Files (x86)\PostgreSQL\18\bin\psql.exe",
+            @"C:\Program Files (x86)\PostgreSQL\17\bin\psql.exe",
+            @"C:\Program Files (x86)\PostgreSQL\16\bin\psql.exe",
+            @"C:\Program Files (x86)\PostgreSQL\15\bin\psql.exe",
+            @"C:\Program Files (x86)\PostgreSQL\14\bin\psql.exe",
+            @"C:\Program Files (x86)\PostgreSQL\13\bin\psql.exe",
+            @"C:\Program Files (x86)\PostgreSQL\12\bin\psql.exe"
+        };
+
         private readonly ApplicationDbContext _context;
         private readonly CredentialProtector _credentialProtector;
         private readonly ILogger<PostgresBackupProvider> _logger;
@@ -161,6 +179,83 @@ namespace BackupPro.Services.Backup
                 }
             }
             catch { /* Ignorar errores al eliminar archivo temporal */ }
+        }
+
+        public async Task<(bool success, string message)> RestoreBackupAsync(int databaseId, MemoryStream backupZipStream)
+        {
+            string tempRestorePath = string.Empty;
+
+            try
+            {
+                var postgresConfig = await _context.PostgresSqlDataBases.FindAsync(databaseId);
+                if (postgresConfig == null)
+                {
+                    return (false, "Configuración de PostgreSQL no encontrada");
+                }
+
+                byte[] dumpBytes = BackupZipHelper.ExtractSingleEntry(backupZipStream);
+
+                string psqlPath = ExecutableLocator.Find("psql", PsqlWindowsCommonPaths, "psql");
+                if (string.IsNullOrEmpty(psqlPath))
+                {
+                    return (false, "No se encontró psql. Asegúrate de que PostgreSQL esté instalado y psql esté en el PATH del sistema.");
+                }
+
+                tempRestorePath = Path.Combine(Path.GetTempPath(), $"pg_restore_{Guid.NewGuid():N}.sql");
+                await File.WriteAllBytesAsync(tempRestorePath, dumpBytes);
+
+                var processStartInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = psqlPath,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+
+                // psql lee la contraseña de PGPASSWORD, igual que pg_dump al generar el backup.
+                processStartInfo.EnvironmentVariables["PGPASSWORD"] = _credentialProtector.Unprotect(postgresConfig.Password) ?? string.Empty;
+
+                string arguments = $"--host={postgresConfig.Host} " +
+                                 $"--port={postgresConfig.Port} " +
+                                 $"--username={postgresConfig.Username} " +
+                                 $"--dbname={postgresConfig.DatabaseName} " +
+                                 $"--file=\"{tempRestorePath}\"";
+
+                processStartInfo.Arguments = arguments;
+
+                using var process = System.Diagnostics.Process.Start(processStartInfo);
+                if (process == null)
+                {
+                    return (false, "No se pudo iniciar el proceso psql");
+                }
+
+                bool exited = await Task.Run(() => process.WaitForExit(300000)); // 5 minutos
+
+                if (!exited)
+                {
+                    process.Kill();
+                    return (false, "El proceso psql excedió el tiempo límite de 5 minutos");
+                }
+
+                string errorOutput = await process.StandardError.ReadToEndAsync();
+
+                if (process.ExitCode != 0)
+                {
+                    return (false, $"Error al restaurar con psql: {errorOutput}");
+                }
+
+                return (true, $"Base de datos '{postgresConfig.DatabaseName}' restaurada exitosamente desde el backup.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al restaurar backup de PostgreSQL {DatabaseId}", databaseId);
+                return (false, $"Error al restaurar backup: {ex.Message}");
+            }
+            finally
+            {
+                TryDeleteFile(tempRestorePath);
+            }
         }
     }
 }

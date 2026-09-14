@@ -51,5 +51,14 @@ namespace BackupPro.Models
         /// </summary>
         [MaxLength(500)]
         public string? StorageFileId { get; set; }
+
+        /// <summary>
+        /// Tipo de motor de base de datos del backup (p.ej. "SqlServer", "MySQL"). Nulo en registros
+        /// de error y en backups creados antes de que existiera esta columna. Usado por
+        /// <see cref="Services.Backup.BackupRestoreService"/> para saber con qué
+        /// <see cref="Services.Backup.IDatabaseBackupProvider"/> restaurar el backup.
+        /// </summary>
+        [MaxLength(50)]
+        public string? DatabaseType { get; set; }
     }
 }

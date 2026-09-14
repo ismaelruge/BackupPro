@@ -20,7 +20,7 @@ namespace BackupPro.Services.Backup
             _logger = logger;
         }
 
-        public async Task<(bool success, string filePath, long fileSize, string errorMessage)> SaveBackupAsync(int storageId, MemoryStream backupStream, string fileName, string databaseName, int databaseId)
+        public async Task<(bool success, string filePath, long fileSize, string errorMessage)> SaveBackupAsync(int storageId, MemoryStream backupStream, string fileName, string databaseName, int databaseId, string databaseType)
         {
             var startTime = DateTime.Now;
             string oneDrivePath = string.Empty;
@@ -95,7 +95,7 @@ namespace BackupPro.Services.Backup
                     var duration = DateTime.Now - startTime;
                     await LogBackupSuccessAsync(databaseId, databaseName, startTime,
                         $"Backup guardado exitosamente en OneDrive. Tamaño: {FormatBytes(fileSize)}. Duración: {duration.TotalSeconds:F2} segundos.",
-                        oneDrivePath, StorageType, storageId, uploadedItemId);
+                        oneDrivePath, StorageType, storageId, databaseType, uploadedItemId);
 
                     TryDeleteFile(localTempPath);
 
@@ -158,6 +158,41 @@ namespace BackupPro.Services.Backup
             {
                 _logger.LogError(ex, "Error al borrar backup en OneDrive {StorageFileId} (storage {OneDriveStorageId})", storageFileId, storageId);
                 return false;
+            }
+        }
+
+        public async Task<(bool success, MemoryStream? stream, string errorMessage)> DownloadBackupAsync(int storageId, string backupPath, string? storageFileId)
+        {
+            if (string.IsNullOrEmpty(storageFileId))
+            {
+                return (false, null, "Este backup no tiene un item id de OneDrive registrado; no se puede descargar automáticamente.");
+            }
+
+            var oneDriveStorage = await Context.OneDriveStorages.FindAsync(storageId);
+            if (oneDriveStorage == null || !await _tokenService.EnsureValidTokenAsync(oneDriveStorage))
+            {
+                return (false, null, "No hay un token de acceso válido para OneDrive. Por favor, autentícate primero.");
+            }
+
+            try
+            {
+                string accessToken = _tokenService.GetPlainAccessToken(oneDriveStorage);
+                using var httpClient = new HttpClient();
+                httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
+
+                var response = await httpClient.GetAsync($"https://graph.microsoft.com/v1.0/me/drive/items/{storageFileId}/content");
+                if (!response.IsSuccessStatusCode)
+                {
+                    return (false, null, $"Error al descargar de OneDrive: {response.StatusCode}");
+                }
+
+                var bytes = await response.Content.ReadAsByteArrayAsync();
+                return (true, new MemoryStream(bytes), string.Empty);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al descargar backup de OneDrive {StorageFileId} (storage {OneDriveStorageId})", storageFileId, storageId);
+                return (false, null, $"Error al descargar de OneDrive: {ex.Message}");
             }
         }
     }

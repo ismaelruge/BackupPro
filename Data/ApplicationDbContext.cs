@@ -17,6 +17,7 @@ namespace BackupPro.Data
 
         public DbSet<CompanyConfig> CompanyConfigs { get; set; }
         public DbSet<BackupHistory> BackupHistories { get; set; }
+        public DbSet<RestoreHistory> RestoreHistories { get; set; }
 
         // Storage Configurations
         public DbSet<GoogleDriveStorage> GoogleDriveStorages { get; set; }

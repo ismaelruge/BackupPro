@@ -17,5 +17,13 @@ namespace BackupPro.Services.Backup
         /// responsable de liberar el stream devuelto.
         /// </summary>
         Task<(bool success, MemoryStream? backupStream, string fileName, string databaseName, string errorMessage)> CreateBackupAsync(int databaseId);
+
+        /// <summary>
+        /// Restaura <paramref name="backupZipStream"/> (el mismo .zip que devuelve
+        /// <see cref="CreateBackupAsync"/>, con el dump original adentro) sobre la base de datos
+        /// <paramref name="databaseId"/>. Operación destructiva: reemplaza los datos actuales de esa
+        /// base de datos por los del backup. Usada por <see cref="BackupRestoreService"/>.
+        /// </summary>
+        Task<(bool success, string message)> RestoreBackupAsync(int databaseId, MemoryStream backupZipStream);
     }
 }
