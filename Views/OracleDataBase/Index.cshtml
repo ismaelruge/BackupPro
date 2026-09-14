@@ -1,4 +1,4 @@
-@model IEnumerable<BackupPro.Models.MariaDbDataBase>
+@model IEnumerable<BackupPro.Models.OracleDataBase>
 @{
     ViewData["Title"] = "Tipos de Bases de Datos";
 }
@@ -61,7 +61,7 @@
                             </a>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <a class="nav-link active" id="mariadb-tab" role="tab" asp-area="" asp-controller="MariaDbDataBase" asp-action="Index">
+                            <a class="nav-link" id="mariadb-tab" role="tab" asp-area="" asp-controller="MariaDbDataBase" asp-action="Index">
                                 <i class="bi bi-database-fill-gear me-2"></i>MariaDB
                             </a>
                         </li>
@@ -81,7 +81,7 @@
                             </a>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <a class="nav-link" id="oracle-tab" role="tab" asp-area="" asp-controller="OracleDataBase" asp-action="Index">
+                            <a class="nav-link active" id="oracle-tab" role="tab" asp-area="" asp-controller="OracleDataBase" asp-action="Index">
                                 <i class="bi bi-database-fill me-2"></i>Oracle
                             </a>
                         </li>
@@ -89,12 +89,27 @@
 
                     <!-- Tab Content -->
                     <div class="tab-content" id="databaseTabContent">
-                        <!-- MariaDB -->
-                        <div class="tab-pane fade show active" id="mariadb" role="tabpanel">
+                        <!-- Oracle -->
+                        <div class="tab-pane fade show active" id="oracle" role="tabpanel">
                             <div class="text-center mb-4">
-                                <i class="bi bi-database-fill-gear text-primary" style="font-size: 3rem;"></i>
-                                <h4 class="mt-3">MariaDB</h4>
-                                <p class="text-muted">Configura múltiples conexiones a bases de datos MariaDB</p>
+                                <i class="bi bi-database-fill text-primary" style="font-size: 3rem;"></i>
+                                <h4 class="mt-3">Oracle</h4>
+                                <p class="text-muted">Configura múltiples conexiones a bases de datos Oracle</p>
+                            </div>
+
+                            <div class="alert alert-warning d-flex align-items-center mb-4" role="alert">
+                                <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
+                                <div>
+                                    <h6 class="mb-1">Limitación de Oracle Data Pump</h6>
+                                    <p class="mb-0 small">
+                                        Oracle exporta/importa (expdp/impdp) siempre del lado del <strong>servidor</strong> Oracle,
+                                        a través de un objeto DIRECTORY (<code>DATA_PUMP_DIR</code>). El backup solo puede
+                                        completarse desde esta app cuando el servidor Oracle corre en el mismo host que BackupPro
+                                        y se indica la carpeta local equivalente a ese DIRECTORY (<em>Carpeta local de DATA_PUMP_DIR</em>).
+                                        En cualquier otro caso, el backup fallará con un mensaje explicando esta limitación en vez
+                                        de reportar éxito falso.
+                                    </p>
+                                </div>
                             </div>
 
                             <!-- Lista de configuraciones -->
@@ -116,12 +131,12 @@
                                                 <div class="flex-grow-1">
                                                     <div class="d-flex align-items-center mb-2">
                                                         <div class="bg-primary bg-opacity-10 rounded-circle p-2 me-3">
-                                                            <i class="bi bi-database-fill-gear text-primary fs-5"></i>
+                                                            <i class="bi bi-database-fill text-primary fs-5"></i>
                                                         </div>
                                                         <div>
                                                             <h6 class="mb-0 fw-semibold">
                                                                 <span class="text-primary">@db.ConfigurationName</span>
-                                                                <span class="text-muted fw-normal"> - @db.DatabaseName</span>
+                                                                <span class="text-muted fw-normal"> - @db.ServiceName</span>
                                                             </h6>
                                                             <small class="text-muted">Creado: @db.CreatedAt.ToString("dd/MM/yyyy HH:mm")</small>
                                                         </div>
@@ -138,10 +153,16 @@
                                                             <code class="ms-1">@db.Username</code>
                                                         </div>
                                                         <div class="mb-2">
-                                                            @if (db.SslMode)
+                                                            @if (!string.IsNullOrWhiteSpace(db.DumpDirectoryPath))
                                                             {
                                                                 <span class="badge bg-info me-2">
-                                                                    <i class="bi bi-lock-fill me-1"></i>SSL Habilitado
+                                                                    <i class="bi bi-folder-check me-1"></i>DATA_PUMP_DIR local configurado
+                                                                </span>
+                                                            }
+                                                            else
+                                                            {
+                                                                <span class="badge bg-secondary me-2">
+                                                                    <i class="bi bi-folder-x me-1"></i>Sin acceso local al DIRECTORY
                                                                 </span>
                                                             }
                                                         </div>
@@ -153,20 +174,20 @@
                                                 <div>
                                                     <button class="btn btn-sm btn-outline-primary rounded-pill me-2"
                                                             data-bs-toggle="modal"
-                                                            data-bs-target="#editMariaDbModal"
+                                                            data-bs-target="#editOracleModal"
                                                             data-id="@db.Id"
                                                             data-name="@db.ConfigurationName"
                                                             data-host="@db.Host"
                                                             data-port="@db.Port"
-                                                            data-database="@db.DatabaseName"
+                                                            data-service="@db.ServiceName"
                                                             data-username="@db.Username"
-                                                            data-ssl="@db.SslMode"
+                                                            data-dumpdir="@db.DumpDirectoryPath"
                                                             aria-label="Editar configuración">
                                                         <i class="bi bi-pencil"></i>
                                                     </button>
                                                     <button class="btn btn-sm btn-outline-danger rounded-pill"
                                                             data-bs-toggle="modal"
-                                                            data-bs-target="#deleteMariaDbModal"
+                                                            data-bs-target="#deleteOracleModal"
                                                             data-id="@db.Id"
                                                             data-name="@db.ConfigurationName"
                                                             aria-label="Eliminar configuración">
@@ -184,7 +205,7 @@
                                         <i class="bi bi-info-circle-fill fs-4 me-3"></i>
                                         <div>
                                             <h6 class="mb-1">No hay configuraciones</h6>
-                                            <p class="mb-0 small">Aún no has configurado ninguna conexión a MariaDB. Haz clic en el botón de abajo para agregar tu primera configuración.</p>
+                                            <p class="mb-0 small">Aún no has configurado ninguna conexión a Oracle. Haz clic en el botón de abajo para agregar tu primera configuración.</p>
                                         </div>
                                     </div>
                                 }
@@ -192,7 +213,7 @@
 
                             <!-- Botón agregar nueva configuración -->
                             <div class="d-grid">
-                                <button type="button" class="btn btn-outline-primary btn-lg rounded-pill" data-bs-toggle="modal" data-bs-target="#addMariaDbModal">
+                                <button type="button" class="btn btn-outline-primary btn-lg rounded-pill" data-bs-toggle="modal" data-bs-target="#addOracleModal">
                                     <i class="bi bi-plus-circle me-2"></i>Agregar Nueva Configuración
                                 </button>
                             </div>
@@ -215,27 +236,27 @@
     </div>
 </div>
 
-<!-- Modal Agregar MariaDB -->
-<div class="modal fade" id="addMariaDbModal" tabindex="-1" aria-labelledby="addMariaDbModalLabel" aria-hidden="true">
+<!-- Modal Agregar Oracle -->
+<div class="modal fade" id="addOracleModal" tabindex="-1" aria-labelledby="addOracleModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header bg-primary text-white border-0">
-                <h5 class="modal-title" id="addMariaDbModalLabel">
-                    <i class="bi bi-database-fill-gear me-2"></i>Nueva Configuración MariaDB
+                <h5 class="modal-title" id="addOracleModalLabel">
+                    <i class="bi bi-database-fill me-2"></i>Nueva Configuración Oracle
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form id="addMariaDbForm" asp-action="Create" method="post">
+            <form id="addOracleForm" asp-action="Create" method="post">
                 <div class="modal-body p-4">
                     <!-- Alerta de errores -->
-                    <div id="add_mariadb_error_alert" class="alert alert-danger alert-dismissible fade" role="alert" style="display: none;">
+                    <div id="add_oracle_error_alert" class="alert alert-danger alert-dismissible fade" role="alert" style="display: none;">
                         <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                        <span id="add_mariadb_error_message"></span>
-                        <button type="button" class="btn-close" onclick="hideAlert('add_mariadb_error_alert')"></button>
+                        <span id="add_oracle_error_message"></span>
+                        <button type="button" class="btn-close" onclick="hideAlert('add_oracle_error_alert')"></button>
                     </div>
 
                     <!-- Alerta de validación de conexión -->
-                    <div id="add_mariadb_validating_alert" class="alert alert-info" role="alert" style="display: none;">
+                    <div id="add_oracle_validating_alert" class="alert alert-info" role="alert" style="display: none;">
                         <div class="d-flex align-items-center">
                             <div class="spinner-border spinner-border-sm me-2" role="status">
                                 <span class="visually-hidden">Validando...</span>
@@ -247,75 +268,76 @@
                     <div class="row g-3">
                         <!-- Nombre de Configuración -->
                         <div class="col-12">
-                            <label for="add_mariadb_configurationName" class="form-label fw-semibold">
+                            <label for="add_oracle_configurationName" class="form-label fw-semibold">
                                 <i class="bi bi-tag me-1 text-primary"></i>Nombre de Configuración
                             </label>
-                            <input type="text" class="form-control" id="add_mariadb_configurationName" name="ConfigurationName"
-                                   placeholder="Ej: MariaDB Producción, MariaDB Analytics..." required>
+                            <input type="text" class="form-control" id="add_oracle_configurationName" name="ConfigurationName"
+                                   placeholder="Ej: Oracle Producción, Oracle QA..." required>
                             <small class="text-muted">Nombre descriptivo para identificar esta configuración</small>
                         </div>
 
                         <!-- Host y Puerto -->
                         <div class="col-md-8">
-                            <label for="add_mariadb_host" class="form-label fw-semibold">
+                            <label for="add_oracle_host" class="form-label fw-semibold">
                                 <i class="bi bi-hdd-network me-1 text-primary"></i>Servidor/Host
                             </label>
-                            <input type="text" class="form-control" id="add_mariadb_host" name="Host"
+                            <input type="text" class="form-control" id="add_oracle_host" name="Host"
                                    placeholder="localhost o dirección IP" required>
                         </div>
                         <div class="col-md-4">
-                            <label for="add_mariadb_port" class="form-label fw-semibold">
+                            <label for="add_oracle_port" class="form-label fw-semibold">
                                 <i class="bi bi-plug me-1 text-primary"></i>Puerto
                             </label>
-                            <input type="number" class="form-control" id="add_mariadb_port" name="Port"
-                                   value="3306" required>
+                            <input type="number" class="form-control" id="add_oracle_port" name="Port"
+                                   value="1521" required>
                         </div>
 
-                        <!-- Nombre de Base de Datos -->
+                        <!-- Service Name / SID -->
                         <div class="col-12">
-                            <label for="add_mariadb_databaseName" class="form-label fw-semibold">
-                                <i class="bi bi-database me-1 text-primary"></i>Nombre de Base de Datos
+                            <label for="add_oracle_serviceName" class="form-label fw-semibold">
+                                <i class="bi bi-database me-1 text-primary"></i>Service Name / SID
                             </label>
-                            <input type="text" class="form-control" id="add_mariadb_databaseName" name="DatabaseName"
-                                   placeholder="Nombre de la base de datos" required>
+                            <input type="text" class="form-control" id="add_oracle_serviceName" name="ServiceName"
+                                   placeholder="Ej: ORCLPDB1, XE..." required>
                         </div>
 
                         <!-- Usuario y Contraseña -->
                         <div class="col-md-6">
-                            <label for="add_mariadb_username" class="form-label fw-semibold">
+                            <label for="add_oracle_username" class="form-label fw-semibold">
                                 <i class="bi bi-person me-1 text-primary"></i>Usuario
                             </label>
-                            <input type="text" class="form-control" id="add_mariadb_username" name="Username"
+                            <input type="text" class="form-control" id="add_oracle_username" name="Username"
                                    placeholder="Usuario de la base de datos" required>
                         </div>
                         <div class="col-md-6">
-                            <label for="add_mariadb_password" class="form-label fw-semibold">
+                            <label for="add_oracle_password" class="form-label fw-semibold">
                                 <i class="bi bi-key me-1 text-primary"></i>Contraseña
                             </label>
                             <div class="input-group">
-                                <input type="password" class="form-control" id="add_mariadb_password" name="Password"
+                                <input type="password" class="form-control" id="add_oracle_password" name="Password"
                                        placeholder="Contraseña" required>
-                                <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordMariaDb('add_mariadb_password')">
+                                <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordOracle('add_oracle_password')">
                                     <i class="bi bi-eye"></i>
                                 </button>
                             </div>
                         </div>
 
-                        <!-- Opciones de Seguridad -->
+                        <!-- DATA_PUMP_DIR local -->
                         <div class="col-12">
                             <label class="form-label fw-semibold">
-                                <i class="bi bi-shield-lock me-1 text-primary"></i>Opciones de Seguridad
+                                <i class="bi bi-folder-symlink me-1 text-primary"></i>Carpeta local de DATA_PUMP_DIR (opcional)
                             </label>
                             <div class="card bg-light border-0">
                                 <div class="card-body">
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" id="add_mariadb_sslMode"
-                                               name="SslMode" value="true">
-                                        <label class="form-check-label" for="add_mariadb_sslMode">
-                                            <strong>Habilitar SSL/TLS</strong>
-                                            <br><small class="text-muted">Conexión segura encriptada</small>
-                                        </label>
-                                    </div>
+                                    <input type="text" class="form-control" id="add_oracle_dumpDirectoryPath" name="DumpDirectoryPath"
+                                           placeholder="Ej: /opt/oracle/admin/XE/dpdump (solo si Oracle corre en este mismo host)">
+                                    <small class="text-muted d-block mt-2">
+                                        expdp/impdp siempre leen/escriben del lado del servidor Oracle (objeto DIRECTORY
+                                        <code>DATA_PUMP_DIR</code>). Solo si el servidor Oracle corre en esta misma máquina
+                                        puede indicarse aquí la ruta local equivalente para que el backup pueda completarse;
+                                        de lo contrario, dejar en blanco y el backup informará la limitación en vez de fallar
+                                        silenciosamente.
+                                    </small>
                                 </div>
                             </div>
                         </div>
@@ -325,7 +347,7 @@
                     <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">
                         <i class="bi bi-x-circle me-2"></i>Cancelar
                     </button>
-                    <button type="submit" id="add_mariadb_submit_btn" class="btn btn-primary rounded-pill px-4">
+                    <button type="submit" id="add_oracle_submit_btn" class="btn btn-primary rounded-pill px-4">
                         <i class="bi bi-check-circle me-2"></i>Guardar Configuración
                     </button>
                 </div>
@@ -334,28 +356,28 @@
     </div>
 </div>
 
-<!-- Modal Editar MariaDB -->
-<div class="modal fade" id="editMariaDbModal" tabindex="-1" aria-labelledby="editMariaDbModalLabel" aria-hidden="true">
+<!-- Modal Editar Oracle -->
+<div class="modal fade" id="editOracleModal" tabindex="-1" aria-labelledby="editOracleModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header bg-warning text-dark border-0">
-                <h5 class="modal-title" id="editMariaDbModalLabel">
-                    <i class="bi bi-pencil-square me-2"></i>Editar Configuración MariaDB
+                <h5 class="modal-title" id="editOracleModalLabel">
+                    <i class="bi bi-pencil-square me-2"></i>Editar Configuración Oracle
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form id="editMariaDbForm" asp-action="Edit" method="post">
-                <input type="hidden" id="edit_mariadb_id" name="Id">
+            <form id="editOracleForm" asp-action="Edit" method="post">
+                <input type="hidden" id="edit_oracle_id" name="Id">
                 <div class="modal-body p-4">
                     <!-- Alerta de errores -->
-                    <div id="edit_mariadb_error_alert" class="alert alert-danger alert-dismissible fade" role="alert" style="display: none;">
+                    <div id="edit_oracle_error_alert" class="alert alert-danger alert-dismissible fade" role="alert" style="display: none;">
                         <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                        <span id="edit_mariadb_error_message"></span>
-                        <button type="button" class="btn-close" onclick="hideAlert('edit_mariadb_error_alert')"></button>
+                        <span id="edit_oracle_error_message"></span>
+                        <button type="button" class="btn-close" onclick="hideAlert('edit_oracle_error_alert')"></button>
                     </div>
 
                     <!-- Alerta de validación de conexión -->
-                    <div id="edit_mariadb_validating_alert" class="alert alert-info" role="alert" style="display: none;">
+                    <div id="edit_oracle_validating_alert" class="alert alert-info" role="alert" style="display: none;">
                         <div class="d-flex align-items-center">
                             <div class="spinner-border spinner-border-sm me-2" role="status">
                                 <span class="visually-hidden">Validando...</span>
@@ -367,76 +389,77 @@
                     <div class="row g-3">
                         <!-- Nombre de Configuración -->
                         <div class="col-12">
-                            <label for="edit_mariadb_configurationName" class="form-label fw-semibold">
+                            <label for="edit_oracle_configurationName" class="form-label fw-semibold">
                                 <i class="bi bi-tag me-1 text-warning"></i>Nombre de Configuración
                             </label>
-                            <input type="text" class="form-control" id="edit_mariadb_configurationName" name="ConfigurationName"
-                                   placeholder="Ej: MariaDB Producción, MariaDB Analytics..." required>
+                            <input type="text" class="form-control" id="edit_oracle_configurationName" name="ConfigurationName"
+                                   placeholder="Ej: Oracle Producción, Oracle QA..." required>
                             <small class="text-muted">Nombre descriptivo para identificar esta configuración</small>
                         </div>
 
                         <!-- Host y Puerto -->
                         <div class="col-md-8">
-                            <label for="edit_mariadb_host" class="form-label fw-semibold">
+                            <label for="edit_oracle_host" class="form-label fw-semibold">
                                 <i class="bi bi-hdd-network me-1 text-warning"></i>Servidor/Host
                             </label>
-                            <input type="text" class="form-control" id="edit_mariadb_host" name="Host"
+                            <input type="text" class="form-control" id="edit_oracle_host" name="Host"
                                    placeholder="localhost o dirección IP" required>
                         </div>
                         <div class="col-md-4">
-                            <label for="edit_mariadb_port" class="form-label fw-semibold">
+                            <label for="edit_oracle_port" class="form-label fw-semibold">
                                 <i class="bi bi-plug me-1 text-warning"></i>Puerto
                             </label>
-                            <input type="number" class="form-control" id="edit_mariadb_port" name="Port"
-                                   value="3306" required>
+                            <input type="number" class="form-control" id="edit_oracle_port" name="Port"
+                                   value="1521" required>
                         </div>
 
-                        <!-- Nombre de Base de Datos -->
+                        <!-- Service Name / SID -->
                         <div class="col-12">
-                            <label for="edit_mariadb_databaseName" class="form-label fw-semibold">
-                                <i class="bi bi-database me-1 text-warning"></i>Nombre de Base de Datos
+                            <label for="edit_oracle_serviceName" class="form-label fw-semibold">
+                                <i class="bi bi-database me-1 text-warning"></i>Service Name / SID
                             </label>
-                            <input type="text" class="form-control" id="edit_mariadb_databaseName" name="DatabaseName"
-                                   placeholder="Nombre de la base de datos" required>
+                            <input type="text" class="form-control" id="edit_oracle_serviceName" name="ServiceName"
+                                   placeholder="Ej: ORCLPDB1, XE..." required>
                         </div>
 
                         <!-- Usuario y Contraseña -->
                         <div class="col-md-6">
-                            <label for="edit_mariadb_username" class="form-label fw-semibold">
+                            <label for="edit_oracle_username" class="form-label fw-semibold">
                                 <i class="bi bi-person me-1 text-warning"></i>Usuario
                             </label>
-                            <input type="text" class="form-control" id="edit_mariadb_username" name="Username"
+                            <input type="text" class="form-control" id="edit_oracle_username" name="Username"
                                    placeholder="Usuario de la base de datos" required>
                         </div>
                         <div class="col-md-6">
-                            <label for="edit_mariadb_password" class="form-label fw-semibold">
+                            <label for="edit_oracle_password" class="form-label fw-semibold">
                                 <i class="bi bi-key me-1 text-warning"></i>Contraseña
                             </label>
                             <div class="input-group">
-                                <input type="password" class="form-control" id="edit_mariadb_password" name="Password"
+                                <input type="password" class="form-control" id="edit_oracle_password" name="Password"
                                        placeholder="Dejar vacío para mantener la actual">
-                                <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordMariaDb('edit_mariadb_password')">
+                                <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordOracle('edit_oracle_password')">
                                     <i class="bi bi-eye"></i>
                                 </button>
                             </div>
                             <small class="text-muted">Dejar vacío si no desea cambiar la contraseña</small>
                         </div>
 
-                        <!-- Opciones de Seguridad -->
+                        <!-- DATA_PUMP_DIR local -->
                         <div class="col-12">
                             <label class="form-label fw-semibold">
-                                <i class="bi bi-shield-lock me-1 text-warning"></i>Opciones de Seguridad
+                                <i class="bi bi-folder-symlink me-1 text-warning"></i>Carpeta local de DATA_PUMP_DIR (opcional)
                             </label>
                             <div class="card bg-light border-0">
                                 <div class="card-body">
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" id="edit_mariadb_sslMode"
-                                               name="SslMode" value="true">
-                                        <label class="form-check-label" for="edit_mariadb_sslMode">
-                                            <strong>Habilitar SSL/TLS</strong>
-                                            <br><small class="text-muted">Conexión segura encriptada</small>
-                                        </label>
-                                    </div>
+                                    <input type="text" class="form-control" id="edit_oracle_dumpDirectoryPath" name="DumpDirectoryPath"
+                                           placeholder="Ej: /opt/oracle/admin/XE/dpdump (solo si Oracle corre en este mismo host)">
+                                    <small class="text-muted d-block mt-2">
+                                        expdp/impdp siempre leen/escriben del lado del servidor Oracle (objeto DIRECTORY
+                                        <code>DATA_PUMP_DIR</code>). Solo si el servidor Oracle corre en esta misma máquina
+                                        puede indicarse aquí la ruta local equivalente para que el backup pueda completarse;
+                                        de lo contrario, dejar en blanco y el backup informará la limitación en vez de fallar
+                                        silenciosamente.
+                                    </small>
                                 </div>
                             </div>
                         </div>
@@ -446,7 +469,7 @@
                     <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">
                         <i class="bi bi-x-circle me-2"></i>Cancelar
                     </button>
-                    <button type="submit" id="edit_mariadb_submit_btn" class="btn btn-warning text-dark rounded-pill px-4">
+                    <button type="submit" id="edit_oracle_submit_btn" class="btn btn-warning text-dark rounded-pill px-4">
                         <i class="bi bi-check-circle me-2"></i>Actualizar Configuración
                     </button>
                 </div>
@@ -455,18 +478,18 @@
     </div>
 </div>
 
-<!-- Modal Eliminar MariaDB -->
-<div class="modal fade" id="deleteMariaDbModal" tabindex="-1" aria-labelledby="deleteMariaDbModalLabel" aria-hidden="true">
+<!-- Modal Eliminar Oracle -->
+<div class="modal fade" id="deleteOracleModal" tabindex="-1" aria-labelledby="deleteOracleModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header bg-danger text-white border-0">
-                <h5 class="modal-title" id="deleteMariaDbModalLabel">
+                <h5 class="modal-title" id="deleteOracleModalLabel">
                     <i class="bi bi-exclamation-triangle me-2"></i>Confirmar Eliminación
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form asp-action="Delete" method="post">
-                <input type="hidden" id="delete_mariadb_id" name="id">
+                <input type="hidden" id="delete_oracle_id" name="id">
                 <div class="modal-body p-4">
                     <div class="text-center mb-4">
                         <i class="bi bi-exclamation-circle text-danger" style="font-size: 4rem;"></i>
@@ -475,7 +498,7 @@
                     <div class="alert alert-warning d-flex align-items-center" role="alert">
                         <i class="bi bi-info-circle-fill me-2 flex-shrink-0"></i>
                         <div>
-                            <strong id="delete_mariadb_configName"></strong>
+                            <strong id="delete_oracle_configName"></strong>
                             <p class="mb-0 small">Esta acción no se puede deshacer.</p>
                         </div>
                     </div>
@@ -541,7 +564,7 @@
 
 <script>
     // Función para mostrar/ocultar contraseña
-    function togglePasswordMariaDb(inputId) {
+    function togglePasswordOracle(inputId) {
         const input = document.getElementById(inputId);
         const icon = event.currentTarget.querySelector('i');
 
@@ -577,38 +600,36 @@
     }
 
     // Cargar datos en el modal de edición
-    document.getElementById('editMariaDbModal')?.addEventListener('show.bs.modal', function (event) {
+    document.getElementById('editOracleModal')?.addEventListener('show.bs.modal', function (event) {
         const button = event.relatedTarget;
 
-        document.getElementById('edit_mariadb_id').value = button.getAttribute('data-id');
-        document.getElementById('edit_mariadb_configurationName').value = button.getAttribute('data-name');
-        document.getElementById('edit_mariadb_host').value = button.getAttribute('data-host');
-        document.getElementById('edit_mariadb_port').value = button.getAttribute('data-port');
-        document.getElementById('edit_mariadb_databaseName').value = button.getAttribute('data-database');
-        document.getElementById('edit_mariadb_username').value = button.getAttribute('data-username');
-
-        const sslMode = button.getAttribute('data-ssl') === 'True';
-        document.getElementById('edit_mariadb_sslMode').checked = sslMode;
+        document.getElementById('edit_oracle_id').value = button.getAttribute('data-id');
+        document.getElementById('edit_oracle_configurationName').value = button.getAttribute('data-name');
+        document.getElementById('edit_oracle_host').value = button.getAttribute('data-host');
+        document.getElementById('edit_oracle_port').value = button.getAttribute('data-port');
+        document.getElementById('edit_oracle_serviceName').value = button.getAttribute('data-service');
+        document.getElementById('edit_oracle_username').value = button.getAttribute('data-username');
+        document.getElementById('edit_oracle_dumpDirectoryPath').value = button.getAttribute('data-dumpdir') || '';
     });
 
     // Cargar datos en el modal de eliminación
-    document.getElementById('deleteMariaDbModal')?.addEventListener('show.bs.modal', function (event) {
+    document.getElementById('deleteOracleModal')?.addEventListener('show.bs.modal', function (event) {
         const button = event.relatedTarget;
 
-        document.getElementById('delete_mariadb_id').value = button.getAttribute('data-id');
-        document.getElementById('delete_mariadb_configName').textContent = button.getAttribute('data-name');
+        document.getElementById('delete_oracle_id').value = button.getAttribute('data-id');
+        document.getElementById('delete_oracle_configName').textContent = button.getAttribute('data-name');
     });
 
     // Manejo del formulario de agregar con AJAX
-    document.getElementById('addMariaDbForm')?.addEventListener('submit', function(e) {
+    document.getElementById('addOracleForm')?.addEventListener('submit', function(e) {
         e.preventDefault();
 
         // Ocultar errores previos
-        hideAlert('add_mariadb_error_alert');
+        hideAlert('add_oracle_error_alert');
 
         // Mostrar indicador de validación
-        document.getElementById('add_mariadb_validating_alert').style.display = 'block';
-        document.getElementById('add_mariadb_submit_btn').disabled = true;
+        document.getElementById('add_oracle_validating_alert').style.display = 'block';
+        document.getElementById('add_oracle_submit_btn').disabled = true;
 
         const formData = new FormData(this);
 
@@ -623,35 +644,35 @@
         .then(response => response.json())
         .then(data => {
             // Ocultar indicador de validación
-            document.getElementById('add_mariadb_validating_alert').style.display = 'none';
-            document.getElementById('add_mariadb_submit_btn').disabled = false;
+            document.getElementById('add_oracle_validating_alert').style.display = 'none';
+            document.getElementById('add_oracle_submit_btn').disabled = false;
 
             if (data.success) {
                 // Cerrar modal y recargar página
-                bootstrap.Modal.getInstance(document.getElementById('addMariaDbModal')).hide();
+                bootstrap.Modal.getInstance(document.getElementById('addOracleModal')).hide();
                 location.reload();
             } else {
                 // Mostrar error en el modal
-                showAlert('add_mariadb_error_alert', 'add_mariadb_error_message', data.message);
+                showAlert('add_oracle_error_alert', 'add_oracle_error_message', data.message);
             }
         })
         .catch(error => {
-            document.getElementById('add_mariadb_validating_alert').style.display = 'none';
-            document.getElementById('add_mariadb_submit_btn').disabled = false;
-            showAlert('add_mariadb_error_alert', 'add_mariadb_error_message', 'Error de conexión: ' + error.message);
+            document.getElementById('add_oracle_validating_alert').style.display = 'none';
+            document.getElementById('add_oracle_submit_btn').disabled = false;
+            showAlert('add_oracle_error_alert', 'add_oracle_error_message', 'Error de conexión: ' + error.message);
         });
     });
 
     // Manejo del formulario de editar con AJAX
-    document.getElementById('editMariaDbForm')?.addEventListener('submit', function(e) {
+    document.getElementById('editOracleForm')?.addEventListener('submit', function(e) {
         e.preventDefault();
 
         // Ocultar errores previos
-        hideAlert('edit_mariadb_error_alert');
+        hideAlert('edit_oracle_error_alert');
 
         // Mostrar indicador de validación
-        document.getElementById('edit_mariadb_validating_alert').style.display = 'block';
-        document.getElementById('edit_mariadb_submit_btn').disabled = true;
+        document.getElementById('edit_oracle_validating_alert').style.display = 'block';
+        document.getElementById('edit_oracle_submit_btn').disabled = true;
 
         const formData = new FormData(this);
 
@@ -666,29 +687,29 @@
         .then(response => response.json())
         .then(data => {
             // Ocultar indicador de validación
-            document.getElementById('edit_mariadb_validating_alert').style.display = 'none';
-            document.getElementById('edit_mariadb_submit_btn').disabled = false;
+            document.getElementById('edit_oracle_validating_alert').style.display = 'none';
+            document.getElementById('edit_oracle_submit_btn').disabled = false;
 
             if (data.success) {
                 // Cerrar modal y recargar página
-                bootstrap.Modal.getInstance(document.getElementById('editMariaDbModal')).hide();
+                bootstrap.Modal.getInstance(document.getElementById('editOracleModal')).hide();
                 location.reload();
             } else {
                 // Mostrar error en el modal
-                showAlert('edit_mariadb_error_alert', 'edit_mariadb_error_message', data.message);
+                showAlert('edit_oracle_error_alert', 'edit_oracle_error_message', data.message);
             }
         })
         .catch(error => {
-            document.getElementById('edit_mariadb_validating_alert').style.display = 'none';
-            document.getElementById('edit_mariadb_submit_btn').disabled = false;
-            showAlert('edit_mariadb_error_alert', 'edit_mariadb_error_message', 'Error de conexión: ' + error.message);
+            document.getElementById('edit_oracle_validating_alert').style.display = 'none';
+            document.getElementById('edit_oracle_submit_btn').disabled = false;
+            showAlert('edit_oracle_error_alert', 'edit_oracle_error_message', 'Error de conexión: ' + error.message);
         });
     });
 
     // Limpiar formulario cuando se cierra el modal de agregar
-    document.getElementById('addMariaDbModal')?.addEventListener('hidden.bs.modal', function() {
-        document.getElementById('addMariaDbForm').reset();
-        hideAlert('add_mariadb_error_alert');
-        document.getElementById('add_mariadb_validating_alert').style.display = 'none';
+    document.getElementById('addOracleModal')?.addEventListener('hidden.bs.modal', function() {
+        document.getElementById('addOracleForm').reset();
+        hideAlert('add_oracle_error_alert');
+        document.getElementById('add_oracle_validating_alert').style.display = 'none';
     });
 </script>

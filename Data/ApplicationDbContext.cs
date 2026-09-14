@@ -35,6 +35,7 @@ namespace BackupPro.Data
         public DbSet<MongoDBDataBase> MongoDBDataBases { get; set; }
         public DbSet<SqliteDataBase> SqliteDataBases { get; set; }
         public DbSet<MariaDbDataBase> MariaDbDataBases { get; set; }
+        public DbSet<OracleDataBase> OracleDataBases { get; set; }
 
         // Task Scheduler
         public DbSet<Models.TaskScheduler> TaskSchedulers { get; set; }

@@ -105,6 +105,13 @@ namespace BackupPro.Controllers
                     names[("MariaDB", d.Id)] = d.ConfigurationName;
             }
 
+            var oracleIds = IdsFor(tasks, "Oracle");
+            if (oracleIds.Count > 0)
+            {
+                await foreach (var d in _context.OracleDataBases.Where(d => oracleIds.Contains(d.Id)).AsAsyncEnumerable())
+                    names[("Oracle", d.Id)] = d.ConfigurationName;
+            }
+
             return names;
         }
 
@@ -198,6 +205,9 @@ namespace BackupPro.Controllers
                         .Select(d => new { id = d.Id, name = d.ConfigurationName })
                         .ToListAsync(),
                     "MariaDB" => await _context.MariaDbDataBases
+                        .Select(d => new { id = d.Id, name = d.ConfigurationName })
+                        .ToListAsync(),
+                    "Oracle" => await _context.OracleDataBases
                         .Select(d => new { id = d.Id, name = d.ConfigurationName })
                         .ToListAsync(),
                     _ => new List<object>()
@@ -307,6 +317,7 @@ namespace BackupPro.Controllers
                     "MongoDB" => await _context.MongoDBDataBases.AnyAsync(d => d.Id == model.DatabaseId),
                     "SQLite" => await _context.SqliteDataBases.AnyAsync(d => d.Id == model.DatabaseId),
                     "MariaDB" => await _context.MariaDbDataBases.AnyAsync(d => d.Id == model.DatabaseId),
+                    "Oracle" => await _context.OracleDataBases.AnyAsync(d => d.Id == model.DatabaseId),
                     _ => false
                 };
 
@@ -470,6 +481,7 @@ namespace BackupPro.Controllers
                     "MongoDB" => await _context.MongoDBDataBases.AnyAsync(d => d.Id == model.DatabaseId),
                     "SQLite" => await _context.SqliteDataBases.AnyAsync(d => d.Id == model.DatabaseId),
                     "MariaDB" => await _context.MariaDbDataBases.AnyAsync(d => d.Id == model.DatabaseId),
+                    "Oracle" => await _context.OracleDataBases.AnyAsync(d => d.Id == model.DatabaseId),
                     _ => false
                 };
 

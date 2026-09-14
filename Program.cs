@@ -201,6 +201,7 @@ namespace BackupPro
             builder.Services.AddScoped<IDatabaseBackupProvider, MongoDbBackupProvider>();
             builder.Services.AddScoped<IDatabaseBackupProvider, SqliteBackupProvider>();
             builder.Services.AddScoped<IDatabaseBackupProvider, MariaDbBackupProvider>();
+            builder.Services.AddScoped<IDatabaseBackupProvider, OracleBackupProvider>();
 
             builder.Services.AddScoped<IStorageProvider, LocalStorageProvider>();
             builder.Services.AddScoped<IStorageProvider, FtpStorageProvider>();
