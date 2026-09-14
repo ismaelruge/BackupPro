@@ -26,6 +26,7 @@ namespace BackupPro.Data
         public DbSet<FtpStorage> FtpStorages { get; set; }
         public DbSet<LocalStorage> LocalStorages { get; set; }
         public DbSet<S3Storage> S3Storages { get; set; }
+        public DbSet<SftpStorage> SftpStorages { get; set; }
 
         // Database Configurations
         public DbSet<SqlServerDataBase> SqlServerDataBases { get; set; }

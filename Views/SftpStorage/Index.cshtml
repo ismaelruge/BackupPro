@@ -1,6 +1,6 @@
-@model IEnumerable<BackupPro.Models.S3Storage>
+@model IEnumerable<BackupPro.Models.SftpStorage>
 @{
-    ViewData["Title"] = "Amazon S3";
+    ViewData["Title"] = "Sftp Storage";
 }
 
 <div class="container mt-5">
@@ -42,7 +42,7 @@
                             </a>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <a class="nav-link" id="sftp-tab" role="tab" asp-area="" asp-controller="SftpStorage" asp-action="Index">
+                            <a class="nav-link active" id="sftp-tab" role="tab" asp-area="" asp-controller="SftpStorage" asp-action="Index">
                                 <i class="bi bi-shield-lock me-2"></i>SFTP
                             </a>
                         </li>
@@ -51,22 +51,17 @@
                                 <i class="bi bi-folder me-2"></i>Local
                             </a>
                         </li>
-                        <li class="nav-item" role="presentation">
-                            <a class="nav-link active" id="s3-tab" role="tab" asp-area="" asp-controller="S3Storage" asp-action="Index">
-                                <i class="bi bi-bucket me-2"></i>Amazon S3
-                            </a>
-                        </li>
                     </ul>
 
                     <!-- Tab Content -->
                     <div class="tab-content" id="storageTabContent">
 
-                        <!-- Amazon S3 -->
-                        <div class="tab-pane fade show active" id="s3" role="tabpanel">
+                        <!-- SFTP -->
+                        <div class="tab-pane fade show active" id="sftp" role="tabpanel">
                             <div class="text-center mb-4">
-                                <i class="bi bi-bucket text-primary" style="font-size: 3rem;"></i>
-                                <h4 class="mt-3">Amazon S3</h4>
-                                <p class="text-muted">Configura múltiples buckets de Amazon S3</p>
+                                <i class="bi bi-shield-lock text-primary" style="font-size: 3rem;"></i>
+                                <h4 class="mt-3">Servidor SFTP</h4>
+                                <p class="text-muted">Configura múltiples servidores SFTP (transferencia segura por SSH)</p>
                             </div>
 
                             <!-- Lista de configuraciones -->
@@ -82,7 +77,7 @@
                                 {
                                     <div class="alert alert-info" role="alert">
                                         <i class="bi bi-info-circle me-2"></i>
-                                        No hay configuraciones de Amazon S3 registradas. Haz clic en "Agregar Nuevo Bucket" para comenzar.
+                                        No hay configuraciones SFTP registradas. Haz clic en "Agregar Nueva Configuración" para comenzar.
                                     </div>
                                 }
                                 else
@@ -96,21 +91,17 @@
                                                     <div class="flex-grow-1">
                                                         <h6 class="mb-2 fw-semibold">
                                                             <span class="text-primary">@config.ConfigurationName</span>
-                                                            <span class="text-muted fw-normal"> - @config.BucketName</span>
+                                                            <span class="text-muted fw-normal"> - @config.Host:@config.Port</span>
                                                         </h6>
                                                         <div class="ms-4">
                                                             <div class="mb-1">
-                                                                <i class="bi bi-geo-alt me-2 text-muted"></i>
-                                                                <small class="text-muted">Región: @config.Region</small>
-                                                            </div>
-                                                            <div class="mb-1">
-                                                                <i class="bi bi-key me-2 text-muted"></i>
-                                                                <small class="text-muted">Access Key: @config.AccessKeyId</small>
+                                                                <i class="bi bi-person me-2 text-muted"></i>
+                                                                <small class="text-muted">Usuario: @config.Username</small>
                                                             </div>
                                                             <div class="mb-1">
                                                                 <i class="bi bi-folder me-2 text-muted"></i>
-                                                                <span class="text-muted">Prefijo:</span>
-                                                                <code class="ms-1">@(string.IsNullOrEmpty(config.Prefix) ? "/" : config.Prefix)</code>
+                                                                <span class="text-muted">Ruta:</span>
+                                                                <code class="ms-1">@config.RemotePath</code>
                                                             </div>
                                                             <span class="badge bg-success mt-1">
                                                                 <i class="bi bi-check-circle me-1"></i>Activo
@@ -120,12 +111,12 @@
                                                     <div>
                                                         <button class="btn btn-sm btn-outline-primary rounded-pill me-2"
                                                                 onclick="openEditModal(@config.Id)"
-                                                                aria-label="Editar configuración S3">
+                                                                aria-label="Editar configuración SFTP">
                                                             <i class="bi bi-pencil"></i>
                                                         </button>
                                                         <button class="btn btn-sm btn-outline-danger rounded-pill"
-                                                                onclick="openDeleteModal(@config.Id, '@config.ConfigurationName', '@config.BucketName', '@(string.IsNullOrEmpty(config.Prefix) ? "/" : config.Prefix)')"
-                                                                aria-label="Eliminar configuración S3">
+                                                                onclick="openDeleteModal(@config.Id, '@config.ConfigurationName', '@config.Host:@config.Port', '@config.Username', '@config.RemotePath')"
+                                                                aria-label="Eliminar configuración SFTP">
                                                             <i class="bi bi-trash"></i>
                                                         </button>
                                                     </div>
@@ -138,12 +129,11 @@
 
                             <!-- Botón agregar nueva configuración -->
                             <div class="d-grid">
-                                <button type="button" class="btn btn-outline-primary btn-lg rounded-pill" data-bs-toggle="modal" data-bs-target="#addS3Modal">
-                                    <i class="bi bi-plus-circle me-2"></i>Agregar Nuevo Bucket
+                                <button type="button" class="btn btn-outline-primary btn-lg rounded-pill" data-bs-toggle="modal" data-bs-target="#addSftpModal">
+                                    <i class="bi bi-plus-circle me-2"></i>Agregar Nueva Configuración
                                 </button>
                             </div>
                         </div>
-
                     </div>
                 </div>
             </div>
@@ -162,63 +152,60 @@
     </div>
 </div>
 
-<!-- Modal Agregar Amazon S3 -->
-<div class="modal fade" id="addS3Modal" tabindex="-1" aria-labelledby="addS3ModalLabel" aria-hidden="true">
+<!-- Modal Agregar SFTP -->
+<div class="modal fade" id="addSftpModal" tabindex="-1" aria-labelledby="addSftpModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header bg-primary text-white border-0">
-                <h5 class="modal-title" id="addS3ModalLabel">
-                    <i class="bi bi-bucket me-2"></i>Agregar Amazon S3
+                <h5 class="modal-title" id="addSftpModalLabel">
+                    <i class="bi bi-shield-lock me-2"></i>Agregar Configuración SFTP
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
             <div class="modal-body p-4">
-                <form id="addS3Form">
+                <form id="addSftpForm">
                     <div class="mb-3">
-                        <label for="s3ConfigName" class="form-label fw-semibold">
+                        <label for="sftpConfigName" class="form-label fw-semibold">
                             <i class="bi bi-tag me-2 text-primary"></i>Nombre de Configuración
                         </label>
-                        <input type="text" class="form-control" id="s3ConfigName" placeholder="Ej: S3 Principal" required>
+                        <input type="text" class="form-control" id="sftpConfigName" placeholder="Ej: Servidor SFTP Principal" required>
                         <div class="form-text">Dale un nombre descriptivo a esta configuración</div>
                     </div>
                     <div class="mb-3">
-                        <label for="s3AccessKeyId" class="form-label fw-semibold">
-                            <i class="bi bi-person-circle me-2 text-primary"></i>Access Key Id
+                        <label for="sftpHost" class="form-label fw-semibold">
+                            <i class="bi bi-hdd-network me-2 text-primary"></i>Servidor SFTP
                         </label>
-                        <input type="text" class="form-control" id="s3AccessKeyId" placeholder="AKIAIOSFODNN7EXAMPLE" required>
-                        <div class="form-text">Access Key Id de la credencial de AWS</div>
+                        <input type="text" class="form-control" id="sftpHost" placeholder="sftp.servidor.com" required>
+                        <div class="form-text">Dirección del servidor (sin el puerto)</div>
                     </div>
                     <div class="mb-3">
-                        <label for="s3SecretAccessKey" class="form-label fw-semibold">
-                            <i class="bi bi-key me-2 text-primary"></i>Secret Access Key
+                        <label for="sftpPort" class="form-label fw-semibold">
+                            <i class="bi bi-hdd-network me-2 text-primary"></i>Puerto
                         </label>
-                        <input type="password" class="form-control" id="s3SecretAccessKey" placeholder="••••••••••••••••••••" required>
-                        <div class="form-text">Secret Access Key de la credencial de AWS</div>
+                        <input type="number" class="form-control" id="sftpPort" placeholder="22" value="22" min="1" max="65535" required>
                     </div>
                     <div class="mb-3">
-                        <label for="s3BucketName" class="form-label fw-semibold">
-                            <i class="bi bi-box me-2 text-primary"></i>Nombre del Bucket
+                        <label for="sftpUsername" class="form-label fw-semibold">
+                            <i class="bi bi-person me-2 text-primary"></i>Usuario
                         </label>
-                        <input type="text" class="form-control" id="s3BucketName" placeholder="mi-bucket-backups" required>
-                        <div class="form-text">Nombre del bucket en Amazon S3</div>
+                        <input type="text" class="form-control" id="sftpUsername" placeholder="usuario_sftp" required>
                     </div>
                     <div class="mb-3">
-                        <label for="s3Region" class="form-label fw-semibold">
-                            <i class="bi bi-geo-alt me-2 text-primary"></i>Región
+                        <label for="sftpPassword" class="form-label fw-semibold">
+                            <i class="bi bi-key me-2 text-primary"></i>Contraseña
                         </label>
-                        <input type="text" class="form-control" id="s3Region" placeholder="us-east-1" required>
-                        <div class="form-text">Región de AWS donde vive el bucket</div>
+                        <input type="password" class="form-control" id="sftpPassword" placeholder="••••••••" required>
                     </div>
                     <div class="mb-3">
-                        <label for="s3Prefix" class="form-label fw-semibold">
-                            <i class="bi bi-folder me-2 text-primary"></i>Prefijo
+                        <label for="sftpPath" class="form-label fw-semibold">
+                            <i class="bi bi-folder me-2 text-primary"></i>Ruta en el Servidor
                         </label>
-                        <input type="text" class="form-control" id="s3Prefix" placeholder="folder/subfolder">
-                        <div class="form-text">Prefijo/"carpeta" dentro del bucket (opcional)</div>
+                        <input type="text" class="form-control" id="sftpPath" placeholder="/backups/principal" value="/" required>
+                        <div class="form-text">Ruta donde se guardarán los backups en el servidor SFTP</div>
                     </div>
                     <div class="alert alert-warning rounded-3 mb-0" role="alert">
                         <i class="bi bi-exclamation-triangle me-2"></i>
-                        <small><strong>Nota:</strong> Asegúrate de que la credencial de AWS tenga permisos sobre el bucket.</small>
+                        <small><strong>Nota:</strong> Asegúrate de tener acceso y permisos de escritura en el servidor SFTP.</small>
                     </div>
                 </form>
             </div>
@@ -226,63 +213,66 @@
                 <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">
                     <i class="bi bi-x-circle me-2"></i>Cancelar
                 </button>
-                <button type="submit" form="addS3Form" class="btn btn-primary rounded-pill">
-                    <i class="bi bi-bucket me-2"></i>Conectar Amazon S3
+                <button type="submit" form="addSftpForm" class="btn btn-primary rounded-pill">
+                    <i class="bi bi-shield-lock me-2"></i>Conectar Servidor SFTP
                 </button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modal Editar Amazon S3 -->
-<div class="modal fade" id="editS3Modal" tabindex="-1" aria-labelledby="editS3ModalLabel" aria-hidden="true">
+<!-- Modal Editar SFTP -->
+<div class="modal fade" id="editSftpModal" tabindex="-1" aria-labelledby="editSftpModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header bg-warning text-dark border-0">
-                <h5 class="modal-title" id="editS3ModalLabel">
-                    <i class="bi bi-pencil-square me-2"></i>Editar Amazon S3
+                <h5 class="modal-title" id="editSftpModalLabel">
+                    <i class="bi bi-pencil-square me-2"></i>Editar Configuración SFTP
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
             <div class="modal-body p-4">
-                <form id="editS3Form">
-                    <input type="hidden" id="editS3Id">
+                <form id="editSftpForm">
+                    <input type="hidden" id="editSftpId">
+                    <input type="hidden" id="editSftpCurrentPassword">
                     <div class="mb-3">
-                        <label for="editS3ConfigName" class="form-label fw-semibold">
+                        <label for="editSftpConfigName" class="form-label fw-semibold">
                             <i class="bi bi-tag me-2 text-warning"></i>Nombre de Configuración
                         </label>
-                        <input type="text" class="form-control" id="editS3ConfigName" required>
+                        <input type="text" class="form-control" id="editSftpConfigName" required>
                     </div>
                     <div class="mb-3">
-                        <label for="editS3AccessKeyId" class="form-label fw-semibold">
-                            <i class="bi bi-person-circle me-2 text-warning"></i>Access Key Id
+                        <label for="editSftpHost" class="form-label fw-semibold">
+                            <i class="bi bi-hdd-network me-2 text-warning"></i>Servidor SFTP
                         </label>
-                        <input type="text" class="form-control" id="editS3AccessKeyId" required>
+                        <input type="text" class="form-control" id="editSftpHost" placeholder="sftp.servidor.com" required>
+                        <div class="form-text">Dirección del servidor (sin el puerto)</div>
                     </div>
                     <div class="mb-3">
-                        <label for="editS3SecretAccessKey" class="form-label fw-semibold">
-                            <i class="bi bi-key me-2 text-warning"></i>Secret Access Key
+                        <label for="editSftpPort" class="form-label fw-semibold">
+                            <i class="bi bi-hdd-network me-2 text-warning"></i>Puerto
                         </label>
-                        <input type="password" class="form-control" id="editS3SecretAccessKey" placeholder="Dejar vacío para mantener el actual">
-                        <div class="form-text">Dejar vacío para mantener el Secret Access Key actual</div>
+                        <input type="number" class="form-control" id="editSftpPort" min="1" max="65535" required>
                     </div>
                     <div class="mb-3">
-                        <label for="editS3BucketName" class="form-label fw-semibold">
-                            <i class="bi bi-box me-2 text-warning"></i>Nombre del Bucket
+                        <label for="editSftpUsername" class="form-label fw-semibold">
+                            <i class="bi bi-person me-2 text-warning"></i>Usuario
                         </label>
-                        <input type="text" class="form-control" id="editS3BucketName" required>
+                        <input type="text" class="form-control" id="editSftpUsername" required>
                     </div>
                     <div class="mb-3">
-                        <label for="editS3Region" class="form-label fw-semibold">
-                            <i class="bi bi-geo-alt me-2 text-warning"></i>Región
+                        <label for="editSftpPassword" class="form-label fw-semibold">
+                            <i class="bi bi-key me-2 text-warning"></i>Contraseña
                         </label>
-                        <input type="text" class="form-control" id="editS3Region" required>
+                        <input type="password" class="form-control" id="editSftpPassword" placeholder="••••••••">
+                        <div class="form-text">Deja vacío para mantener la contraseña actual. Escribe una nueva para cambiarla.</div>
                     </div>
                     <div class="mb-3">
-                        <label for="editS3Prefix" class="form-label fw-semibold">
-                            <i class="bi bi-folder me-2 text-warning"></i>Prefijo
+                        <label for="editSftpPath" class="form-label fw-semibold">
+                            <i class="bi bi-folder me-2 text-warning"></i>Ruta en el Servidor
                         </label>
-                        <input type="text" class="form-control" id="editS3Prefix">
+                        <input type="text" class="form-control" id="editSftpPath" required>
+                        <div class="form-text">Ruta donde se guardarán los backups en el servidor SFTP</div>
                     </div>
                 </form>
             </div>
@@ -290,7 +280,7 @@
                 <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">
                     <i class="bi bi-x-circle me-2"></i>Cancelar
                 </button>
-                <button type="submit" form="editS3Form" class="btn btn-warning rounded-pill">
+                <button type="submit" form="editSftpForm" class="btn btn-warning rounded-pill">
                     <i class="bi bi-save me-2"></i>Guardar Cambios
                 </button>
             </div>
@@ -298,17 +288,18 @@
     </div>
 </div>
 
-<!-- Modal Eliminar Amazon S3 -->
-<div class="modal fade" id="deleteS3Modal" tabindex="-1" aria-labelledby="deleteS3ModalLabel" aria-hidden="true">
+<!-- Modal Eliminar SFTP -->
+<div class="modal fade" id="deleteSftpModal" tabindex="-1" aria-labelledby="deleteSftpModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header bg-danger text-white border-0">
-                <h5 class="modal-title" id="deleteS3ModalLabel">
+                <h5 class="modal-title" id="deleteSftpModalLabel">
                     <i class="bi bi-exclamation-triangle me-2"></i>Confirmar Eliminación
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
             <div class="modal-body p-4">
+                <input type="hidden" id="deleteSftpId">
                 <div class="text-center mb-4">
                     <div class="bg-danger bg-opacity-10 rounded-circle p-3 d-inline-flex mb-3">
                         <i class="bi bi-trash text-danger" style="font-size: 3rem;"></i>
@@ -317,26 +308,32 @@
                 </div>
                 <div class="bg-light rounded-3 p-3 mb-3">
                     <div class="mb-2">
-                        <strong class="text-primary" id="deleteS3ConfigName"></strong>
-                        <span class="text-muted"> - <span id="deleteS3Bucket"></span></span>
+                        <strong class="text-primary" id="deleteConfigName"></strong>
+                        <span class="text-muted" id="deleteHostPort"></span>
+                    </div>
+                    <div class="text-muted">
+                        <small>
+                            <i class="bi bi-person me-2"></i>
+                            Usuario: <code id="deleteUsername"></code>
+                        </small>
                     </div>
                     <div class="text-muted">
                         <small>
                             <i class="bi bi-folder me-2"></i>
-                            Prefijo: <code id="deleteS3Prefix"></code>
+                            Ruta: <code id="deleteRemotePath"></code>
                         </small>
                     </div>
                 </div>
                 <div class="alert alert-danger rounded-3 mb-0" role="alert">
                     <i class="bi bi-exclamation-triangle me-2"></i>
-                    <strong>Advertencia:</strong> Esta acción no se puede deshacer. Los backups existentes en Amazon S3 no serán eliminados, solo se removerá la configuración de este sistema.
+                    <strong>Advertencia:</strong> Esta acción no se puede deshacer. Los backups existentes en el servidor SFTP no serán eliminados, solo se removerá la configuración de este sistema.
                 </div>
             </div>
             <div class="modal-footer border-0 bg-light">
                 <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">
                     <i class="bi bi-x-circle me-2"></i>Cancelar
                 </button>
-                <button type="button" class="btn btn-danger rounded-pill" id="btnConfirmDeleteS3">
+                <button type="button" class="btn btn-danger rounded-pill" id="btnConfirmDelete">
                     <i class="bi bi-trash me-2"></i>Sí, Eliminar Configuración
                 </button>
             </div>
@@ -432,192 +429,152 @@
         toast.show();
     }
 
-    // ========== CRUD OPERATIONS ==========
+    // CRUD Operations
 
-    // Variables globales para eliminar
-    let deleteS3Id = null;
-
-    // Agregar nueva configuración de S3
-    document.getElementById('addS3Form')?.addEventListener('submit', async function(e) {
+    // Crear nueva configuración SFTP
+    document.getElementById('addSftpForm')?.addEventListener('submit', async function(e) {
         e.preventDefault();
 
-        const configName = document.getElementById('s3ConfigName').value.trim();
-        const accessKeyId = document.getElementById('s3AccessKeyId').value.trim();
-        const secretAccessKey = document.getElementById('s3SecretAccessKey').value.trim();
-        const bucketName = document.getElementById('s3BucketName').value.trim();
-        const region = document.getElementById('s3Region').value.trim();
-        const prefix = document.getElementById('s3Prefix').value.trim();
-
-        if (!configName || !accessKeyId || !secretAccessKey || !bucketName || !region) {
-            showToast('warning', 'Por favor, completa todos los campos requeridos.');
-            return;
-        }
+        const data = {
+            configurationName: document.getElementById('sftpConfigName').value,
+            host: document.getElementById('sftpHost').value,
+            port: parseInt(document.getElementById('sftpPort').value),
+            username: document.getElementById('sftpUsername').value,
+            password: document.getElementById('sftpPassword').value,
+            remotePath: document.getElementById('sftpPath').value
+        };
 
         try {
-            const response = await fetch('/S3Storage/Create', {
+            const response = await fetch('/SftpStorage/Create', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
                 },
-                body: JSON.stringify({
-                    ConfigurationName: configName,
-                    AccessKeyId: accessKeyId,
-                    SecretAccessKey: secretAccessKey,
-                    BucketName: bucketName,
-                    Region: region,
-                    Prefix: prefix
-                })
+                body: JSON.stringify(data)
             });
 
-            const data = await response.json();
+            const result = await response.json();
 
-            if (data.success) {
-                showToast('success', data.message || 'Configuración creada exitosamente.');
-
-                // Cerrar modal
-                const addModal = bootstrap.Modal.getInstance(document.getElementById('addS3Modal'));
-                addModal.hide();
-
-                // Limpiar formulario
-                document.getElementById('addS3Form').reset();
-
-                // Recargar página para mostrar la nueva configuración
-                setTimeout(() => location.reload(), 1000);
+            if (result.success) {
+                showToast('success', result.message);
+                bootstrap.Modal.getInstance(document.getElementById('addSftpModal')).hide();
+                setTimeout(() => window.location.reload(), 1500);
             } else {
-                showToast('error', data.message || 'Error al crear la configuración.');
+                showToast('error', result.message);
             }
         } catch (error) {
             showToast('error', 'Error de conexión: ' + error.message);
         }
     });
 
-    // Abrir modal de edición
+    // Abrir modal de editar y cargar datos
     async function openEditModal(id) {
         try {
-            const response = await fetch(`/S3Storage/GetById?id=${id}`);
-            const data = await response.json();
+            const response = await fetch(`/SftpStorage/GetById?id=${id}`);
+            const result = await response.json();
 
-            if (data.success) {
-                const config = data.data;
+            if (result.success) {
+                const data = result.data;
+                document.getElementById('editSftpId').value = data.id;
+                document.getElementById('editSftpConfigName').value = data.configurationName;
+                document.getElementById('editSftpHost').value = data.host;
+                document.getElementById('editSftpPort').value = data.port;
+                document.getElementById('editSftpUsername').value = data.username;
+                document.getElementById('editSftpPassword').value = ''; // Dejar vacío para que el usuario pueda cambiarla
+                document.getElementById('editSftpCurrentPassword').value = data.password; // Guardar contraseña actual en campo oculto
+                document.getElementById('editSftpPath').value = data.remotePath;
 
-                // Cargar datos en el formulario
-                document.getElementById('editS3Id').value = config.id;
-                document.getElementById('editS3ConfigName').value = config.configurationName;
-                document.getElementById('editS3AccessKeyId').value = config.accessKeyId;
-                document.getElementById('editS3SecretAccessKey').value = ''; // Dejar vacío por seguridad
-                document.getElementById('editS3BucketName').value = config.bucketName;
-                document.getElementById('editS3Region').value = config.region;
-                document.getElementById('editS3Prefix').value = config.prefix || '';
-
-                // Abrir modal
-                const editModal = new bootstrap.Modal(document.getElementById('editS3Modal'));
-                editModal.show();
+                const modal = new bootstrap.Modal(document.getElementById('editSftpModal'));
+                modal.show();
             } else {
-                showToast('error', 'Error al cargar la configuración.');
+                showToast('error', result.message);
             }
         } catch (error) {
-            showToast('error', 'Error de conexión: ' + error.message);
+            showToast('error', 'Error al cargar la configuración: ' + error.message);
         }
     }
 
-    // Actualizar configuración de S3
-    document.getElementById('editS3Form')?.addEventListener('submit', async function(e) {
+    // Guardar cambios de edición
+    document.getElementById('editSftpForm')?.addEventListener('submit', async function(e) {
         e.preventDefault();
 
-        const id = document.getElementById('editS3Id').value;
-        const configName = document.getElementById('editS3ConfigName').value.trim();
-        const accessKeyId = document.getElementById('editS3AccessKeyId').value.trim();
-        const secretAccessKey = document.getElementById('editS3SecretAccessKey').value.trim();
-        const bucketName = document.getElementById('editS3BucketName').value.trim();
-        const region = document.getElementById('editS3Region').value.trim();
-        const prefix = document.getElementById('editS3Prefix').value.trim();
-
-        if (!configName || !accessKeyId || !bucketName || !region) {
-            showToast('warning', 'Por favor, completa todos los campos requeridos.');
-            return;
+        // Si el campo de contraseña visible está vacío, usar la contraseña actual
+        let passwordToSend = document.getElementById('editSftpPassword').value;
+        if (!passwordToSend) {
+            passwordToSend = document.getElementById('editSftpCurrentPassword').value;
         }
 
+        const data = {
+            id: parseInt(document.getElementById('editSftpId').value),
+            configurationName: document.getElementById('editSftpConfigName').value,
+            host: document.getElementById('editSftpHost').value,
+            port: parseInt(document.getElementById('editSftpPort').value),
+            username: document.getElementById('editSftpUsername').value,
+            password: passwordToSend,
+            remotePath: document.getElementById('editSftpPath').value
+        };
+
         try {
-            const response = await fetch('/S3Storage/Edit', {
+            const response = await fetch('/SftpStorage/Edit', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
                 },
-                body: JSON.stringify({
-                    Id: parseInt(id),
-                    ConfigurationName: configName,
-                    AccessKeyId: accessKeyId,
-                    SecretAccessKey: secretAccessKey,
-                    BucketName: bucketName,
-                    Region: region,
-                    Prefix: prefix
-                })
+                body: JSON.stringify(data)
             });
 
-            const data = await response.json();
+            const result = await response.json();
 
-            if (data.success) {
-                showToast('success', data.message || 'Configuración actualizada exitosamente.');
-
-                // Cerrar modal
-                const editModal = bootstrap.Modal.getInstance(document.getElementById('editS3Modal'));
-                editModal.hide();
-
-                // Recargar página
-                setTimeout(() => location.reload(), 1000);
+            if (result.success) {
+                showToast('success', result.message);
+                bootstrap.Modal.getInstance(document.getElementById('editSftpModal')).hide();
+                setTimeout(() => window.location.reload(), 1500);
             } else {
-                showToast('error', data.message || 'Error al actualizar la configuración.');
+                showToast('error', result.message);
             }
         } catch (error) {
             showToast('error', 'Error de conexión: ' + error.message);
         }
     });
 
-    // Abrir modal de eliminación
-    function openDeleteModal(id, name, bucket, prefix) {
-        deleteS3Id = id;
-        document.getElementById('deleteS3ConfigName').textContent = name;
-        document.getElementById('deleteS3Bucket').textContent = bucket;
-        document.getElementById('deleteS3Prefix').textContent = prefix;
+    // Abrir modal de eliminar
+    function openDeleteModal(id, name, hostPort, username, remotePath) {
+        document.getElementById('deleteSftpId').value = id;
+        document.getElementById('deleteConfigName').textContent = name;
+        document.getElementById('deleteHostPort').textContent = ' - ' + hostPort;
+        document.getElementById('deleteUsername').textContent = username;
+        document.getElementById('deleteRemotePath').textContent = remotePath;
 
-        const deleteModal = new bootstrap.Modal(document.getElementById('deleteS3Modal'));
-        deleteModal.show();
+        const modal = new bootstrap.Modal(document.getElementById('deleteSftpModal'));
+        modal.show();
     }
 
     // Confirmar eliminación
-    document.getElementById('btnConfirmDeleteS3')?.addEventListener('click', async function() {
-        if (!deleteS3Id) {
-            showToast('error', 'ID de configuración no válido.');
-            return;
-        }
+    document.getElementById('btnConfirmDelete')?.addEventListener('click', async function() {
+        const id = document.getElementById('deleteSftpId').value;
 
         try {
-            const response = await fetch(`/S3Storage/Delete?id=${deleteS3Id}`, {
+            const response = await fetch('/SftpStorage/Delete?id=' + id, {
                 method: 'POST',
                 headers: {
+                    'Content-Type': 'application/json',
                     'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
                 }
             });
 
-            const data = await response.json();
+            const result = await response.json();
 
-            if (data.success) {
-                showToast('success', data.message || 'Configuración eliminada exitosamente.');
-
-                // Cerrar modal
-                const deleteModal = bootstrap.Modal.getInstance(document.getElementById('deleteS3Modal'));
-                deleteModal.hide();
-
-                // Recargar página
-                setTimeout(() => location.reload(), 1000);
+            if (result.success) {
+                showToast('success', result.message);
+                bootstrap.Modal.getInstance(document.getElementById('deleteSftpModal')).hide();
+                setTimeout(() => window.location.reload(), 1500);
             } else {
-                showToast('error', data.message || 'Error al eliminar la configuración.');
+                showToast('error', result.message);
             }
         } catch (error) {
             showToast('error', 'Error de conexión: ' + error.message);
         }
     });
-
 </script>

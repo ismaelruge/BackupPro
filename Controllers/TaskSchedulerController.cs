@@ -154,6 +154,13 @@ namespace BackupPro.Controllers
                     names[("S3", s.Id)] = s.ConfigurationName;
             }
 
+            var sftpIds = IdsFor(tasks, "Sftp", task => task.StorageType, task => task.StorageId);
+            if (sftpIds.Count > 0)
+            {
+                await foreach (var s in _context.SftpStorages.Where(s => sftpIds.Contains(s.Id)).AsAsyncEnumerable())
+                    names[("Sftp", s.Id)] = s.ConfigurationName;
+            }
+
             return names;
         }
 
@@ -230,6 +237,9 @@ namespace BackupPro.Controllers
                         .Select(s => new { id = s.Id, name = s.ConfigurationName })
                         .ToListAsync(),
                     "S3" => await _context.S3Storages
+                        .Select(s => new { id = s.Id, name = s.ConfigurationName })
+                        .ToListAsync(),
+                    "Sftp" => await _context.SftpStorages
                         .Select(s => new { id = s.Id, name = s.ConfigurationName })
                         .ToListAsync(),
                     _ => new List<object>()
@@ -322,6 +332,7 @@ namespace BackupPro.Controllers
                     "Ftp" => await _context.FtpStorages.AnyAsync(s => s.Id == model.StorageId),
                     "Local" => await _context.LocalStorages.AnyAsync(s => s.Id == model.StorageId),
                     "S3" => await _context.S3Storages.AnyAsync(s => s.Id == model.StorageId),
+                    "Sftp" => await _context.SftpStorages.AnyAsync(s => s.Id == model.StorageId),
                     _ => false
                 };
 
@@ -484,6 +495,7 @@ namespace BackupPro.Controllers
                     "Ftp" => await _context.FtpStorages.AnyAsync(s => s.Id == model.StorageId),
                     "Local" => await _context.LocalStorages.AnyAsync(s => s.Id == model.StorageId),
                     "S3" => await _context.S3Storages.AnyAsync(s => s.Id == model.StorageId),
+                    "Sftp" => await _context.SftpStorages.AnyAsync(s => s.Id == model.StorageId),
                     _ => false
                 };
 
