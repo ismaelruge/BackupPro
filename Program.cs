@@ -1,3 +1,4 @@
+using BackupPro.Binders;
 using BackupPro.Data;
 using BackupPro.Filters;
 using BackupPro.Services;
@@ -177,6 +178,10 @@ namespace BackupPro
                 // completar el asistente de configuración inicial antes de dejar usar cualquier
                 // otra parte de la app.
                 options.Filters.AddService<RequireSetupCompleteFilter>();
+
+                // Recorta espacios en blanco al inicio/final de todo campo de texto recibido
+                // (excepto contraseñas), sin tener que repetirlo en cada controlador.
+                options.ModelBinderProviders.Insert(0, new TrimmingModelBinderProvider());
             });
             builder.Services.AddScoped<EmailService>();
             builder.Services.AddSingleton<CredentialProtector>();

@@ -143,6 +143,11 @@ organizado en capas lógicas por carpeta:
     usuario existente es el `admin` temporal); usado por `AccountController` y por
     `Filters/RequireSetupCompleteFilter.cs`, que bloquea el resto de la aplicación hasta que se
     complete el asistente de configuración inicial.
+  - `Binders/TrimmingModelBinder.cs`: recorta espacios en blanco al inicio/final de todo campo de
+    texto recibido por form/query/ruta (excepto contraseñas), registrado una sola vez en
+    `Program.cs` en vez de repetir `.Trim()` en cada controlador. Su contraparte del lado del
+    cliente vive en `wwwroot/js/site.js`, que también implementa la protección anti-doble-clic
+    global (deshabilita el botón de envío de cualquier formulario al enviarlo).
 - **Composición** — `Program.cs` (registro de servicios en el contenedor de DI, pipeline HTTP).
 
 Un matiz honesto: no es una arquitectura N-Tier estricta. Los 9 controladores de
@@ -225,9 +230,9 @@ error, con providers simulados), `BackupRetentionService` (los distintos escenar
 destino registrado, series independientes), `BackupRestoreService` (backup inexistente, con error,
 sin motor/destino registrado, fallo al descargar, éxito de punta a punta, combinación no soportada —
 todo con providers simulados, sin depender de un motor de base de datos real), `CredentialProtector`
-(cifrado/descifrado, valores legados sin cifrar) y `SetupState` (detección del estado "recién
-instalado"). No hay pruebas de
-controladores ni de vistas todavía.
+(cifrado/descifrado, valores legados sin cifrar), `SetupState` (detección del estado "recién
+instalado") y `TrimmingRules` (qué propiedades se excluyen del recorte automático). No hay pruebas
+de controladores ni de vistas todavía.
 
 ## Autor
 
