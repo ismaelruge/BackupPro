@@ -322,34 +322,34 @@ namespace BackupPro.Controllers.StorageTypes
 
     public class BlobConnectionRequest
     {
-        public string ConnectionString { get; set; }
+        public string ConnectionString { get; set; } = string.Empty;
     }
 
     public class BlobCreateDirectoryRequest
     {
-        public string ConnectionString { get; set; }
-        public string ContainerName { get; set; }
-        public string CurrentPath { get; set; }
-        public string NewFolderName { get; set; }
+        public string ConnectionString { get; set; } = string.Empty;
+        public string ContainerName { get; set; } = string.Empty;
+        public string CurrentPath { get; set; } = string.Empty;
+        public string NewFolderName { get; set; } = string.Empty;
     }
 
     public class BlobDirectoryRequest
     {
-        public string ConnectionString { get; set; }
-        public string ContainerName { get; set; }
-        public string Path { get; set; }
+        public string ConnectionString { get; set; } = string.Empty;
+        public string ContainerName { get; set; } = string.Empty;
+        public string Path { get; set; } = string.Empty;
     }
 
     public class BlobContainerInfo
     {
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
         public DateTime LastModified { get; set; }
     }
 
     public class BlobDirectoryInfo
     {
-        public string Name { get; set; }
-        public string FullPath { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string FullPath { get; set; } = string.Empty;
     }
 
     #endregion

@@ -597,15 +597,15 @@ namespace BackupPro.Controllers.StorageTypes
 
     public class OneDriveListRequest
     {
-        public string AccessToken { get; set; }
-        public string ItemId { get; set; }
+        public string AccessToken { get; set; } = string.Empty;
+        public string ItemId { get; set; } = string.Empty;
     }
 
     public class OneDriveCreateFolderRequest
     {
-        public string AccessToken { get; set; }
-        public string ParentId { get; set; }
-        public string FolderName { get; set; }
+        public string AccessToken { get; set; } = string.Empty;
+        public string ParentId { get; set; } = string.Empty;
+        public string FolderName { get; set; } = string.Empty;
     }
 
     public class OneDriveListByIdRequest
@@ -623,15 +623,15 @@ namespace BackupPro.Controllers.StorageTypes
 
     public class OneDriveFolderInfo
     {
-        public string Id { get; set; }
-        public string Name { get; set; }
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
         public DateTime LastModifiedDateTime { get; set; }
     }
 
     public class SaveTokensRequest
     {
         public int Id { get; set; }
-        public string AccessToken { get; set; }
-        public string RefreshToken { get; set; }
+        public string AccessToken { get; set; } = string.Empty;
+        public string RefreshToken { get; set; } = string.Empty;
     }
 }

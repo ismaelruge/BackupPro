@@ -125,7 +125,7 @@ namespace BackupPro.Controllers
             }
             else
             {
-                user = await _userManager.FindByNameAsync(model.Email);
+                user = await _userManager.FindByNameAsync(model.Email ?? string.Empty);
             }
 
             string errorMessage = "Usuario o contraseña incorrectos.";

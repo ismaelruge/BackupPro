@@ -329,25 +329,25 @@ namespace BackupPro.Controllers.StorageTypes
     #region Clases de soporte
     public class FtpConnectionRequest
     {
-        public string Host { get; set; }
-        public string Username { get; set; }
-        public string Password { get; set; }
-        public string Path { get; set; }
+        public string Host { get; set; } = string.Empty;
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public string Path { get; set; } = string.Empty;
     }
 
     public class FtpCreateDirectoryRequest
     {
-        public string Host { get; set; }
-        public string Username { get; set; }
-        public string Password { get; set; }
-        public string CurrentPath { get; set; }
-        public string NewFolderName { get; set; }
+        public string Host { get; set; } = string.Empty;
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public string CurrentPath { get; set; } = string.Empty;
+        public string NewFolderName { get; set; } = string.Empty;
     }
 
     public class FtpDirectoryInfo
     {
-        public string Name { get; set; }
-        public string FullPath { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string FullPath { get; set; } = string.Empty;
         public DateTime ModifiedDate { get; set; }
     }
 

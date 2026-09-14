@@ -32,6 +32,13 @@ namespace BackupPro.Services.Backup
         /// </summary>
         private static bool EnsureFolderWritePermissions(string folderPath)
         {
+            // Las ACL de NTFS (System.Security.AccessControl) solo existen en Windows; en otros
+            // sistemas operativos no hay nada que otorgar y se omite sin error.
+            if (!OperatingSystem.IsWindows())
+            {
+                return false;
+            }
+
             try
             {
                 var directoryInfo = new DirectoryInfo(folderPath);
