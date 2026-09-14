@@ -1,7 +1,8 @@
 # BackupPro
 
 Aplicación web (ASP.NET Core 9 MVC) para programar y gestionar backups de bases de datos hacia
-distintos destinos de almacenamiento.
+distintos destinos de almacenamiento. **De uso gratuito**, con un requisito de atribución de
+autoría (ver [Licencia](#licencia)).
 
 - **Bases de datos soportadas:** SQL Server, MySQL, PostgreSQL, MongoDB.
 - **Destinos de almacenamiento soportados:** disco local, FTP, Azure Blob Storage, Google Drive,
@@ -166,11 +167,18 @@ Creado por **[Ismael Ruge González](https://ismaelruge.github.io)**.
 
 ## Licencia
 
-Ver [LICENSE.txt](LICENSE.txt) — MIT con un requisito adicional de atribución: toda copia,
-fork, modificación o instancia pública de este software (modificada o no) debe mantener visible
-para sus usuarios finales, sin alterar, el aviso "Desarrollado por Ismael Ruge González" con
-enlace a [ismaelruge.github.io](https://ismaelruge.github.io), tal como aparece en el pie de
-página de la aplicación (`Views/Shared/_Layout.cshtml`). Quitar, ocultar o modificar ese aviso
-excede el permiso otorgado por la licencia y constituye una infracción de los derechos de autor y
-propiedad intelectual, pudiendo dar lugar a acciones legales — el texto completo y vinculante está
-en [LICENSE.txt](LICENSE.txt).
+Ver [LICENSE.txt](LICENSE.txt) — MIT con un requisito adicional de atribución y autoría. El
+software es **gratuito para sus usuarios finales**, pero eso no renuncia a la autoría ni a la
+propiedad intelectual del proyecto, que son de Ismael Ruge González. Toda copia, fork,
+modificación o instancia pública de este software (modificada o no) debe:
+
+- Mantener visible para sus usuarios finales, sin alterar, el aviso "Desarrollado por Ismael Ruge
+  González" con enlace a [ismaelruge.github.io](https://ismaelruge.github.io), tal como aparece en
+  el pie de página de la aplicación (`Views/Shared/_Layout.cshtml`).
+- No quitar, alterar ni reasignar a otro nombre el autor, el aviso de copyright de
+  [LICENSE.txt](LICENSE.txt), ni ningún otro aviso de autoría o propiedad intelectual del proyecto
+  (incluyendo los metadatos de `BackupPro.csproj` y los créditos de este README).
+
+Quitar, ocultar, alterar o reasignar cualquiera de esos avisos excede el permiso otorgado por la
+licencia y constituye una infracción de los derechos de autor y propiedad intelectual, pudiendo
+dar lugar a acciones legales — el texto completo y vinculante está en [LICENSE.txt](LICENSE.txt).
