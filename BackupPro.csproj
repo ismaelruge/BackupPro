@@ -11,6 +11,7 @@
     <Company>Ismael Ruge González</Company>
     <Product>BackupPro</Product>
     <Copyright>Copyright (c) 2026 Ismael Ruge González</Copyright>
+    <PackageProjectUrl>https://ismaelruge.github.io</PackageProjectUrl>
   </PropertyGroup>
 
   <ItemGroup>

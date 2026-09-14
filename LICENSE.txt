@@ -1,6 +1,6 @@
-MIT License
+MIT License with Attribution Requirement
 
-Copyright (c) 2026 Ismael Ruge González
+Copyright (c) 2026 Ismael Ruge González (https://ismaelruge.github.io)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -11,6 +11,20 @@ furnished to do so, subject to the following conditions:
 
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
+
+ATTRIBUTION REQUIREMENT: Any copy, fork, modification, deployment, or
+public-facing instance of the Software, whether or not substantially
+modified, must keep visible to its end users, unmodified and unobscured, the
+attribution notice "Desarrollado por Ismael Ruge González" (or its direct
+English equivalent, "Developed by Ismael Ruge González") together with a
+working hyperlink to https://ismaelruge.github.io — in the same location and
+manner in which it appears in the original Software (the footer rendered on
+every page; see Views/Shared/_Layout.cshtml). Removing, hiding, obscuring, or
+altering this attribution notice or link, or distributing or deploying the
+Software without it, exceeds the permission granted above and constitutes an
+infringement of the author's copyright and intellectual property rights,
+which may subject the infringing party to legal action, including but not
+limited to claims for copyright infringement and damages.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,

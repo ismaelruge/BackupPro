@@ -162,8 +162,15 @@ ni de vistas todavía.
 
 ## Autor
 
-Creado por **Ismael Ruge González**.
+Creado por **[Ismael Ruge González](https://ismaelruge.github.io)**.
 
 ## Licencia
 
-Ver [LICENSE.txt](LICENSE.txt).
+Ver [LICENSE.txt](LICENSE.txt) — MIT con un requisito adicional de atribución: toda copia,
+fork, modificación o instancia pública de este software (modificada o no) debe mantener visible
+para sus usuarios finales, sin alterar, el aviso "Desarrollado por Ismael Ruge González" con
+enlace a [ismaelruge.github.io](https://ismaelruge.github.io), tal como aparece en el pie de
+página de la aplicación (`Views/Shared/_Layout.cshtml`). Quitar, ocultar o modificar ese aviso
+excede el permiso otorgado por la licencia y constituye una infracción de los derechos de autor y
+propiedad intelectual, pudiendo dar lugar a acciones legales — el texto completo y vinculante está
+en [LICENSE.txt](LICENSE.txt).
