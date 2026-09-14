@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using BackupPro.Data;
 using BackupPro.Models;
 using BackupPro.Services;
+using BackupPro.Services.OAuth;
 using BackupPro.ViewModels;
 using Microsoft.EntityFrameworkCore;
 using System.IO.Compression;
@@ -16,13 +17,15 @@ namespace BackupPro.Controllers.StorageTypes
         private readonly ApplicationDbContext _context;
         private readonly GoogleOAuthSettings _googleOAuthSettings;
         private readonly CredentialProtector _credentialProtector;
+        private readonly GoogleDriveTokenService _tokenService;
         private readonly ILogger<GoogleDriveStorageController> _logger;
 
-        public GoogleDriveStorageController(ApplicationDbContext context, GoogleOAuthSettings googleOAuthSettings, CredentialProtector credentialProtector, ILogger<GoogleDriveStorageController> logger)
+        public GoogleDriveStorageController(ApplicationDbContext context, GoogleOAuthSettings googleOAuthSettings, CredentialProtector credentialProtector, GoogleDriveTokenService tokenService, ILogger<GoogleDriveStorageController> logger)
         {
             _context = context;
             _googleOAuthSettings = googleOAuthSettings;
             _credentialProtector = credentialProtector;
+            _tokenService = tokenService;
             _logger = logger;
         }
 
@@ -487,12 +490,12 @@ namespace BackupPro.Controllers.StorageTypes
             try
             {
                 var googleDrive = await _context.GoogleDriveStorages.FindAsync(request.Id);
-                if (googleDrive == null || !await EnsureValidToken(googleDrive))
+                if (googleDrive == null || !await _tokenService.EnsureValidTokenAsync(googleDrive))
                 {
                     return Json(new { success = false, message = "No hay un token de acceso válido para Google Drive. Por favor, autentícate primero." });
                 }
 
-                string accessToken = _credentialProtector.Unprotect(googleDrive.AccessToken) ?? string.Empty;
+                string accessToken = _tokenService.GetPlainAccessToken(googleDrive);
 
                 using var httpClient = new HttpClient();
                 httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
@@ -529,12 +532,12 @@ namespace BackupPro.Controllers.StorageTypes
             try
             {
                 var googleDrive = await _context.GoogleDriveStorages.FindAsync(request.Id);
-                if (googleDrive == null || !await EnsureValidToken(googleDrive))
+                if (googleDrive == null || !await _tokenService.EnsureValidTokenAsync(googleDrive))
                 {
                     return Json(new { success = false, message = "No hay un token de acceso válido para Google Drive. Por favor, autentícate primero." });
                 }
 
-                string accessToken = _credentialProtector.Unprotect(googleDrive.AccessToken) ?? string.Empty;
+                string accessToken = _tokenService.GetPlainAccessToken(googleDrive);
                 var (success, folderId, message) = await CreateDriveFolderInternal(accessToken, request.ParentId, request.FolderName);
                 return success
                     ? Json(new { success = true, folderId, message = "Carpeta creada exitosamente" })
@@ -597,318 +600,8 @@ namespace BackupPro.Controllers.StorageTypes
             var data = System.Text.Json.JsonDocument.Parse(responseJson);
             return (true, data.RootElement.GetProperty("id").GetString(), string.Empty);
         }
-
-        // ========== TOKEN REFRESH ==========
-
-        /// <summary>
-        /// Renueva el access token usando el refresh token
-        /// </summary>
-        private async Task<bool> RefreshAccessToken(GoogleDriveStorage googleDriveStorage)
-        {
-            try
-            {
-                if (string.IsNullOrEmpty(googleDriveStorage.RefreshToken))
-                {
-                    return false;
-                }
-
-                string plainRefreshToken = _credentialProtector.Unprotect(googleDriveStorage.RefreshToken) ?? string.Empty;
-                var tokenRequest = new Dictionary<string, string>
-                {
-                    {"refresh_token", plainRefreshToken},
-                    {"client_id", _googleOAuthSettings.ClientId!},
-                    {"client_secret", _googleOAuthSettings.ClientSecret!},
-                    {"grant_type", "refresh_token"}
-                };
-
-                using var httpClient = new HttpClient();
-                var tokenResponse = await httpClient.PostAsync("https://oauth2.googleapis.com/token",
-                    new FormUrlEncodedContent(tokenRequest));
-
-                if (!tokenResponse.IsSuccessStatusCode)
-                {
-                    var errorContent = await tokenResponse.Content.ReadAsStringAsync();
-                    _logger.LogWarning("No se pudo renovar el token de Google Drive: {Error}", errorContent);
-                    return false;
-                }
-
-                var tokenJson = await tokenResponse.Content.ReadAsStringAsync();
-                var tokenData = System.Text.Json.JsonDocument.Parse(tokenJson);
-                var newAccessToken = tokenData.RootElement.GetProperty("access_token").GetString();
-
-                // Actualizar el token en la base de datos (cifrado)
-                googleDriveStorage.AccessToken = _credentialProtector.Protect(newAccessToken);
-
-                // Google generalmente no devuelve un nuevo refresh_token en la renovación
-                // El refresh_token original sigue siendo válido
-
-                googleDriveStorage.TokenExpiresAt = DateTime.Now.AddHours(1);
-                googleDriveStorage.LastModifiedAt = DateTime.Now;
-
-                _context.GoogleDriveStorages.Update(googleDriveStorage);
-                await _context.SaveChangesAsync();
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error al renovar el token de Google Drive");
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Verifica si el token está expirado y lo renueva si es necesario
-        /// </summary>
-        private async Task<bool> EnsureValidToken(GoogleDriveStorage googleDriveStorage)
-        {
-            // Si no hay token, no se puede renovar
-            if (string.IsNullOrEmpty(googleDriveStorage.AccessToken))
-            {
-                return false;
-            }
-
-            // Si el token no ha expirado, está válido
-            if (googleDriveStorage.TokenExpiresAt.HasValue && googleDriveStorage.TokenExpiresAt.Value > DateTime.Now.AddMinutes(5))
-            {
-                return true;
-            }
-
-            return await RefreshAccessToken(googleDriveStorage);
-        }
-
-        /// <summary>
-        /// Registra un error en el histórico de backups
-        /// </summary>
-        private async Task LogBackupError(int databaseId, string databaseName, DateTime startTime, string errorMessage)
-        {
-            try
-            {
-                var backupHistory = new BackupHistory
-                {
-                    DatabaseSourceId = databaseId,
-                    DatabaseName = databaseName,
-                    Date = startTime,
-                    Status = "Error",
-                    Message = errorMessage,
-                    BackupPath = "N/A"
-                };
-
-                _context.BackupHistories.Add(backupHistory);
-                await _context.SaveChangesAsync();
-            }
-            catch
-            {
-                // Ignorar errores al registrar en histórico
-            }
-        }
-
-        // ========== BACKUP OPERATIONS ==========
-
-        /// <summary>
-        /// Guarda un backup (MemoryStream) en Google Drive
-        /// </summary>
-        /// <param name="googleDriveStorageId">ID de la configuración de Google Drive</param>
-        /// <param name="backupStream">Stream del backup</param>
-        /// <param name="fileName">Nombre del archivo</param>
-        /// <param name="databaseName">Nombre de la base de datos</param>
-        /// <param name="databaseId">ID de la base de datos de origen</param>
-        /// <returns>Tuple con el resultado de la operación</returns>
-        public async Task<(bool success, string filePath, long fileSize, string errorMessage)> SaveBackup(int googleDriveStorageId, MemoryStream backupStream, string fileName, string databaseName, int databaseId)
-        {
-            var startTime = DateTime.Now;
-            string googleDrivePath = string.Empty;
-            string localTempPath = string.Empty;
-
-            try
-            {
-                // Obtener configuración de Google Drive
-                var googleDriveStorage = await _context.GoogleDriveStorages.FindAsync(googleDriveStorageId);
-                if (googleDriveStorage == null)
-                {
-                    var errorMsg = "Configuración de Google Drive no encontrada";
-                    await LogBackupError(databaseId, databaseName, startTime, errorMsg);
-                    return (false, string.Empty, 0, errorMsg);
-                }
-
-                // Verificar y renovar token si es necesario
-                if (!await EnsureValidToken(googleDriveStorage))
-                {
-                    var errorMsg = "No hay un token de acceso válido para Google Drive. Por favor, autentícate primero.";
-                    await LogBackupError(databaseId, databaseName, startTime, errorMsg);
-                    return (false, string.Empty, 0, errorMsg);
-                }
-
-                // Cambiar extensión a .zip
-                string zipFileName = Path.ChangeExtension(fileName, ".zip");
-
-                // Construir ruta de Google Drive
-                googleDrivePath = string.IsNullOrEmpty(googleDriveStorage.FolderPath)
-                    ? zipFileName
-                    : $"{googleDriveStorage.FolderPath.TrimEnd('/')}/{zipFileName}";
-
-                // Crear archivo temporal local comprimido
-                localTempPath = Path.Combine(Path.GetTempPath(), zipFileName);
-
-                // Comprimir el backup en un archivo .zip temporal
-                using (var fileStream = new FileStream(localTempPath, FileMode.Create, FileAccess.Write))
-                using (var zipArchive = new ZipArchive(fileStream, ZipArchiveMode.Create, false))
-                {
-                    var entry = zipArchive.CreateEntry(fileName, CompressionLevel.Optimal);
-
-                    using (var entryStream = entry.Open())
-                    {
-                        backupStream.Position = 0; // Asegurar que el stream está al inicio
-                        await backupStream.CopyToAsync(entryStream);
-                    }
-                }
-
-                // Subir a Google Drive usando Google Drive API v3
-                string accessToken = _credentialProtector.Unprotect(googleDriveStorage.AccessToken) ?? string.Empty;
-                using var httpClient = new HttpClient();
-                httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
-
-                // Preparar metadata del archivo
-                var parentId = string.IsNullOrEmpty(googleDriveStorage.FolderId) ? "root" : googleDriveStorage.FolderId;
-                var metadata = new
-                {
-                    name = zipFileName,
-                    parents = new[] { parentId }
-                };
-
-                var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
-
-                // Leer el archivo en bytes
-                byte[] fileBytes = await System.IO.File.ReadAllBytesAsync(localTempPath);
-
-                // Crear el cuerpo multipart/related manualmente
-                var boundary = "===============" + DateTime.Now.Ticks.ToString("x") + "==";
-                var delimiter = "\r\n--" + boundary + "\r\n";
-                var closeDelimiter = "\r\n--" + boundary + "--";
-
-                var multipartBody = new StringBuilder();
-                multipartBody.Append(delimiter);
-                multipartBody.Append("Content-Type: application/json; charset=UTF-8\r\n\r\n");
-                multipartBody.Append(metadataJson);
-                multipartBody.Append(delimiter);
-                multipartBody.Append("Content-Type: application/zip\r\n");
-                multipartBody.Append("Content-Transfer-Encoding: base64\r\n\r\n");
-                multipartBody.Append(Convert.ToBase64String(fileBytes));
-                multipartBody.Append(closeDelimiter);
-
-                var content = new StringContent(multipartBody.ToString(), System.Text.Encoding.UTF8);
-                content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("multipart/related");
-                content.Headers.ContentType.Parameters.Add(new System.Net.Http.Headers.NameValueHeaderValue("boundary", boundary));
-
-                var response = await httpClient.PostAsync("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,size", content);
-                var responseJson = await response.Content.ReadAsStringAsync();
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    var errorMsg = $"Error al subir archivo a Google Drive: {responseJson}";
-                    await LogBackupError(databaseId, databaseName, startTime, errorMsg);
-                    return (false, string.Empty, 0, errorMsg);
-                }
-
-                // Obtener tamaño del archivo desde la respuesta
-                var responseData = System.Text.Json.JsonDocument.Parse(responseJson);
-                var fileId = responseData.RootElement.GetProperty("id").GetString();
-
-                long fileSize = 0;
-                if (responseData.RootElement.TryGetProperty("size", out var sizeElement))
-                {
-                    fileSize = long.Parse(sizeElement.GetString()!);
-                }
-                else
-                {
-                    // Si no se puede obtener el tamaño desde la API, usar el tamaño del archivo local
-                    fileSize = new FileInfo(localTempPath).Length;
-                }
-
-                var duration = DateTime.Now - startTime;
-
-                // Registrar en el histórico
-                var backupHistory = new BackupHistory
-                {
-                    DatabaseSourceId = databaseId,
-                    DatabaseName = databaseName,
-                    Date = startTime,
-                    Status = "Exitoso",
-                    Message = $"Backup guardado exitosamente en Google Drive. Tamaño: {FormatBytes(fileSize)}. Duración: {duration.TotalSeconds:F2} segundos.",
-                    BackupPath = googleDrivePath
-                };
-
-                _context.BackupHistories.Add(backupHistory);
-                await _context.SaveChangesAsync();
-
-                // Eliminar archivo temporal local
-                try
-                {
-                    if (System.IO.File.Exists(localTempPath))
-                    {
-                        System.IO.File.Delete(localTempPath);
-                    }
-                }
-                catch { /* Ignorar errores al eliminar */ }
-
-                return (true, googleDrivePath, fileSize, string.Empty);
-            }
-            catch (Exception ex)
-            {
-                // Error general
-                var errorMessage = $"Error al guardar backup en Google Drive: {ex.Message}";
-
-                // Eliminar archivo temporal local si existe
-                try
-                {
-                    if (!string.IsNullOrEmpty(localTempPath) && System.IO.File.Exists(localTempPath))
-                    {
-                        System.IO.File.Delete(localTempPath);
-                    }
-                }
-                catch { /* Ignorar errores al eliminar */ }
-
-                // Registrar error en el histórico
-                try
-                {
-                    var backupHistory = new BackupHistory
-                    {
-                        DatabaseSourceId = databaseId,
-                        DatabaseName = databaseName,
-                        Date = startTime,
-                        Status = "Error",
-                        Message = errorMessage,
-                        BackupPath = googleDrivePath ?? "N/A"
-                    };
-
-                    _context.BackupHistories.Add(backupHistory);
-                    await _context.SaveChangesAsync();
-                }
-                catch { /* Ignorar errores al registrar */ }
-
-                _logger.LogError(ex, "Error al guardar backup en Google Drive {GoogleDriveStorageId}", googleDriveStorageId);
-                return (false, string.Empty, 0, errorMessage);
-            }
-        }
-
-        /// <summary>
-        /// Formatea bytes a una representación legible (KB, MB, GB)
-        /// </summary>
-        private string FormatBytes(long bytes)
-        {
-            string[] sizes = { "B", "KB", "MB", "GB", "TB" };
-            double len = bytes;
-            int order = 0;
-
-            while (len >= 1024 && order < sizes.Length - 1)
-            {
-                order++;
-                len = len / 1024;
-            }
-
-            return $"{len:0.##} {sizes[order]}";
-        }
     }
+
     public class DriveListRequest
     {
         public string AccessToken { get; set; }

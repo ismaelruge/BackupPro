@@ -3,9 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 using BackupPro.Data;
 using BackupPro.Models;
 using BackupPro.Services;
+using BackupPro.Services.OAuth;
 using BackupPro.ViewModels;
 using Microsoft.EntityFrameworkCore;
-using System.IO.Compression;
 
 namespace BackupPro.Controllers.StorageTypes
 {
@@ -15,13 +15,15 @@ namespace BackupPro.Controllers.StorageTypes
         private readonly ApplicationDbContext _context;
         private readonly OneDriveSettings _oneDriveSettings;
         private readonly CredentialProtector _credentialProtector;
+        private readonly OneDriveTokenService _tokenService;
         private readonly ILogger<OneDriveStorageController> _logger;
 
-        public OneDriveStorageController(ApplicationDbContext context, OneDriveSettings oneDriveSettings, CredentialProtector credentialProtector, ILogger<OneDriveStorageController> logger)
+        public OneDriveStorageController(ApplicationDbContext context, OneDriveSettings oneDriveSettings, CredentialProtector credentialProtector, OneDriveTokenService tokenService, ILogger<OneDriveStorageController> logger)
         {
             _context = context;
             _oneDriveSettings = oneDriveSettings;
             _credentialProtector = credentialProtector;
+            _tokenService = tokenService;
             _logger = logger;
         }
 
@@ -472,12 +474,12 @@ namespace BackupPro.Controllers.StorageTypes
             try
             {
                 var oneDrive = await _context.OneDriveStorages.FindAsync(request.Id);
-                if (oneDrive == null || !await EnsureValidToken(oneDrive))
+                if (oneDrive == null || !await _tokenService.EnsureValidTokenAsync(oneDrive))
                 {
                     return Json(new { success = false, message = "No hay un token de acceso válido para OneDrive. Por favor, autentícate primero." });
                 }
 
-                string accessToken = _credentialProtector.Unprotect(oneDrive.AccessToken) ?? string.Empty;
+                string accessToken = _tokenService.GetPlainAccessToken(oneDrive);
                 var (success, folders, message) = await ListOneDriveFoldersInternal(accessToken, request.ItemId);
                 return success ? Json(new { success = true, folders }) : Json(new { success = false, message });
             }
@@ -499,12 +501,12 @@ namespace BackupPro.Controllers.StorageTypes
             try
             {
                 var oneDrive = await _context.OneDriveStorages.FindAsync(request.Id);
-                if (oneDrive == null || !await EnsureValidToken(oneDrive))
+                if (oneDrive == null || !await _tokenService.EnsureValidTokenAsync(oneDrive))
                 {
                     return Json(new { success = false, message = "No hay un token de acceso válido para OneDrive. Por favor, autentícate primero." });
                 }
 
-                string accessToken = _credentialProtector.Unprotect(oneDrive.AccessToken) ?? string.Empty;
+                string accessToken = _tokenService.GetPlainAccessToken(oneDrive);
                 var (success, folderId, message) = await CreateOneDriveFolderInternal(accessToken, request.ParentId, request.FolderName);
                 return success
                     ? Json(new { success = true, folderId, message = "Carpeta creada exitosamente" })
@@ -591,295 +593,6 @@ namespace BackupPro.Controllers.StorageTypes
             return (true, data.RootElement.GetProperty("id").GetString(), string.Empty);
         }
 
-        // ========== TOKEN REFRESH ==========
-
-        /// <summary>
-        /// Renueva el access token usando el refresh token
-        /// </summary>
-        private async Task<bool> RefreshAccessToken(OneDriveStorage oneDriveStorage)
-        {
-            try
-            {
-                if (string.IsNullOrEmpty(oneDriveStorage.RefreshToken))
-                {
-                    return false;
-                }
-
-                string plainRefreshToken = _credentialProtector.Unprotect(oneDriveStorage.RefreshToken) ?? string.Empty;
-                var tokenRequest = new Dictionary<string, string>
-                {
-                    {"refresh_token", plainRefreshToken},
-                    {"client_id", _oneDriveSettings.ClientId!},
-                    {"client_secret", _oneDriveSettings.ClientSecret!},
-                    {"grant_type", "refresh_token"}
-                };
-
-                using var httpClient = new HttpClient();
-                var tokenResponse = await httpClient.PostAsync("https://login.microsoftonline.com/common/oauth2/v2.0/token",
-                    new FormUrlEncodedContent(tokenRequest));
-
-                if (!tokenResponse.IsSuccessStatusCode)
-                {
-                    return false;
-                }
-
-                var tokenJson = await tokenResponse.Content.ReadAsStringAsync();
-                var tokenData = System.Text.Json.JsonDocument.Parse(tokenJson);
-                var newAccessToken = tokenData.RootElement.GetProperty("access_token").GetString();
-
-                // Actualizar el token en la base de datos (cifrado)
-                oneDriveStorage.AccessToken = _credentialProtector.Protect(newAccessToken);
-
-                // Actualizar refresh token si viene uno nuevo
-                if (tokenData.RootElement.TryGetProperty("refresh_token", out var newRefreshToken))
-                {
-                    oneDriveStorage.RefreshToken = _credentialProtector.Protect(newRefreshToken.GetString());
-                }
-
-                oneDriveStorage.TokenExpiresAt = DateTime.Now.AddHours(1);
-                oneDriveStorage.LastModifiedAt = DateTime.Now;
-
-                _context.OneDriveStorages.Update(oneDriveStorage);
-                await _context.SaveChangesAsync();
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error al renovar el token de OneDrive");
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Verifica si el token está expirado y lo renueva si es necesario
-        /// </summary>
-        private async Task<bool> EnsureValidToken(OneDriveStorage oneDriveStorage)
-        {
-            // Si no hay token, no se puede renovar
-            if (string.IsNullOrEmpty(oneDriveStorage.AccessToken))
-            {
-                return false;
-            }
-
-            // Si el token no ha expirado, está válido
-            if (oneDriveStorage.TokenExpiresAt.HasValue && oneDriveStorage.TokenExpiresAt.Value > DateTime.Now.AddMinutes(5))
-            {
-                return true;
-            }
-
-            // Token expirado o próximo a expirar, intentar renovar
-            return await RefreshAccessToken(oneDriveStorage);
-        }
-
-        /// <summary>
-        /// Registra un error en el histórico de backups
-        /// </summary>
-        private async Task LogBackupError(int databaseId, string databaseName, DateTime startTime, string errorMessage)
-        {
-            try
-            {
-                var backupHistory = new BackupHistory
-                {
-                    DatabaseSourceId = databaseId,
-                    DatabaseName = databaseName,
-                    Date = startTime,
-                    Status = "Error",
-                    Message = errorMessage,
-                    BackupPath = "N/A"
-                };
-
-                _context.BackupHistories.Add(backupHistory);
-                await _context.SaveChangesAsync();
-            }
-            catch
-            {
-                // Ignorar errores al registrar en histórico
-            }
-        }
-
-        // ========== BACKUP OPERATIONS ==========
-
-        /// <summary>
-        /// Guarda un backup (MemoryStream) en OneDrive
-        /// </summary>
-        /// <param name="oneDriveStorageId">ID de la configuración de OneDrive</param>
-        /// <param name="backupStream">Stream del backup</param>
-        /// <param name="fileName">Nombre del archivo</param>
-        /// <param name="databaseName">Nombre de la base de datos</param>
-        /// <param name="databaseId">ID de la base de datos de origen</param>
-        /// <returns>Tuple con el resultado de la operación</returns>
-        public async Task<(bool success, string filePath, long fileSize, string errorMessage)> SaveBackup(int oneDriveStorageId, MemoryStream backupStream, string fileName, string databaseName, int databaseId)
-        {
-            var startTime = DateTime.Now;
-            string oneDrivePath = string.Empty;
-            string localTempPath = string.Empty;
-
-            try
-            {
-                // Obtener configuración de OneDrive
-                var oneDriveStorage = await _context.OneDriveStorages.FindAsync(oneDriveStorageId);
-                if (oneDriveStorage == null)
-                {
-                    var errorMsg = "Configuración de OneDrive no encontrada";
-                    await LogBackupError(databaseId, databaseName, startTime, errorMsg);
-                    return (false, string.Empty, 0, errorMsg);
-                }
-
-                // Verificar y renovar token si es necesario
-                if (!await EnsureValidToken(oneDriveStorage))
-                {
-                    var errorMsg = "No hay un token de acceso válido para OneDrive. Por favor, autentícate primero.";
-                    await LogBackupError(databaseId, databaseName, startTime, errorMsg);
-                    return (false, string.Empty, 0, errorMsg);
-                }
-
-                // Cambiar extensión a .zip
-                string zipFileName = Path.ChangeExtension(fileName, ".zip");
-
-                // Construir ruta de OneDrive
-                oneDrivePath = string.IsNullOrEmpty(oneDriveStorage.FolderPath)
-                    ? zipFileName
-                    : $"{oneDriveStorage.FolderPath.TrimEnd('/')}/{zipFileName}";
-
-                // Crear archivo temporal local comprimido
-                localTempPath = Path.Combine(Path.GetTempPath(), zipFileName);
-
-                // Comprimir el backup en un archivo .zip temporal
-                using (var fileStream = new FileStream(localTempPath, FileMode.Create, FileAccess.Write))
-                using (var zipArchive = new ZipArchive(fileStream, ZipArchiveMode.Create, false))
-                {
-                    var entry = zipArchive.CreateEntry(fileName, CompressionLevel.Optimal);
-
-                    using (var entryStream = entry.Open())
-                    {
-                        backupStream.Position = 0; // Asegurar que el stream está al inicio
-                        await backupStream.CopyToAsync(entryStream);
-                    }
-                }
-
-                // Subir a OneDrive usando Microsoft Graph API
-                string accessToken = _credentialProtector.Unprotect(oneDriveStorage.AccessToken) ?? string.Empty;
-                using var httpClient = new HttpClient();
-                httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
-
-                // Determinar la URL de upload
-                string uploadUrl;
-                if (string.IsNullOrEmpty(oneDriveStorage.ItemId))
-                {
-                    // Subir a la raíz o a una ruta específica
-                    uploadUrl = $"https://graph.microsoft.com/v1.0/me/drive/root:/{zipFileName}:/content";
-                }
-                else
-                {
-                    // Subir a una carpeta específica por ID
-                    uploadUrl = $"https://graph.microsoft.com/v1.0/me/drive/items/{oneDriveStorage.ItemId}:/{zipFileName}:/content";
-                }
-
-                // Leer el archivo y subirlo
-                using (var uploadStream = System.IO.File.OpenRead(localTempPath))
-                {
-                    var content = new StreamContent(uploadStream);
-                    content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/zip");
-
-                    var response = await httpClient.PutAsync(uploadUrl, content);
-                    var responseJson = await response.Content.ReadAsStringAsync();
-
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        var errorMsg = $"Error al subir archivo a OneDrive: {responseJson}";
-                        await LogBackupError(databaseId, databaseName, startTime, errorMsg);
-                        return (false, string.Empty, 0, errorMsg);
-                    }
-
-                    // Obtener tamaño del archivo desde la respuesta
-                    var responseData = System.Text.Json.JsonDocument.Parse(responseJson);
-                    long fileSize = responseData.RootElement.GetProperty("size").GetInt64();
-
-                    var duration = DateTime.Now - startTime;
-
-                    // Registrar en el histórico
-                    var backupHistory = new BackupHistory
-                    {
-                        DatabaseSourceId = databaseId,
-                        DatabaseName = databaseName,
-                        Date = startTime,
-                        Status = "Exitoso",
-                        Message = $"Backup guardado exitosamente en OneDrive. Tamaño: {FormatBytes(fileSize)}. Duración: {duration.TotalSeconds:F2} segundos.",
-                        BackupPath = oneDrivePath
-                    };
-
-                    _context.BackupHistories.Add(backupHistory);
-                    await _context.SaveChangesAsync();
-
-                    // Eliminar archivo temporal local
-                    try
-                    {
-                        if (System.IO.File.Exists(localTempPath))
-                        {
-                            System.IO.File.Delete(localTempPath);
-                        }
-                    }
-                    catch { /* Ignorar errores al eliminar */ }
-
-                    return (true, oneDrivePath, fileSize, string.Empty);
-                }
-            }
-            catch (Exception ex)
-            {
-                // Error general
-                var errorMessage = $"Error al guardar backup en OneDrive: {ex.Message}";
-
-                // Eliminar archivo temporal local si existe
-                try
-                {
-                    if (!string.IsNullOrEmpty(localTempPath) && System.IO.File.Exists(localTempPath))
-                    {
-                        System.IO.File.Delete(localTempPath);
-                    }
-                }
-                catch { /* Ignorar errores al eliminar */ }
-
-                // Registrar error en el histórico
-                try
-                {
-                    var backupHistory = new BackupHistory
-                    {
-                        DatabaseSourceId = databaseId,
-                        DatabaseName = databaseName,
-                        Date = startTime,
-                        Status = "Error",
-                        Message = errorMessage,
-                        BackupPath = oneDrivePath ?? "N/A"
-                    };
-
-                    _context.BackupHistories.Add(backupHistory);
-                    await _context.SaveChangesAsync();
-                }
-                catch { /* Ignorar errores al registrar */ }
-
-                _logger.LogError(ex, "Error al guardar backup en OneDrive {OneDriveStorageId}", oneDriveStorageId);
-                return (false, string.Empty, 0, errorMessage);
-            }
-        }
-
-        /// <summary>
-        /// Formatea bytes a una representación legible (KB, MB, GB)
-        /// </summary>
-        private string FormatBytes(long bytes)
-        {
-            string[] sizes = { "B", "KB", "MB", "GB", "TB" };
-            double len = bytes;
-            int order = 0;
-
-            while (len >= 1024 && order < sizes.Length - 1)
-            {
-                order++;
-                len = len / 1024;
-            }
-
-            return $"{len:0.##} {sizes[order]}";
-        }
     }
 
     public class OneDriveListRequest

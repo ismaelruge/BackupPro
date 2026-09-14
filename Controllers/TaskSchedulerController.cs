@@ -2,84 +2,145 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using BackupPro.Data;
 using BackupPro.Models;
+using BackupPro.Services.Backup;
 using BackupPro.ViewModels;
 using Microsoft.EntityFrameworkCore;
 using System.Linq;
 
 namespace BackupPro.Controllers
 {
+    /// <summary>
+    /// CRUD de tareas programadas y disparador de ejecución manual. La ejecución en sí (elegir el
+    /// provider de base de datos y de almacenamiento correctos y correr el backup) vive en
+    /// <see cref="BackupExecutionService"/>, compartido con <see cref="Services.BackupSchedulerBackgroundService"/>
+    /// que ejecuta las tareas automáticamente cuando llega su hora.
+    /// </summary>
     [Authorize]
     public class TaskSchedulerController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly BackupExecutionService _backupExecutionService;
         private readonly ILogger<TaskSchedulerController> _logger;
-        private readonly DataBasesTypes.SqlServerDataBaseController _sqlServerController;
-        private readonly DataBasesTypes.MySqlDataBaseController _mySqlController;
-        private readonly DataBasesTypes.PostgresSqlDataBaseController _postgresSqlController;
-        private readonly DataBasesTypes.MongoDBDataBaseController _mongoDBController;
-        private readonly StorageTypes.LocalStorageController _localStorageController;
-        private readonly StorageTypes.FtpStorageController _ftpStorageController;
-        private readonly StorageTypes.BlobStorageController _blobStorageController;
-        private readonly StorageTypes.OneDriveStorageController _oneDriveStorageController;
-        private readonly StorageTypes.GoogleDriveStorageController _googleDriveStorageController;
 
-        public TaskSchedulerController(
-            ApplicationDbContext context,
-            ILogger<TaskSchedulerController> logger,
-            DataBasesTypes.SqlServerDataBaseController sqlServerController,
-            DataBasesTypes.MySqlDataBaseController mySqlController,
-            DataBasesTypes.PostgresSqlDataBaseController postgresSqlController,
-            DataBasesTypes.MongoDBDataBaseController mongoDBController,
-            StorageTypes.LocalStorageController localStorageController,
-            StorageTypes.FtpStorageController ftpStorageController,
-            StorageTypes.BlobStorageController blobStorageController,
-            StorageTypes.OneDriveStorageController oneDriveStorageController,
-            StorageTypes.GoogleDriveStorageController googleDriveStorageController)
+        public TaskSchedulerController(ApplicationDbContext context, BackupExecutionService backupExecutionService, ILogger<TaskSchedulerController> logger)
         {
             _context = context;
+            _backupExecutionService = backupExecutionService;
             _logger = logger;
-            _sqlServerController = sqlServerController;
-            _mySqlController = mySqlController;
-            _postgresSqlController = postgresSqlController;
-            _mongoDBController = mongoDBController;
-            _localStorageController = localStorageController;
-            _ftpStorageController = ftpStorageController;
-            _blobStorageController = blobStorageController;
-            _oneDriveStorageController = oneDriveStorageController;
-            _googleDriveStorageController = googleDriveStorageController;
         }
 
         public async Task<IActionResult> Index()
         {
             var tasks = await _context.TaskSchedulers.ToListAsync();
 
-            var viewModels = new List<TaskSchedulerIndexViewModel>();
+            // Se cargan los nombres de configuración con una consulta por tipo (filtrada a los ids
+            // realmente referenciados), en vez de una consulta por cada tarea (N+1).
+            var databaseNames = await LoadDatabaseNamesAsync(tasks);
+            var storageNames = await LoadStorageNamesAsync(tasks);
 
-            foreach (var task in tasks)
+            var viewModels = tasks.Select(task => new TaskSchedulerIndexViewModel
             {
-                var viewModel = new TaskSchedulerIndexViewModel
-                {
-                    Id = task.Id,
-                    TaskName = task.TaskName,
-                    DatabaseType = task.DatabaseType,
-                    DatabaseId = task.DatabaseId,
-                    DatabaseName = await GetDatabaseName(task.DatabaseType, task.DatabaseId),
-                    StorageType = task.StorageType,
-                    StorageId = task.StorageId,
-                    StorageName = await GetStorageName(task.StorageType, task.StorageId),
-                    FrequencyType = task.FrequencyType,
-                    FrequencyValue = task.FrequencyValue,
-                    IsActive = task.IsActive,
-                    LastRunAt = task.LastRunAt,
-                    NextRunAt = task.NextRunAt,
-                    CreatedAt = task.CreatedAt
-                };
-
-                viewModels.Add(viewModel);
-            }
+                Id = task.Id,
+                TaskName = task.TaskName,
+                DatabaseType = task.DatabaseType,
+                DatabaseId = task.DatabaseId,
+                DatabaseName = databaseNames.GetValueOrDefault((task.DatabaseType, task.DatabaseId), "N/A"),
+                StorageType = task.StorageType,
+                StorageId = task.StorageId,
+                StorageName = storageNames.GetValueOrDefault((task.StorageType, task.StorageId), "N/A"),
+                FrequencyType = task.FrequencyType,
+                FrequencyValue = task.FrequencyValue,
+                IsActive = task.IsActive,
+                LastRunAt = task.LastRunAt,
+                NextRunAt = task.NextRunAt,
+                CreatedAt = task.CreatedAt
+            }).ToList();
 
             return View(viewModels);
         }
+
+        private async Task<Dictionary<(string Type, int Id), string>> LoadDatabaseNamesAsync(List<Models.TaskScheduler> tasks)
+        {
+            var names = new Dictionary<(string, int), string>();
+
+            var sqlServerIds = IdsFor(tasks, "SqlServer");
+            if (sqlServerIds.Count > 0)
+            {
+                await foreach (var d in _context.SqlServerDataBases.Where(d => sqlServerIds.Contains(d.Id)).AsAsyncEnumerable())
+                    names[("SqlServer", d.Id)] = d.ConfigurationName;
+            }
+
+            var mySqlIds = IdsFor(tasks, "MySQL");
+            if (mySqlIds.Count > 0)
+            {
+                await foreach (var d in _context.MySqlDataBases.Where(d => mySqlIds.Contains(d.Id)).AsAsyncEnumerable())
+                    names[("MySQL", d.Id)] = d.ConfigurationName;
+            }
+
+            var postgresIds = IdsFor(tasks, "PostgreSQL");
+            if (postgresIds.Count > 0)
+            {
+                await foreach (var d in _context.PostgresSqlDataBases.Where(d => postgresIds.Contains(d.Id)).AsAsyncEnumerable())
+                    names[("PostgreSQL", d.Id)] = d.ConfigurationName;
+            }
+
+            var mongoIds = IdsFor(tasks, "MongoDB");
+            if (mongoIds.Count > 0)
+            {
+                await foreach (var d in _context.MongoDBDataBases.Where(d => mongoIds.Contains(d.Id)).AsAsyncEnumerable())
+                    names[("MongoDB", d.Id)] = d.ConfigurationName;
+            }
+
+            return names;
+        }
+
+        private async Task<Dictionary<(string Type, int Id), string>> LoadStorageNamesAsync(List<Models.TaskScheduler> tasks)
+        {
+            var names = new Dictionary<(string, int), string>();
+
+            var googleDriveIds = IdsFor(tasks, "GoogleDrive", task => task.StorageType, task => task.StorageId);
+            if (googleDriveIds.Count > 0)
+            {
+                await foreach (var s in _context.GoogleDriveStorages.Where(s => googleDriveIds.Contains(s.Id)).AsAsyncEnumerable())
+                    names[("GoogleDrive", s.Id)] = s.ConfigurationName;
+            }
+
+            var oneDriveIds = IdsFor(tasks, "OneDrive", task => task.StorageType, task => task.StorageId);
+            if (oneDriveIds.Count > 0)
+            {
+                await foreach (var s in _context.OneDriveStorages.Where(s => oneDriveIds.Contains(s.Id)).AsAsyncEnumerable())
+                    names[("OneDrive", s.Id)] = s.ConfigurationName;
+            }
+
+            var blobIds = IdsFor(tasks, "AzureBlob", task => task.StorageType, task => task.StorageId);
+            if (blobIds.Count > 0)
+            {
+                await foreach (var s in _context.AzureBlobStorages.Where(s => blobIds.Contains(s.Id)).AsAsyncEnumerable())
+                    names[("AzureBlob", s.Id)] = s.ConfigurationName;
+            }
+
+            var ftpIds = IdsFor(tasks, "Ftp", task => task.StorageType, task => task.StorageId);
+            if (ftpIds.Count > 0)
+            {
+                await foreach (var s in _context.FtpStorages.Where(s => ftpIds.Contains(s.Id)).AsAsyncEnumerable())
+                    names[("Ftp", s.Id)] = s.ConfigurationName;
+            }
+
+            var localIds = IdsFor(tasks, "Local", task => task.StorageType, task => task.StorageId);
+            if (localIds.Count > 0)
+            {
+                await foreach (var s in _context.LocalStorages.Where(s => localIds.Contains(s.Id)).AsAsyncEnumerable())
+                    names[("Local", s.Id)] = s.ConfigurationName;
+            }
+
+            return names;
+        }
+
+        private static HashSet<int> IdsFor(List<Models.TaskScheduler> tasks, string type) =>
+            IdsFor(tasks, type, task => task.DatabaseType, task => task.DatabaseId);
+
+        private static HashSet<int> IdsFor(List<Models.TaskScheduler> tasks, string type, Func<Models.TaskScheduler, string> typeSelector, Func<Models.TaskScheduler, int> idSelector) =>
+            tasks.Where(t => typeSelector(t) == type).Select(idSelector).ToHashSet();
 
         // ========== HELPER METHODS ==========
 
@@ -96,37 +157,6 @@ namespace BackupPro.Controllers
                 "hours" => baseTime.AddHours(frequencyValue),
                 "days" => baseTime.AddDays(frequencyValue),
                 _ => baseTime.AddHours(1) // Default: 1 hour
-            };
-        }
-
-        /// <summary>
-        /// Obtiene el nombre de la configuración de base de datos
-        /// </summary>
-        private async Task<string> GetDatabaseName(string databaseType, int databaseId)
-        {
-            return databaseType switch
-            {
-                "SqlServer" => (await _context.SqlServerDataBases.FindAsync(databaseId))?.ConfigurationName ?? "N/A",
-                "PostgreSQL" => (await _context.PostgresSqlDataBases.FindAsync(databaseId))?.ConfigurationName ?? "N/A",
-                "MySQL" => (await _context.MySqlDataBases.FindAsync(databaseId))?.ConfigurationName ?? "N/A",
-                "MongoDB" => (await _context.MongoDBDataBases.FindAsync(databaseId))?.ConfigurationName ?? "N/A",
-                _ => "N/A"
-            };
-        }
-
-        /// <summary>
-        /// Obtiene el nombre de la configuración de almacenamiento
-        /// </summary>
-        private async Task<string> GetStorageName(string storageType, int storageId)
-        {
-            return storageType switch
-            {
-                "GoogleDrive" => (await _context.GoogleDriveStorages.FindAsync(storageId))?.ConfigurationName ?? "N/A",
-                "OneDrive" => (await _context.OneDriveStorages.FindAsync(storageId))?.ConfigurationName ?? "N/A",
-                "AzureBlob" => (await _context.AzureBlobStorages.FindAsync(storageId))?.ConfigurationName ?? "N/A",
-                "Ftp" => (await _context.FtpStorages.FindAsync(storageId))?.ConfigurationName ?? "N/A",
-                "Local" => (await _context.LocalStorages.FindAsync(storageId))?.ConfigurationName ?? "N/A",
-                _ => "N/A"
             };
         }
 
@@ -589,1101 +619,6 @@ namespace BackupPro.Controllers
         }
 
         /// <summary>
-        /// Registra un error en el histórico de backups
-        /// </summary>
-        private async Task LogBackupError(int databaseId, string databaseName, DateTime startTime, string errorMessage)
-        {
-            try
-            {
-                var backupHistory = new BackupHistory
-                {
-                    DatabaseSourceId = databaseId,
-                    DatabaseName = databaseName,
-                    Date = startTime,
-                    Status = "Error",
-                    Message = errorMessage,
-                    BackupPath = "N/A"
-                };
-
-                _context.BackupHistories.Add(backupHistory);
-                await _context.SaveChangesAsync();
-            }
-            catch
-            {
-                // Ignorar errores al registrar en histórico
-            }
-        }
-
-        /// <summary>
-        /// Ejecuta el backup según el tipo de base de datos y almacenamiento
-        /// </summary>
-        /// <summary>
-        /// Mapa (tipo de base de datos, tipo de almacenamiento) -> función que ejecuta ese backup.
-        /// Reemplaza una cadena if/else de 20 ramas por una búsqueda directa, evitando el riesgo de
-        /// una combinación mal escrita al agregar/editar una rama.
-        /// </summary>
-        private Dictionary<(string DatabaseType, string StorageType), Func<int, int, Task<string>>> BuildBackupDispatch() => new()
-        {
-            [("SqlServer", "Local")] = ExecuteBackupSqlServerLocal,
-            [("SqlServer", "Ftp")] = ExecuteBackupSqlServerFtp,
-            [("SqlServer", "AzureBlob")] = ExecuteBackupSqlServerBlob,
-            [("SqlServer", "OneDrive")] = ExecuteBackupSqlServerOneDrive,
-            [("SqlServer", "GoogleDrive")] = ExecuteBackupSqlServerGoogleDrive,
-
-            [("MySQL", "Local")] = ExecuteBackupMySqlLocal,
-            [("MySQL", "Ftp")] = ExecuteBackupMySqlFtp,
-            [("MySQL", "AzureBlob")] = ExecuteBackupMySqlBlob,
-            [("MySQL", "OneDrive")] = ExecuteBackupMySqlOneDrive,
-            [("MySQL", "GoogleDrive")] = ExecuteBackupMySqlGoogleDrive,
-
-            [("PostgreSQL", "Local")] = ExecuteBackupPostgreSqlLocal,
-            [("PostgreSQL", "Ftp")] = ExecuteBackupPostgreSqlFtp,
-            [("PostgreSQL", "AzureBlob")] = ExecuteBackupPostgreSqlBlob,
-            [("PostgreSQL", "OneDrive")] = ExecuteBackupPostgreSqlOneDrive,
-            [("PostgreSQL", "GoogleDrive")] = ExecuteBackupPostgreSqlGoogleDrive,
-
-            [("MongoDB", "Local")] = ExecuteBackupMongoDBLocal,
-            [("MongoDB", "Ftp")] = ExecuteBackupMongoDBFtp,
-            [("MongoDB", "AzureBlob")] = ExecuteBackupMongoDBBlob,
-            [("MongoDB", "OneDrive")] = ExecuteBackupMongoDBOneDrive,
-            [("MongoDB", "GoogleDrive")] = ExecuteBackupMongoDBGoogleDrive,
-        };
-
-        private async Task<string> ExecuteBackupByType(Models.TaskScheduler task)
-        {
-            var dispatch = BuildBackupDispatch();
-
-            if (dispatch.TryGetValue((task.DatabaseType, task.StorageType), out var executeBackup))
-            {
-                return await executeBackup(task.DatabaseId, task.StorageId);
-            }
-
-            return $"Combinación no soportada o aún no implementada: {task.DatabaseType} a {task.StorageType}";
-        }
-
-        /// <summary>
-        /// Ejecuta backup de SQL Server a almacenamiento local
-        /// </summary>
-        private async Task<string> ExecuteBackupSqlServerLocal(int sqlServerDatabaseId, int localStorageId)
-        {
-            MemoryStream? backupStream = null;
-            var startTime = DateTime.Now;
-            string databaseName = "Desconocida";
-
-            try
-            {
-                // Paso 1: Crear el backup en SQL Server y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _sqlServerController.CreateBackup(sqlServerDatabaseId);
-                databaseName = dbName;
-
-                if (!backupSuccess || backupStream2 == null)
-                {
-                    await LogBackupError(sqlServerDatabaseId, databaseName, startTime, backupError);
-                    throw new Exception(backupError);
-                }
-
-                backupStream = backupStream2;
-
-                // Paso 2: Guardar el backup en almacenamiento local
-                var (saveSuccess, filePath, fileSize, saveError) = await _localStorageController.SaveBackup(
-                    localStorageId,
-                    backupStream,
-                    fileName,
-                    databaseName,
-                    sqlServerDatabaseId
-                );
-
-                if (!saveSuccess)
-                {
-                    throw new Exception(saveError);
-                }
-
-                return $"Backup creado exitosamente: {fileName} ({FormatBytes(fileSize)})";
-            }
-            catch (Exception ex)
-            {
-                // El error ya fue registrado en el histórico si es de CreateBackup
-                // o será registrado por SaveBackup si es de almacenamiento
-                throw new Exception($"Error al ejecutar backup: {ex.Message}", ex);
-            }
-            finally
-            {
-                // Liberar el MemoryStream
-                backupStream?.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// Ejecuta backup de SQL Server a almacenamiento FTP
-        /// </summary>
-        private async Task<string> ExecuteBackupSqlServerFtp(int sqlServerDatabaseId, int ftpStorageId)
-        {
-            MemoryStream? backupStream = null;
-            var startTime = DateTime.Now;
-            string databaseName = "Desconocida";
-
-            try
-            {
-                // Paso 1: Crear el backup en SQL Server y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _sqlServerController.CreateBackup(sqlServerDatabaseId);
-                databaseName = dbName;
-
-                if (!backupSuccess || backupStream2 == null)
-                {
-                    await LogBackupError(sqlServerDatabaseId, databaseName, startTime, backupError);
-                    throw new Exception(backupError);
-                }
-
-                backupStream = backupStream2;
-
-                // Paso 2: Guardar el backup en almacenamiento FTP
-                var (saveSuccess, filePath, fileSize, saveError) = await _ftpStorageController.SaveBackup(
-                    ftpStorageId,
-                    backupStream,
-                    fileName,
-                    databaseName,
-                    sqlServerDatabaseId
-                );
-
-                if (!saveSuccess)
-                {
-                    throw new Exception(saveError);
-                }
-
-                return $"Backup creado exitosamente en FTP: {fileName} ({FormatBytes(fileSize)})";
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error al ejecutar backup FTP: {ex.Message}", ex);
-            }
-            finally
-            {
-                // Liberar el MemoryStream
-                backupStream?.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// Ejecuta backup de SQL Server a Azure Blob Storage
-        /// </summary>
-        private async Task<string> ExecuteBackupSqlServerBlob(int sqlServerDatabaseId, int blobStorageId)
-        {
-            MemoryStream? backupStream = null;
-            var startTime = DateTime.Now;
-            string databaseName = "Desconocida";
-
-            try
-            {
-                // Paso 1: Crear el backup en SQL Server y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _sqlServerController.CreateBackup(sqlServerDatabaseId);
-                databaseName = dbName;
-
-                if (!backupSuccess || backupStream2 == null)
-                {
-                    await LogBackupError(sqlServerDatabaseId, databaseName, startTime, backupError);
-                    throw new Exception(backupError);
-                }
-
-                backupStream = backupStream2;
-
-                // Paso 2: Guardar el backup en Azure Blob Storage
-                var (saveSuccess, filePath, fileSize, saveError) = await _blobStorageController.SaveBackup(
-                    blobStorageId,
-                    backupStream,
-                    fileName,
-                    databaseName,
-                    sqlServerDatabaseId
-                );
-
-                if (!saveSuccess)
-                {
-                    throw new Exception(saveError);
-                }
-
-                return $"Backup creado exitosamente en Azure Blob: {fileName} ({FormatBytes(fileSize)})";
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error al ejecutar backup Azure Blob: {ex.Message}", ex);
-            }
-            finally
-            {
-                // Liberar el MemoryStream
-                backupStream?.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// Ejecuta backup de SQL Server a OneDrive
-        /// </summary>
-        private async Task<string> ExecuteBackupSqlServerOneDrive(int sqlServerDatabaseId, int oneDriveStorageId)
-        {
-            MemoryStream? backupStream = null;
-            var startTime = DateTime.Now;
-            string databaseName = "Desconocida";
-
-            try
-            {
-                // Paso 1: Crear el backup en SQL Server y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _sqlServerController.CreateBackup(sqlServerDatabaseId);
-                databaseName = dbName;
-
-                if (!backupSuccess || backupStream2 == null)
-                {
-                    await LogBackupError(sqlServerDatabaseId, databaseName, startTime, backupError);
-                    throw new Exception(backupError);
-                }
-
-                backupStream = backupStream2;
-
-                // Paso 2: Guardar el backup en OneDrive
-                var (saveSuccess, filePath, fileSize, saveError) = await _oneDriveStorageController.SaveBackup(
-                    oneDriveStorageId,
-                    backupStream,
-                    fileName,
-                    databaseName,
-                    sqlServerDatabaseId
-                );
-
-                if (!saveSuccess)
-                {
-                    throw new Exception(saveError);
-                }
-
-                return $"Backup creado exitosamente en OneDrive: {fileName} ({FormatBytes(fileSize)})";
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error al ejecutar backup OneDrive: {ex.Message}", ex);
-            }
-            finally
-            {
-                // Liberar el MemoryStream
-                backupStream?.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// Ejecuta backup de SQL Server a Google Drive
-        /// </summary>
-        private async Task<string> ExecuteBackupSqlServerGoogleDrive(int sqlServerDatabaseId, int googleDriveStorageId)
-        {
-            MemoryStream? backupStream = null;
-            var startTime = DateTime.Now;
-            string databaseName = "Desconocida";
-
-            try
-            {
-                // Paso 1: Crear el backup en SQL Server y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _sqlServerController.CreateBackup(sqlServerDatabaseId);
-                databaseName = dbName;
-
-                if (!backupSuccess || backupStream2 == null)
-                {
-                    await LogBackupError(sqlServerDatabaseId, databaseName, startTime, backupError);
-                    throw new Exception(backupError);
-                }
-
-                backupStream = backupStream2;
-
-                // Paso 2: Guardar el backup en Google Drive
-                var (saveSuccess, filePath, fileSize, saveError) = await _googleDriveStorageController.SaveBackup(
-                    googleDriveStorageId,
-                    backupStream,
-                    fileName,
-                    databaseName,
-                    sqlServerDatabaseId
-                );
-
-                if (!saveSuccess)
-                {
-                    throw new Exception(saveError);
-                }
-
-                return $"Backup creado exitosamente en Google Drive: {fileName} ({FormatBytes(fileSize)})";
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error al ejecutar backup Google Drive: {ex.Message}", ex);
-            }
-            finally
-            {
-                // Liberar el MemoryStream
-                backupStream?.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// Ejecuta backup de MySQL a almacenamiento local
-        /// </summary>
-        private async Task<string> ExecuteBackupMySqlLocal(int mySqlDatabaseId, int localStorageId)
-        {
-            MemoryStream? backupStream = null;
-            var startTime = DateTime.Now;
-            string databaseName = "Desconocida";
-
-            try
-            {
-                // Paso 1: Crear el backup en MySQL y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _mySqlController.CreateBackup(mySqlDatabaseId);
-                databaseName = dbName;
-
-                if (!backupSuccess || backupStream2 == null)
-                {
-                    await LogBackupError(mySqlDatabaseId, databaseName, startTime, backupError);
-                    throw new Exception(backupError);
-                }
-
-                backupStream = backupStream2;
-
-                // Paso 2: Guardar el backup en almacenamiento local
-                var (saveSuccess, filePath, fileSize, saveError) = await _localStorageController.SaveBackup(
-                    localStorageId,
-                    backupStream,
-                    fileName,
-                    databaseName,
-                    mySqlDatabaseId
-                );
-
-                if (!saveSuccess)
-                {
-                    throw new Exception(saveError);
-                }
-
-                return $"Backup creado exitosamente: {fileName} ({FormatBytes(fileSize)})";
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error al ejecutar backup: {ex.Message}", ex);
-            }
-            finally
-            {
-                // Liberar el MemoryStream
-                backupStream?.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// Ejecuta backup de MySQL a almacenamiento FTP
-        /// </summary>
-        private async Task<string> ExecuteBackupMySqlFtp(int mySqlDatabaseId, int ftpStorageId)
-        {
-            MemoryStream? backupStream = null;
-            var startTime = DateTime.Now;
-            string databaseName = "Desconocida";
-
-            try
-            {
-                // Paso 1: Crear el backup en MySQL y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _mySqlController.CreateBackup(mySqlDatabaseId);
-                databaseName = dbName;
-
-                if (!backupSuccess || backupStream2 == null)
-                {
-                    await LogBackupError(mySqlDatabaseId, databaseName, startTime, backupError);
-                    throw new Exception(backupError);
-                }
-
-                backupStream = backupStream2;
-
-                // Paso 2: Guardar el backup en almacenamiento FTP
-                var (saveSuccess, filePath, fileSize, saveError) = await _ftpStorageController.SaveBackup(
-                    ftpStorageId,
-                    backupStream,
-                    fileName,
-                    databaseName,
-                    mySqlDatabaseId
-                );
-
-                if (!saveSuccess)
-                {
-                    throw new Exception(saveError);
-                }
-
-                return $"Backup creado exitosamente en FTP: {fileName} ({FormatBytes(fileSize)})";
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error al ejecutar backup FTP: {ex.Message}", ex);
-            }
-            finally
-            {
-                // Liberar el MemoryStream
-                backupStream?.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// Ejecuta backup de MySQL a Azure Blob Storage
-        /// </summary>
-        private async Task<string> ExecuteBackupMySqlBlob(int mySqlDatabaseId, int blobStorageId)
-        {
-            MemoryStream? backupStream = null;
-            var startTime = DateTime.Now;
-            string databaseName = "Desconocida";
-
-            try
-            {
-                // Paso 1: Crear el backup en MySQL y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _mySqlController.CreateBackup(mySqlDatabaseId);
-                databaseName = dbName;
-
-                if (!backupSuccess || backupStream2 == null)
-                {
-                    await LogBackupError(mySqlDatabaseId, databaseName, startTime, backupError);
-                    throw new Exception(backupError);
-                }
-
-                backupStream = backupStream2;
-
-                // Paso 2: Guardar el backup en Azure Blob Storage
-                var (saveSuccess, filePath, fileSize, saveError) = await _blobStorageController.SaveBackup(
-                    blobStorageId,
-                    backupStream,
-                    fileName,
-                    databaseName,
-                    mySqlDatabaseId
-                );
-
-                if (!saveSuccess)
-                {
-                    throw new Exception(saveError);
-                }
-
-                return $"Backup creado exitosamente en Azure Blob: {fileName} ({FormatBytes(fileSize)})";
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error al ejecutar backup Azure Blob: {ex.Message}", ex);
-            }
-            finally
-            {
-                // Liberar el MemoryStream
-                backupStream?.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// Ejecuta backup de MySQL a OneDrive
-        /// </summary>
-        private async Task<string> ExecuteBackupMySqlOneDrive(int mySqlDatabaseId, int oneDriveStorageId)
-        {
-            MemoryStream? backupStream = null;
-            var startTime = DateTime.Now;
-            string databaseName = "Desconocida";
-
-            try
-            {
-                // Paso 1: Crear el backup en MySQL y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _mySqlController.CreateBackup(mySqlDatabaseId);
-                databaseName = dbName;
-
-                if (!backupSuccess || backupStream2 == null)
-                {
-                    await LogBackupError(mySqlDatabaseId, databaseName, startTime, backupError);
-                    throw new Exception(backupError);
-                }
-
-                backupStream = backupStream2;
-
-                // Paso 2: Guardar el backup en OneDrive
-                var (saveSuccess, filePath, fileSize, saveError) = await _oneDriveStorageController.SaveBackup(
-                    oneDriveStorageId,
-                    backupStream,
-                    fileName,
-                    databaseName,
-                    mySqlDatabaseId
-                );
-
-                if (!saveSuccess)
-                {
-                    throw new Exception(saveError);
-                }
-
-                return $"Backup creado exitosamente en OneDrive: {fileName} ({FormatBytes(fileSize)})";
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error al ejecutar backup OneDrive: {ex.Message}", ex);
-            }
-            finally
-            {
-                // Liberar el MemoryStream
-                backupStream?.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// Ejecuta backup de MySQL a Google Drive
-        /// </summary>
-        private async Task<string> ExecuteBackupMySqlGoogleDrive(int mySqlDatabaseId, int googleDriveStorageId)
-        {
-            MemoryStream? backupStream = null;
-            var startTime = DateTime.Now;
-            string databaseName = "Desconocida";
-
-            try
-            {
-                // Paso 1: Crear el backup en MySQL y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _mySqlController.CreateBackup(mySqlDatabaseId);
-                databaseName = dbName;
-
-                if (!backupSuccess || backupStream2 == null)
-                {
-                    await LogBackupError(mySqlDatabaseId, databaseName, startTime, backupError);
-                    throw new Exception(backupError);
-                }
-
-                backupStream = backupStream2;
-
-                // Paso 2: Guardar el backup en Google Drive
-                var (saveSuccess, filePath, fileSize, saveError) = await _googleDriveStorageController.SaveBackup(
-                    googleDriveStorageId,
-                    backupStream,
-                    fileName,
-                    databaseName,
-                    mySqlDatabaseId
-                );
-
-                if (!saveSuccess)
-                {
-                    throw new Exception(saveError);
-                }
-
-                return $"Backup creado exitosamente en Google Drive: {fileName} ({FormatBytes(fileSize)})";
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error al ejecutar backup Google Drive: {ex.Message}", ex);
-            }
-            finally
-            {
-                // Liberar el MemoryStream
-                backupStream?.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// Ejecuta backup de PostgreSQL a almacenamiento local
-        /// </summary>
-        private async Task<string> ExecuteBackupPostgreSqlLocal(int postgresDatabaseId, int localStorageId)
-        {
-            MemoryStream? backupStream = null;
-            var startTime = DateTime.Now;
-            string databaseName = "Desconocida";
-
-            try
-            {
-                // Paso 1: Crear el backup en PostgreSQL y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _postgresSqlController.CreateBackup(postgresDatabaseId);
-                databaseName = dbName;
-
-                if (!backupSuccess || backupStream2 == null)
-                {
-                    await LogBackupError(postgresDatabaseId, databaseName, startTime, backupError);
-                    throw new Exception(backupError);
-                }
-
-                backupStream = backupStream2;
-
-                // Paso 2: Guardar el backup en almacenamiento local
-                var (saveSuccess, filePath, fileSize, saveError) = await _localStorageController.SaveBackup(
-                    localStorageId,
-                    backupStream,
-                    fileName,
-                    databaseName,
-                    postgresDatabaseId
-                );
-
-                if (!saveSuccess)
-                {
-                    throw new Exception(saveError);
-                }
-
-                return $"Backup creado exitosamente: {fileName} ({FormatBytes(fileSize)})";
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error al ejecutar backup: {ex.Message}", ex);
-            }
-            finally
-            {
-                // Liberar el MemoryStream
-                backupStream?.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// Ejecuta backup de PostgreSQL a almacenamiento FTP
-        /// </summary>
-        private async Task<string> ExecuteBackupPostgreSqlFtp(int postgresDatabaseId, int ftpStorageId)
-        {
-            MemoryStream? backupStream = null;
-            var startTime = DateTime.Now;
-            string databaseName = "Desconocida";
-
-            try
-            {
-                // Paso 1: Crear el backup en PostgreSQL y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _postgresSqlController.CreateBackup(postgresDatabaseId);
-                databaseName = dbName;
-
-                if (!backupSuccess || backupStream2 == null)
-                {
-                    await LogBackupError(postgresDatabaseId, databaseName, startTime, backupError);
-                    throw new Exception(backupError);
-                }
-
-                backupStream = backupStream2;
-
-                // Paso 2: Guardar el backup en almacenamiento FTP
-                var (saveSuccess, filePath, fileSize, saveError) = await _ftpStorageController.SaveBackup(
-                    ftpStorageId,
-                    backupStream,
-                    fileName,
-                    databaseName,
-                    postgresDatabaseId
-                );
-
-                if (!saveSuccess)
-                {
-                    throw new Exception(saveError);
-                }
-
-                return $"Backup creado exitosamente en FTP: {fileName} ({FormatBytes(fileSize)})";
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error al ejecutar backup FTP: {ex.Message}", ex);
-            }
-            finally
-            {
-                // Liberar el MemoryStream
-                backupStream?.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// Ejecuta backup de PostgreSQL a Azure Blob Storage
-        /// </summary>
-        private async Task<string> ExecuteBackupPostgreSqlBlob(int postgresDatabaseId, int blobStorageId)
-        {
-            MemoryStream? backupStream = null;
-            var startTime = DateTime.Now;
-            string databaseName = "Desconocida";
-
-            try
-            {
-                // Paso 1: Crear el backup en PostgreSQL y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _postgresSqlController.CreateBackup(postgresDatabaseId);
-                databaseName = dbName;
-
-                if (!backupSuccess || backupStream2 == null)
-                {
-                    await LogBackupError(postgresDatabaseId, databaseName, startTime, backupError);
-                    throw new Exception(backupError);
-                }
-
-                backupStream = backupStream2;
-
-                // Paso 2: Guardar el backup en Azure Blob Storage
-                var (saveSuccess, filePath, fileSize, saveError) = await _blobStorageController.SaveBackup(
-                    blobStorageId,
-                    backupStream,
-                    fileName,
-                    databaseName,
-                    postgresDatabaseId
-                );
-
-                if (!saveSuccess)
-                {
-                    throw new Exception(saveError);
-                }
-
-                return $"Backup creado exitosamente en Azure Blob: {fileName} ({FormatBytes(fileSize)})";
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error al ejecutar backup Azure Blob: {ex.Message}", ex);
-            }
-            finally
-            {
-                // Liberar el MemoryStream
-                backupStream?.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// Ejecuta backup de PostgreSQL a OneDrive
-        /// </summary>
-        private async Task<string> ExecuteBackupPostgreSqlOneDrive(int postgresDatabaseId, int oneDriveStorageId)
-        {
-            MemoryStream? backupStream = null;
-            var startTime = DateTime.Now;
-            string databaseName = "Desconocida";
-
-            try
-            {
-                // Paso 1: Crear el backup en PostgreSQL y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _postgresSqlController.CreateBackup(postgresDatabaseId);
-                databaseName = dbName;
-
-                if (!backupSuccess || backupStream2 == null)
-                {
-                    await LogBackupError(postgresDatabaseId, databaseName, startTime, backupError);
-                    throw new Exception(backupError);
-                }
-
-                backupStream = backupStream2;
-
-                // Paso 2: Guardar el backup en OneDrive
-                var (saveSuccess, filePath, fileSize, saveError) = await _oneDriveStorageController.SaveBackup(
-                    oneDriveStorageId,
-                    backupStream,
-                    fileName,
-                    databaseName,
-                    postgresDatabaseId
-                );
-
-                if (!saveSuccess)
-                {
-                    throw new Exception(saveError);
-                }
-
-                return $"Backup creado exitosamente en OneDrive: {fileName} ({FormatBytes(fileSize)})";
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error al ejecutar backup OneDrive: {ex.Message}", ex);
-            }
-            finally
-            {
-                // Liberar el MemoryStream
-                backupStream?.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// Ejecuta backup de PostgreSQL a Google Drive
-        /// </summary>
-        private async Task<string> ExecuteBackupPostgreSqlGoogleDrive(int postgresDatabaseId, int googleDriveStorageId)
-        {
-            MemoryStream? backupStream = null;
-            var startTime = DateTime.Now;
-            string databaseName = "Desconocida";
-
-            try
-            {
-                // Paso 1: Crear el backup en PostgreSQL y obtener el MemoryStream
-                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _postgresSqlController.CreateBackup(postgresDatabaseId);
-                databaseName = dbName;
-
-                if (!backupSuccess || backupStream2 == null)
-                {
-                    await LogBackupError(postgresDatabaseId, databaseName, startTime, backupError);
-                    throw new Exception(backupError);
-                }
-
-                backupStream = backupStream2;
-
-                // Paso 2: Guardar el backup en Google Drive
-                var (saveSuccess, filePath, fileSize, saveError) = await _googleDriveStorageController.SaveBackup(
-                    googleDriveStorageId,
-                    backupStream,
-                    fileName,
-                    databaseName,
-                    postgresDatabaseId
-                );
-
-                if (!saveSuccess)
-                {
-                    throw new Exception(saveError);
-                }
-
-                return $"Backup creado exitosamente en Google Drive: {fileName} ({FormatBytes(fileSize)})";
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error al ejecutar backup Google Drive: {ex.Message}", ex);
-            }
-            finally
-            {
-                // Liberar el MemoryStream
-                backupStream?.Dispose();
-            }
-        }
-
-        // ========== MONGODB BACKUP METHODS ==========
-
-        /// <summary>
-        /// Ejecuta backup de MongoDB a almacenamiento local
-        /// </summary>
-        private async Task<string> ExecuteBackupMongoDBLocal(int mongodbDatabaseId, int localStorageId)
-        {
-            MemoryStream? backupStream = null;
-            var startTime = DateTime.Now;
-            string databaseName = "Desconocida";
-
-            try
-            {
-                // 1. Crear backup de MongoDB
-                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _mongoDBController.CreateBackup(mongodbDatabaseId);
-                databaseName = dbName;
-
-                if (!backupSuccess || backupStream2 == null)
-                {
-                    await LogBackupError(mongodbDatabaseId, databaseName, startTime, backupError);
-                    throw new Exception(backupError);
-                }
-
-                backupStream = backupStream2;
-
-                // 2. Guardar en almacenamiento local
-                var (saveSuccess, filePath, fileSize, saveError) = await _localStorageController.SaveBackup(
-                    localStorageId,
-                    backupStream,
-                    fileName,
-                    databaseName,
-                    mongodbDatabaseId
-                );
-
-                if (!saveSuccess)
-                {
-                    throw new Exception(saveError);
-                }
-
-                return $"Backup creado exitosamente: {fileName} ({FormatBytes(fileSize)})";
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error al ejecutar backup: {ex.Message}", ex);
-            }
-            finally
-            {
-                // Liberar el MemoryStream
-                backupStream?.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// Ejecuta backup de MongoDB a almacenamiento FTP
-        /// </summary>
-        private async Task<string> ExecuteBackupMongoDBFtp(int mongodbDatabaseId, int ftpStorageId)
-        {
-            MemoryStream? backupStream = null;
-            var startTime = DateTime.Now;
-            string databaseName = "Desconocida";
-
-            try
-            {
-                // 1. Crear backup de MongoDB
-                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _mongoDBController.CreateBackup(mongodbDatabaseId);
-                databaseName = dbName;
-
-                if (!backupSuccess || backupStream2 == null)
-                {
-                    await LogBackupError(mongodbDatabaseId, databaseName, startTime, backupError);
-                    throw new Exception(backupError);
-                }
-
-                backupStream = backupStream2;
-
-                // 2. Guardar en almacenamiento FTP
-                var (saveSuccess, filePath, fileSize, saveError) = await _ftpStorageController.SaveBackup(
-                    ftpStorageId,
-                    backupStream,
-                    fileName,
-                    databaseName,
-                    mongodbDatabaseId
-                );
-
-                if (!saveSuccess)
-                {
-                    throw new Exception(saveError);
-                }
-
-                return $"Backup creado exitosamente en FTP: {fileName} ({FormatBytes(fileSize)})";
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error al ejecutar backup FTP: {ex.Message}", ex);
-            }
-            finally
-            {
-                // Liberar el MemoryStream
-                backupStream?.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// Ejecuta backup de MongoDB a Azure Blob Storage
-        /// </summary>
-        private async Task<string> ExecuteBackupMongoDBBlob(int mongodbDatabaseId, int blobStorageId)
-        {
-            MemoryStream? backupStream = null;
-            var startTime = DateTime.Now;
-            string databaseName = "Desconocida";
-
-            try
-            {
-                // 1. Crear backup de MongoDB
-                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _mongoDBController.CreateBackup(mongodbDatabaseId);
-                databaseName = dbName;
-
-                if (!backupSuccess || backupStream2 == null)
-                {
-                    await LogBackupError(mongodbDatabaseId, databaseName, startTime, backupError);
-                    throw new Exception(backupError);
-                }
-
-                backupStream = backupStream2;
-
-                // 2. Guardar en Azure Blob Storage
-                var (saveSuccess, filePath, fileSize, saveError) = await _blobStorageController.SaveBackup(
-                    blobStorageId,
-                    backupStream,
-                    fileName,
-                    databaseName,
-                    mongodbDatabaseId
-                );
-
-                if (!saveSuccess)
-                {
-                    throw new Exception(saveError);
-                }
-
-                return $"Backup creado exitosamente en Azure Blob: {fileName} ({FormatBytes(fileSize)})";
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error al ejecutar backup Azure Blob: {ex.Message}", ex);
-            }
-            finally
-            {
-                // Liberar el MemoryStream
-                backupStream?.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// Ejecuta backup de MongoDB a OneDrive
-        /// </summary>
-        private async Task<string> ExecuteBackupMongoDBOneDrive(int mongodbDatabaseId, int oneDriveStorageId)
-        {
-            MemoryStream? backupStream = null;
-            var startTime = DateTime.Now;
-            string databaseName = "Desconocida";
-
-            try
-            {
-                // 1. Crear backup de MongoDB
-                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _mongoDBController.CreateBackup(mongodbDatabaseId);
-                databaseName = dbName;
-
-                if (!backupSuccess || backupStream2 == null)
-                {
-                    await LogBackupError(mongodbDatabaseId, databaseName, startTime, backupError);
-                    throw new Exception(backupError);
-                }
-
-                backupStream = backupStream2;
-
-                // 2. Guardar en OneDrive
-                var (saveSuccess, filePath, fileSize, saveError) = await _oneDriveStorageController.SaveBackup(
-                    oneDriveStorageId,
-                    backupStream,
-                    fileName,
-                    databaseName,
-                    mongodbDatabaseId
-                );
-
-                if (!saveSuccess)
-                {
-                    throw new Exception(saveError);
-                }
-
-                return $"Backup creado exitosamente en OneDrive: {fileName} ({FormatBytes(fileSize)})";
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error al ejecutar backup OneDrive: {ex.Message}", ex);
-            }
-            finally
-            {
-                // Liberar el MemoryStream
-                backupStream?.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// Ejecuta backup de MongoDB a Google Drive
-        /// </summary>
-        private async Task<string> ExecuteBackupMongoDBGoogleDrive(int mongodbDatabaseId, int googleDriveStorageId)
-        {
-            MemoryStream? backupStream = null;
-            var startTime = DateTime.Now;
-            string databaseName = "Desconocida";
-
-            try
-            {
-                // 1. Crear backup de MongoDB
-                var (backupSuccess, backupStream2, fileName, dbName, backupError) = await _mongoDBController.CreateBackup(mongodbDatabaseId);
-                databaseName = dbName;
-
-                if (!backupSuccess || backupStream2 == null)
-                {
-                    await LogBackupError(mongodbDatabaseId, databaseName, startTime, backupError);
-                    throw new Exception(backupError);
-                }
-
-                backupStream = backupStream2;
-
-                // 2. Guardar en Google Drive
-                var (saveSuccess, filePath, fileSize, saveError) = await _googleDriveStorageController.SaveBackup(
-                    googleDriveStorageId,
-                    backupStream,
-                    fileName,
-                    databaseName,
-                    mongodbDatabaseId
-                );
-
-                if (!saveSuccess)
-                {
-                    throw new Exception(saveError);
-                }
-
-                return $"Backup creado exitosamente en Google Drive: {fileName} ({FormatBytes(fileSize)})";
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error al ejecutar backup Google Drive: {ex.Message}", ex);
-            }
-            finally
-            {
-                // Liberar el MemoryStream
-                backupStream?.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// Formatea bytes a una representación legible (KB, MB, GB)
-        /// </summary>
-        private string FormatBytes(long bytes)
-        {
-            string[] sizes = { "B", "KB", "MB", "GB", "TB" };
-            double len = bytes;
-            int order = 0;
-
-            while (len >= 1024 && order < sizes.Length - 1)
-            {
-                order++;
-                len = len / 1024;
-            }
-
-            return $"{len:0.##} {sizes[order]}";
-        }
-
-        /// <summary>
         /// Ejecuta una tarea específica de manera manual
         /// </summary>
         [HttpPost]
@@ -1705,7 +640,7 @@ namespace BackupPro.Controllers
                 }
 
                 // Ejecutar backup según el tipo de base de datos y almacenamiento
-                string backupResult = await ExecuteBackupByType(task);
+                string backupResult = await _backupExecutionService.ExecuteAsync(task);
 
                 // Actualizar fechas de la tarea
                 task.LastRunAt = DateTime.Now;
@@ -1749,7 +684,7 @@ namespace BackupPro.Controllers
                     try
                     {
                         // Ejecutar backup según el tipo de base de datos y almacenamiento
-                        string backupResult = await ExecuteBackupByType(task);
+                        string backupResult = await _backupExecutionService.ExecuteAsync(task);
 
                         // Actualizar fechas de la tarea
                         task.LastRunAt = DateTime.Now;

@@ -136,12 +136,17 @@ namespace BackupPro.Controllers
             // Mensaje genérico para evitar revelar si el usuario existe
             ModelState.AddModelError(string.Empty, "Usuario o contraseña incorrectos.");
 
-            // Si la petición viene del modal (tiene Referer), redirigir con el error
-            if (Request.Headers["Referer"].ToString().Contains("/Home") ||
-                Request.Headers["Referer"].ToString().Contains("/Account") == false)
+            // Si la petición viene del modal de login (mostrado en páginas distintas a
+            // /Account/Login), redirigir de vuelta a esa página para que el modal muestre el error
+            // ahí. Se valida con Url.IsLocalUrl para no redirigir a una URL externa arbitraria (el
+            // header Referer lo controla quien hace la petición, no es de fiar sin validar), y se
+            // comprueba que no esté vacío (curl, clientes API o extensiones de privacidad no
+            // siempre lo envían).
+            var referer = Request.Headers["Referer"].ToString();
+            if (!string.IsNullOrEmpty(referer) && Url.IsLocalUrl(referer) && !referer.Contains("/Account"))
             {
                 TempData["LoginError"] = "Usuario o contraseña incorrectos.";
-                return Redirect(Request.Headers["Referer"].ToString());
+                return Redirect(referer);
             }
 
             return View(model);

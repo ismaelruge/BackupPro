@@ -1,5 +1,7 @@
 using BackupPro.Data;
 using BackupPro.Services;
+using BackupPro.Services.Backup;
+using BackupPro.Services.OAuth;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
@@ -119,16 +121,32 @@ namespace BackupPro
             builder.Services.AddScoped<EmailService>();
             builder.Services.AddSingleton<CredentialProtector>();
 
-            // Registrar controladores para inyección de dependencias
-            builder.Services.AddScoped<BackupPro.Controllers.DataBasesTypes.SqlServerDataBaseController>();
-            builder.Services.AddScoped<BackupPro.Controllers.DataBasesTypes.MySqlDataBaseController>();
-            builder.Services.AddScoped<BackupPro.Controllers.DataBasesTypes.PostgresSqlDataBaseController>();
-            builder.Services.AddScoped<BackupPro.Controllers.DataBasesTypes.MongoDBDataBaseController>();
-            builder.Services.AddScoped<BackupPro.Controllers.StorageTypes.LocalStorageController>();
-            builder.Services.AddScoped<BackupPro.Controllers.StorageTypes.FtpStorageController>();
-            builder.Services.AddScoped<BackupPro.Controllers.StorageTypes.BlobStorageController>();
-            builder.Services.AddScoped<BackupPro.Controllers.StorageTypes.OneDriveStorageController>();
-            builder.Services.AddScoped<BackupPro.Controllers.StorageTypes.GoogleDriveStorageController>();
+            // Servicios de token OAuth compartidos entre los controladores (explorar carpetas sin
+            // exponer el token real al cliente) y los providers de backup (subir un archivo).
+            builder.Services.AddScoped<GoogleDriveTokenService>();
+            builder.Services.AddScoped<OneDriveTokenService>();
+
+            // Providers de backup: un IDatabaseBackupProvider por motor de base de datos soportado y
+            // un IStorageProvider por destino de almacenamiento soportado. Agregar un motor o destino
+            // nuevo es escribir la clase e inscribirla acá; nada más del código necesita cambiar
+            // (ver BackupProviderRegistry y BackupExecutionService).
+            builder.Services.AddScoped<IDatabaseBackupProvider, SqlServerBackupProvider>();
+            builder.Services.AddScoped<IDatabaseBackupProvider, MySqlBackupProvider>();
+            builder.Services.AddScoped<IDatabaseBackupProvider, PostgresBackupProvider>();
+            builder.Services.AddScoped<IDatabaseBackupProvider, MongoDbBackupProvider>();
+
+            builder.Services.AddScoped<IStorageProvider, LocalStorageProvider>();
+            builder.Services.AddScoped<IStorageProvider, FtpStorageProvider>();
+            builder.Services.AddScoped<IStorageProvider, BlobStorageProvider>();
+            builder.Services.AddScoped<IStorageProvider, GoogleDriveStorageProvider>();
+            builder.Services.AddScoped<IStorageProvider, OneDriveStorageProvider>();
+
+            builder.Services.AddScoped<BackupProviderRegistry>();
+            builder.Services.AddScoped<BackupExecutionService>();
+
+            // Ejecuta las tareas programadas automáticamente cuando llega su hora (antes esto
+            // requería que alguien entrara a la interfaz y apretara "Ejecutar" a mano).
+            builder.Services.AddHostedService<BackupSchedulerBackgroundService>();
 
             // Agregar soporte para sesiones
             builder.Services.AddDistributedMemoryCache();
