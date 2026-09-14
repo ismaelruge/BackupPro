@@ -151,6 +151,7 @@ namespace BackupPro
 
             builder.Services.AddScoped<BackupProviderRegistry>();
             builder.Services.AddScoped<BackupExecutionService>();
+            builder.Services.AddScoped<BackupRetentionService>();
 
             // Ejecuta las tareas programadas automáticamente cuando llega su hora (antes esto
             // requería que alguien entrara a la interfaz y apretara "Ejecutar" a mano).

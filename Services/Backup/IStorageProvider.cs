@@ -13,5 +13,15 @@ namespace BackupPro.Services.Backup
 
         /// <summary>Sube <paramref name="backupStream"/> al destino de almacenamiento indicado.</summary>
         Task<(bool success, string filePath, long fileSize, string errorMessage)> SaveBackupAsync(int storageId, MemoryStream backupStream, string fileName, string databaseName, int databaseId);
+
+        /// <summary>
+        /// Borra un backup ya subido, identificado por <paramref name="backupPath"/> (y, en destinos
+        /// donde la ruta no alcanza para borrar como Google Drive/OneDrive, por
+        /// <paramref name="storageFileId"/>). Usado por <see cref="BackupRetentionService"/> al
+        /// aplicar la política de retención. Devuelve true solo si el archivo quedó efectivamente
+        /// borrado (o ya no existía); false si no se pudo borrar, para que el llamador conserve el
+        /// registro en el histórico y reintente más adelante.
+        /// </summary>
+        Task<bool> DeleteBackupAsync(int storageId, string backupPath, string? storageFileId);
     }
 }

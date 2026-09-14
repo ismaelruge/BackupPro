@@ -72,7 +72,7 @@ namespace BackupPro.Services.Backup
 
                 await LogBackupSuccessAsync(databaseId, databaseName, startTime,
                     $"Backup guardado exitosamente. Tamaño: {FormatBytes(fileInfo.Length)}. Duración: {duration.TotalSeconds:F2} segundos.",
-                    backupFilePath);
+                    backupFilePath, StorageType, storageId);
 
                 return (true, backupFilePath, fileInfo.Length, string.Empty);
             }
@@ -92,6 +92,24 @@ namespace BackupPro.Services.Backup
 
                 await LogBackupErrorAsync(databaseId, databaseName, startTime, errorMessage);
                 return (false, string.Empty, 0, errorMessage);
+            }
+        }
+
+        public Task<bool> DeleteBackupAsync(int storageId, string backupPath, string? storageFileId)
+        {
+            try
+            {
+                if (File.Exists(backupPath))
+                {
+                    File.Delete(backupPath);
+                }
+
+                return Task.FromResult(true);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al borrar backup local {BackupPath}", backupPath);
+                return Task.FromResult(false);
             }
         }
     }

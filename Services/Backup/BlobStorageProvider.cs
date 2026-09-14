@@ -74,7 +74,7 @@ namespace BackupPro.Services.Backup
                 var duration = DateTime.Now - startTime;
                 await LogBackupSuccessAsync(databaseId, databaseName, startTime,
                     $"Backup guardado exitosamente en Azure Blob Storage. Tamaño: {FormatBytes(blobSize)}. Duración: {duration.TotalSeconds:F2} segundos.",
-                    blobPath);
+                    blobPath, StorageType, storageId);
 
                 TryDeleteFile(localTempPath);
 
@@ -101,6 +101,31 @@ namespace BackupPro.Services.Backup
                 }
             }
             catch { /* Ignorar errores al eliminar archivo temporal */ }
+        }
+
+        public async Task<bool> DeleteBackupAsync(int storageId, string backupPath, string? storageFileId)
+        {
+            var blobStorage = await Context.AzureBlobStorages.FindAsync(storageId);
+            if (blobStorage == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                string plainConnectionString = _credentialProtector.Unprotect(blobStorage.ConnectionString) ?? string.Empty;
+                var blobServiceClient = new BlobServiceClient(plainConnectionString);
+                var containerClient = blobServiceClient.GetBlobContainerClient(blobStorage.ContainerName);
+                var blobClient = containerClient.GetBlobClient(backupPath);
+
+                await blobClient.DeleteIfExistsAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al borrar blob {BackupPath} (storage {BlobStorageId})", backupPath, storageId);
+                return false;
+            }
         }
     }
 }

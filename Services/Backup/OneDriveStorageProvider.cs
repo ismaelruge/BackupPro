@@ -88,11 +88,14 @@ namespace BackupPro.Services.Backup
 
                     var responseData = System.Text.Json.JsonDocument.Parse(responseJson);
                     long fileSize = responseData.RootElement.GetProperty("size").GetInt64();
+                    string? uploadedItemId = responseData.RootElement.TryGetProperty("id", out var idElement)
+                        ? idElement.GetString()
+                        : null;
 
                     var duration = DateTime.Now - startTime;
                     await LogBackupSuccessAsync(databaseId, databaseName, startTime,
                         $"Backup guardado exitosamente en OneDrive. Tamaño: {FormatBytes(fileSize)}. Duración: {duration.TotalSeconds:F2} segundos.",
-                        oneDrivePath);
+                        oneDrivePath, StorageType, storageId, uploadedItemId);
 
                     TryDeleteFile(localTempPath);
 
@@ -120,6 +123,42 @@ namespace BackupPro.Services.Backup
                 }
             }
             catch { /* Ignorar errores al eliminar archivo temporal */ }
+        }
+
+        public async Task<bool> DeleteBackupAsync(int storageId, string backupPath, string? storageFileId)
+        {
+            if (string.IsNullOrEmpty(storageFileId))
+            {
+                // Backups guardados antes de que se empezara a registrar el item id real de OneDrive:
+                // no hay forma confiable de ubicarlo solo con la ruta, así que se deja el registro
+                // tal cual (no se borra el archivo ni el histórico).
+                _logger.LogWarning("No se puede borrar el backup de OneDrive {BackupPath}: no tiene un item id registrado.", backupPath);
+                return false;
+            }
+
+            var oneDriveStorage = await Context.OneDriveStorages.FindAsync(storageId);
+            if (oneDriveStorage == null || !await _tokenService.EnsureValidTokenAsync(oneDriveStorage))
+            {
+                return false;
+            }
+
+            try
+            {
+                string accessToken = _tokenService.GetPlainAccessToken(oneDriveStorage);
+                using var httpClient = new HttpClient();
+                httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
+
+                var response = await httpClient.DeleteAsync($"https://graph.microsoft.com/v1.0/me/drive/items/{storageFileId}");
+
+                // 404 significa que ya no existe (por ejemplo, si alguien lo borró manualmente desde
+                // OneDrive): para efectos de retención, el resultado deseado (que no exista) ya se dio.
+                return response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.NotFound;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al borrar backup en OneDrive {StorageFileId} (storage {OneDriveStorageId})", storageFileId, storageId);
+                return false;
+            }
         }
     }
 }

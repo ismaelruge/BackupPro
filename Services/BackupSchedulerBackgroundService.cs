@@ -17,6 +17,7 @@ namespace BackupPro.Services
 
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<BackupSchedulerBackgroundService> _logger;
+        private DateTime? _lastRetentionRunDate;
 
         public BackupSchedulerBackgroundService(IServiceScopeFactory scopeFactory, ILogger<BackupSchedulerBackgroundService> logger)
         {
@@ -35,12 +36,41 @@ namespace BackupPro.Services
                 do
                 {
                     await RunDueTasksAsync(stoppingToken);
+                    await RunRetentionIfDueAsync(stoppingToken);
                 }
                 while (await timer.WaitForNextTickAsync(stoppingToken));
             }
             catch (OperationCanceledException)
             {
                 // Apagado normal de la aplicación
+            }
+        }
+
+        /// <summary>
+        /// Corre la política de retención "3x6" una vez al día (no hace falta revisarla cada minuto:
+        /// depende de fechas con granularidad de meses). Se aprovecha el mismo ciclo de sondeo en vez
+        /// de agregar un segundo timer.
+        /// </summary>
+        private async Task RunRetentionIfDueAsync(CancellationToken stoppingToken)
+        {
+            var today = DateTime.Now.Date;
+            if (_lastRetentionRunDate == today)
+            {
+                return;
+            }
+
+            _lastRetentionRunDate = today;
+
+            using var scope = _scopeFactory.CreateScope();
+            var retentionService = scope.ServiceProvider.GetRequiredService<BackupRetentionService>();
+
+            try
+            {
+                await retentionService.RunAsync(stoppingToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al aplicar la política de retención de backups.");
             }
         }
 

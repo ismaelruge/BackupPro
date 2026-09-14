@@ -40,7 +40,8 @@ namespace BackupPro.Services.Backup
             }
         }
 
-        protected async Task LogBackupSuccessAsync(int databaseId, string databaseName, DateTime startTime, string message, string backupPath)
+        protected async Task LogBackupSuccessAsync(int databaseId, string databaseName, DateTime startTime, string message, string backupPath,
+            string storageType, int storageId, string? storageFileId = null)
         {
             try
             {
@@ -51,7 +52,10 @@ namespace BackupPro.Services.Backup
                     Date = startTime,
                     Status = "Exitoso",
                     Message = message,
-                    BackupPath = backupPath
+                    BackupPath = backupPath,
+                    StorageType = storageType,
+                    StorageId = storageId,
+                    StorageFileId = storageFileId
                 });
 
                 await Context.SaveChangesAsync();

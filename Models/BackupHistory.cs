@@ -31,5 +31,25 @@ namespace BackupPro.Models
         [Required]
         [MaxLength(500)]
         public string BackupPath { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Tipo y de almacenamiento donde quedó guardado el backup (p.ej. "Local", "Ftp"), y su Id
+        /// de configuración. Nulos en registros de error (nunca hubo archivo) y en backups creados
+        /// antes de que existiera esta columna. Usado por <see cref="Services.Backup.BackupRetentionService"/>
+        /// para saber con qué <see cref="Services.Backup.IStorageProvider"/> y configuración borrar
+        /// el archivo real al aplicar la política de retención.
+        /// </summary>
+        [MaxLength(50)]
+        public string? StorageType { get; set; }
+
+        public int? StorageId { get; set; }
+
+        /// <summary>
+        /// Identificador nativo del archivo en el destino de almacenamiento (p.ej. el file id de
+        /// Google Drive o el item id de OneDrive), cuando <see cref="BackupPath"/> por sí solo no
+        /// alcanza para borrarlo. Null en destinos donde la ruta ya es suficiente (local, FTP, Blob).
+        /// </summary>
+        [MaxLength(500)]
+        public string? StorageFileId { get; set; }
     }
 }

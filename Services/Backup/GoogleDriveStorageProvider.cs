@@ -109,10 +109,14 @@ namespace BackupPro.Services.Backup
                     ? long.Parse(sizeElement.GetString()!)
                     : new FileInfo(localTempPath).Length;
 
+                string? uploadedFileId = responseData.RootElement.TryGetProperty("id", out var idElement)
+                    ? idElement.GetString()
+                    : null;
+
                 var duration = DateTime.Now - startTime;
                 await LogBackupSuccessAsync(databaseId, databaseName, startTime,
                     $"Backup guardado exitosamente en Google Drive. Tamaño: {FormatBytes(fileSize)}. Duración: {duration.TotalSeconds:F2} segundos.",
-                    googleDrivePath);
+                    googleDrivePath, StorageType, storageId, uploadedFileId);
 
                 TryDeleteFile(localTempPath);
 
@@ -139,6 +143,42 @@ namespace BackupPro.Services.Backup
                 }
             }
             catch { /* Ignorar errores al eliminar archivo temporal */ }
+        }
+
+        public async Task<bool> DeleteBackupAsync(int storageId, string backupPath, string? storageFileId)
+        {
+            if (string.IsNullOrEmpty(storageFileId))
+            {
+                // Backups guardados antes de que se empezara a registrar el id real del archivo de
+                // Drive: no hay forma confiable de ubicarlo solo con la ruta, así que se deja el
+                // registro tal cual (no se borra el archivo ni el histórico).
+                _logger.LogWarning("No se puede borrar el backup de Google Drive {BackupPath}: no tiene un id de archivo registrado.", backupPath);
+                return false;
+            }
+
+            var googleDriveStorage = await Context.GoogleDriveStorages.FindAsync(storageId);
+            if (googleDriveStorage == null || !await _tokenService.EnsureValidTokenAsync(googleDriveStorage))
+            {
+                return false;
+            }
+
+            try
+            {
+                string accessToken = _tokenService.GetPlainAccessToken(googleDriveStorage);
+                using var httpClient = new HttpClient();
+                httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
+
+                var response = await httpClient.DeleteAsync($"https://www.googleapis.com/drive/v3/files/{storageFileId}");
+
+                // 404 significa que ya no existe (por ejemplo, si alguien lo borró manualmente desde
+                // Drive): para efectos de retención, el resultado deseado (que no exista) ya se dio.
+                return response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.NotFound;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al borrar backup en Google Drive {StorageFileId} (storage {GoogleDriveStorageId})", storageFileId, storageId);
+                return false;
+            }
         }
     }
 }

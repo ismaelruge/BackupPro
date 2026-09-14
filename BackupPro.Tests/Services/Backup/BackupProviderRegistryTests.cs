@@ -24,6 +24,9 @@ namespace BackupPro.Tests.Services.Backup
             public Task<(bool success, string filePath, long fileSize, string errorMessage)> SaveBackupAsync(
                 int storageId, MemoryStream backupStream, string fileName, string databaseName, int databaseId) =>
                 throw new NotImplementedException();
+
+            public Task<bool> DeleteBackupAsync(int storageId, string backupPath, string? storageFileId) =>
+                throw new NotImplementedException();
         }
 
         private static BackupProviderRegistry CreateRegistry() => new(

@@ -74,7 +74,7 @@ namespace BackupPro.Services.Backup
                     var duration = DateTime.Now - startTime;
                     await LogBackupSuccessAsync(databaseId, databaseName, startTime,
                         $"Backup guardado exitosamente en FTP. Tamaño: {FormatBytes(remoteFileSize)}. Duración: {duration.TotalSeconds:F2} segundos.",
-                        remoteFilePath);
+                        remoteFilePath, StorageType, storageId);
 
                     TryDeleteFile(localTempPath);
 
@@ -106,6 +106,39 @@ namespace BackupPro.Services.Backup
                 }
             }
             catch { /* Ignorar errores al eliminar archivo temporal */ }
+        }
+
+        public async Task<bool> DeleteBackupAsync(int storageId, string backupPath, string? storageFileId)
+        {
+            var ftpStorage = await Context.FtpStorages.FindAsync(storageId);
+            if (ftpStorage == null)
+            {
+                return false;
+            }
+
+            AsyncFtpClient? client = null;
+            try
+            {
+                string plainPassword = _credentialProtector.Unprotect(ftpStorage.Password) ?? string.Empty;
+                client = new AsyncFtpClient(ftpStorage.Host, ftpStorage.Username, plainPassword, ftpStorage.Port);
+                await client.Connect();
+
+                if (await client.FileExists(backupPath))
+                {
+                    await client.DeleteFile(backupPath);
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al borrar backup en FTP {BackupPath} (storage {FtpStorageId})", backupPath, storageId);
+                return false;
+            }
+            finally
+            {
+                client?.Dispose();
+            }
         }
     }
 }

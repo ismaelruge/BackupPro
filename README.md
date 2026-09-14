@@ -10,6 +10,7 @@ autoría (ver [Licencia](#licencia)).
 - **Programación de tareas:** ejecución manual desde la interfaz web, o automática (por
   minutos/horas/días) mediante un servicio en segundo plano que revisa las tareas vencidas cada
   minuto — no requiere que alguien entre a la app para que corran. Historial de resultados incluido.
+- **Retención automática de backups ("3x6"):** ver [Retención de backups](#retención-de-backups).
 
 ## Requisitos
 
@@ -149,6 +150,29 @@ propio CRUD, en vez de pasar por una capa de servicio — el refactor a provider
 lógica de *ejecutar* un backup (que sí estaba duplicada 20 veces), no en el CRUD de cada
 configuración.
 
+## Retención de backups
+
+`BackupRetentionService` aplica automáticamente una política "3x6", una vez al día, sobre cada
+combinación de base de datos + destino de almacenamiento por separado:
+
+1. Busca backups exitosos de esa combinación con más de 6 meses de antigüedad. Si no hay ninguno,
+   no hace nada.
+2. Si los hay, cuenta cuántos backups de esa misma combinación tienen **menos** de 6 meses.
+   - Si son **menos de 3**, no borra nada — se necesita ese mínimo de respaldo reciente antes de
+     prescindir de los más viejos.
+   - Si son **3 o más**, borra todos los backups de más de 6 meses de esa combinación: el archivo
+     real en el destino (disco local, FTP, Azure Blob, Google Drive o OneDrive) y su fila en el
+     histórico.
+
+Si el borrado del archivo remoto falla (por ejemplo, no se pudo conectar al FTP), el registro se
+conserva y se reintenta al día siguiente — nunca se borra el histórico sin haber confirmado que el
+archivo real ya no existe.
+
+**Limitación conocida:** los backups guardados con una versión anterior a esta función no tienen
+guardado el destino de almacenamiento exacto en su fila del histórico, así que la política de
+retención los ignora por completo (no se borran automáticamente; hay que hacerlo a mano si se
+quiere). Solo los backups generados después de este cambio participan de la retención automática.
+
 ## Pruebas
 
 ```bash
@@ -157,9 +181,11 @@ dotnet test
 
 `BackupPro.Tests/` (xUnit + Moq + EF Core InMemory) cubre la lógica de negocio en `Services/`:
 `BackupFrequencyCalculator`, `BackupProviderRegistry`, `BackupExecutionService` (casos de éxito y de
-error, con providers simulados), `CredentialProtector` (cifrado/descifrado, valores legados sin
-cifrar) y `SetupState` (detección del estado "recién instalado"). No hay pruebas de controladores
-ni de vistas todavía.
+error, con providers simulados), `BackupRetentionService` (los distintos escenarios de la política
+"3x6": nada que borrar, mínimo no cubierto, borrado exitoso, fallo al borrar el archivo, backups sin
+destino registrado, series independientes), `CredentialProtector` (cifrado/descifrado, valores
+legados sin cifrar) y `SetupState` (detección del estado "recién instalado"). No hay pruebas de
+controladores ni de vistas todavía.
 
 ## Autor
 
