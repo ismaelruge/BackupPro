@@ -25,5 +25,12 @@ namespace BackupPro.ViewModels
         [Compare(nameof(Password), ErrorMessage = "Las contraseñas no coinciden")]
         [Display(Name = "Confirmar contraseña")]
         public string ConfirmPassword { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "El nombre de la empresa es obligatorio")]
+        [Display(Name = "Nombre de la empresa")]
+        public string CompanyName { get; set; } = string.Empty;
+
+        [Display(Name = "Correos adicionales para notificaciones")]
+        public string? AdditionalEmails { get; set; }
     }
 }

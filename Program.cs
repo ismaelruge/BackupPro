@@ -1,4 +1,5 @@
 using BackupPro.Data;
+using BackupPro.Filters;
 using BackupPro.Services;
 using BackupPro.Services.Backup;
 using BackupPro.Services.OAuth;
@@ -117,7 +118,14 @@ namespace BackupPro
             });
 
             // Agregar MVC y servicios
-            builder.Services.AddControllersWithViews();
+            builder.Services.AddScoped<RequireSetupCompleteFilter>();
+            builder.Services.AddControllersWithViews(options =>
+            {
+                // Mientras el sistema esté "recién instalado" (ver SetupState), obliga a
+                // completar el asistente de configuración inicial antes de dejar usar cualquier
+                // otra parte de la app.
+                options.Filters.AddService<RequireSetupCompleteFilter>();
+            });
             builder.Services.AddScoped<EmailService>();
             builder.Services.AddSingleton<CredentialProtector>();
 
@@ -161,6 +169,16 @@ namespace BackupPro
 
             // Aplicar migraciones y crear BD si no existe
             AplicarMigraciones(app);
+
+            // Generar (si hace falta) y cachear la clave maestra de cifrado apenas arranca la app,
+            // en vez de esperar a que alguien guarde la primera credencial. Es un Singleton, así
+            // que forzar su creación acá no cambia su comportamiento, solo el momento: el archivo
+            // Data/master.key queda listo desde el primer arranque sin que el usuario tenga que
+            // hacer ni ver nada al respecto.
+            using (var scope = app.Services.CreateScope())
+            {
+                scope.ServiceProvider.GetRequiredService<CredentialProtector>();
+            }
 
             // Pipeline HTTP
             app.UseExceptionHandler("/Home/Error");

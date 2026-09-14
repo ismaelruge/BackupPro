@@ -30,9 +30,13 @@ y aplica las migraciones pendientes al iniciar. Por defecto escucha en `http://l
 abre el navegador automáticamente.
 
 **Primer inicio:** si no existe ningún usuario, se puede iniciar sesión una sola vez con
-`admin` / `admin` (solo desde el propio equipo, ver más abajo) para llegar al asistente de
-configuración inicial (`SetupAdmin`), donde se crea el usuario administrador definitivo y se
-elimina el usuario temporal.
+`admin` / `admin` (solo desde el propio equipo, ver más abajo). Esto lleva directo al asistente de
+configuración inicial (`/Account/SetupAdmin`, no al login) donde hay que crear el usuario
+administrador definitivo (nombre, correo, contraseña) y los datos básicos de notificación (nombre
+de la empresa, correos adicionales). **Es obligatorio completarlo**: mientras no se haga, no se
+puede usar ninguna otra parte de la aplicación (cualquier otra pantalla rebota de vuelta al
+asistente). Al terminar, el usuario `admin` temporal se elimina. El resto de la configuración
+(SMTP, correos, contraseña) se puede editar después desde **Configuración de la Empresa**.
 
 ## Configuración y secretos
 
@@ -54,7 +58,7 @@ secciones anidadas, siguiendo la convención estándar de configuración de ASP.
 
 | Variable | Para qué sirve |
 |---|---|
-| `BACKUPPRO_MASTER_KEY` | Clave maestra (256 bits en Base64) para cifrar credenciales guardadas en la BD. Generar con `openssl rand -base64 32`. Si no se define, la app genera y persiste una automáticamente en `Data/master.key` la primera vez que arranca — cómodo para desarrollo, pero en producción se recomienda fijarla explícitamente (así no depende de un archivo local y se puede rotar/recuperar de forma controlada). |
+| `BACKUPPRO_MASTER_KEY` | Clave maestra (256 bits en Base64) para cifrar credenciales guardadas en la BD. Generar con `openssl rand -base64 32`. Si no se define, la app la genera sola y la guarda en `Data/master.key` **apenas arranca** (no hace falta ninguna acción ni pantalla del usuario) — cómodo para desarrollo, pero en producción se recomienda fijarla explícitamente (así no depende de un archivo local y se puede rotar/recuperar de forma controlada). |
 | `Smtp__Host`, `Smtp__Port`, `Smtp__EnableSSL`, `Smtp__Email`, `Smtp__Password` | Credenciales SMTP para el envío de notificaciones y recuperación de contraseña. |
 | `GoogleOAuth__ClientId`, `GoogleOAuth__ClientSecret` | Credenciales de la app OAuth de Google (para conectar Google Drive como destino). |
 | `OneDrive__ClientId`, `OneDrive__ClientSecret` | Credenciales de la app OAuth de Microsoft/Azure AD (para conectar OneDrive como destino). |
@@ -104,6 +108,8 @@ organizado en capas lógicas por carpeta:
     de cada configuración de base de datos y de almacenamiento.
   - `Controllers/TaskSchedulerController.cs`: CRUD de tareas programadas y disparo de ejecución
     manual ("Ejecutar"/"Ejecutar todas"); delega la ejecución real en `BackupExecutionService`.
+  - `Controllers/AccountController.cs`: login, logout y el asistente de configuración inicial
+    (`SetupAdmin`, ver [Primer inicio](#cómo-ejecutar-en-desarrollo)).
 - **Dominio** — `Models/` (entidades que EF Core mapea a tablas).
 - **Persistencia** — `Data/ApplicationDbContext.cs` + `Migrations/` (EF Core + SQLite).
 - **Servicios / lógica de negocio** — `Services/`:
@@ -130,6 +136,10 @@ organizado en capas lógicas por carpeta:
     (subir un backup).
   - `CredentialProtector.cs`: cifrado/descifrado de credenciales (ver [arriba](#cifrado-de-credenciales)).
   - `EmailService.cs`: envío de notificaciones por correo.
+  - `SetupState.cs`: detecta si el sistema sigue en el estado de "recién instalado" (el único
+    usuario existente es el `admin` temporal); usado por `AccountController` y por
+    `Filters/RequireSetupCompleteFilter.cs`, que bloquea el resto de la aplicación hasta que se
+    complete el asistente de configuración inicial.
 - **Composición** — `Program.cs` (registro de servicios en el contenedor de DI, pipeline HTTP).
 
 Un matiz honesto: no es una arquitectura N-Tier estricta. Los 9 controladores de
@@ -146,8 +156,9 @@ dotnet test
 
 `BackupPro.Tests/` (xUnit + Moq + EF Core InMemory) cubre la lógica de negocio en `Services/`:
 `BackupFrequencyCalculator`, `BackupProviderRegistry`, `BackupExecutionService` (casos de éxito y de
-error, con providers simulados) y `CredentialProtector` (cifrado/descifrado, valores legados sin
-cifrar). No hay pruebas de controladores ni de vistas todavía.
+error, con providers simulados), `CredentialProtector` (cifrado/descifrado, valores legados sin
+cifrar) y `SetupState` (detección del estado "recién instalado"). No hay pruebas de controladores
+ni de vistas todavía.
 
 ## Licencia
 

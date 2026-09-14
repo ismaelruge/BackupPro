@@ -1,6 +1,10 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using BackupPro.Data;
+using BackupPro.Models;
+using BackupPro.Services;
 using BackupPro.ViewModels;
+using Microsoft.EntityFrameworkCore;
 using System.Net;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
@@ -8,12 +12,14 @@ using Microsoft.AspNetCore.Authorization;
 namespace BackupPro.Controllers
 {
     /// <summary>
-    /// Controlador responsable de la autenticación de usuarios (login y logout).
+    /// Controlador responsable de la autenticación de usuarios (login y logout) y del asistente de
+    /// configuración inicial.
     /// </summary>
     public class AccountController : Controller
     {
         private readonly UserManager<IdentityUser> _userManager;
         private readonly SignInManager<IdentityUser> _signInManager;
+        private readonly ApplicationDbContext _context;
         private readonly ILogger<AccountController> _logger;
 
         /// <summary>
@@ -21,11 +27,13 @@ namespace BackupPro.Controllers
         /// </summary>
         /// <param name="userManager">Gestor de usuarios de identidad.</param>
         /// <param name="signInManager">Gestor de inicio de sesión de identidad.</param>
+        /// <param name="context">Contexto de base de datos.</param>
         /// <param name="logger">Logger.</param>
-        public AccountController(UserManager<IdentityUser> userManager, SignInManager<IdentityUser> signInManager, ILogger<AccountController> logger)
+        public AccountController(UserManager<IdentityUser> userManager, SignInManager<IdentityUser> signInManager, ApplicationDbContext context, ILogger<AccountController> logger)
         {
             _userManager = userManager;
             _signInManager = signInManager;
+            _context = context;
             _logger = logger;
         }
 
@@ -125,7 +133,7 @@ namespace BackupPro.Controllers
                 {
                     // Si es el usuario por defecto y es el único existente, forzar configuración de admin
                     totalUsuarios = _userManager.Users.Count();
-                    if ((user.UserName?.Equals("admin", StringComparison.OrdinalIgnoreCase) ?? false) && totalUsuarios == 1)
+                    if (SetupState.IsBootstrapAdmin(totalUsuarios, user.UserName))
                     {
                         return RedirectToAction(nameof(SetupAdmin));
                     }
@@ -212,11 +220,34 @@ namespace BackupPro.Controllers
                 return View(model);
             }
 
-            var defaultUser = await _userManager.FindByNameAsync("admin");
+            var defaultUser = await _userManager.FindByNameAsync(SetupState.BootstrapUserName);
             if (defaultUser != null)
             {
                 await _userManager.DeleteAsync(defaultUser);
             }
+
+            // Guardar los datos de empresa y correos de notificación en el mismo paso: hasta no
+            // completar este formulario, RequireSetupCompleteFilter no deja usar el resto de la
+            // app, así que este es el único momento garantizado en el que se le puede pedir esto
+            // al usuario. Editable después desde Configuración de la Empresa.
+            var config = await _context.CompanyConfigs.FirstOrDefaultAsync();
+            if (config == null)
+            {
+                config = new CompanyConfig
+                {
+                    CompanyName = model.CompanyName,
+                    AdminEmail = model.Email,
+                    AdditionalEmails = model.AdditionalEmails
+                };
+                _context.CompanyConfigs.Add(config);
+            }
+            else
+            {
+                config.CompanyName = model.CompanyName;
+                config.AdminEmail = model.Email;
+                config.AdditionalEmails = model.AdditionalEmails;
+            }
+            await _context.SaveChangesAsync();
 
             await _signInManager.SignInAsync(newUser, isPersistent: true);
             return RedirectToAction("Index", "Home");
