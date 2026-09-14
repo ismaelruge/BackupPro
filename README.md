@@ -1,6 +1,6 @@
 # BackupPro
 
-Aplicación web (ASP.NET Core 9 MVC) para programar y gestionar backups de bases de datos hacia
+Aplicación web (ASP.NET Core 10 MVC) para programar y gestionar backups de bases de datos hacia
 distintos destinos de almacenamiento. **De uso gratuito**, con un requisito de atribución de
 autoría (ver [Licencia](#licencia)).
 
