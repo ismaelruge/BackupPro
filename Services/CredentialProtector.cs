@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Konscious.Security.Cryptography;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
 namespace BackupPro.Services
@@ -127,25 +128,49 @@ namespace BackupPro.Services
             // fuente para que la app siga funcionando de inmediato. En producción se recomienda
             // definir la variable de entorno BACKUPPRO_MASTER_KEY (ver README) en vez de depender
             // de este archivo generado automáticamente.
-            // Se usa AppContext.BaseDirectory (no IHostEnvironment.ContentRootPath) para que la
-            // clave quede junto a backuppro.db (ver Program.cs), en la carpeta de salida del build,
-            // y no en el árbol de código fuente al ejecutar con "dotnet run".
+            //
+            // Se guarda en su propia base de datos SQLite (keystore.db), separada de backuppro.db
+            // (donde viven las credenciales ya cifradas): así, si alguien llega a copiar o filtrar
+            // backuppro.db, no se lleva en el mismo archivo la clave necesaria para descifrarlo.
+            // Se usa AppContext.BaseDirectory (no IHostEnvironment.ContentRootPath) para que quede
+            // junto a backuppro.db (ver Program.cs), en la carpeta de salida del build, y no en el
+            // árbol de código fuente al ejecutar con "dotnet run".
             string keyFolder = Path.Combine(AppContext.BaseDirectory, "Data");
             Directory.CreateDirectory(keyFolder);
-            string keyFile = Path.Combine(keyFolder, "master.key");
+            string keyStorePath = Path.Combine(keyFolder, "keystore.db");
 
-            if (File.Exists(keyFile))
+            using var connection = new SqliteConnection($"Data Source={keyStorePath}");
+            connection.Open();
+
+            using (var createTable = connection.CreateCommand())
             {
-                return Convert.FromBase64String(File.ReadAllText(keyFile).Trim());
+                createTable.CommandText =
+                    "CREATE TABLE IF NOT EXISTS MasterKey (Id INTEGER PRIMARY KEY CHECK (Id = 1), KeyValue TEXT NOT NULL)";
+                createTable.ExecuteNonQuery();
+            }
+
+            using (var select = connection.CreateCommand())
+            {
+                select.CommandText = "SELECT KeyValue FROM MasterKey WHERE Id = 1";
+                if (select.ExecuteScalar() is string existingKey && !string.IsNullOrWhiteSpace(existingKey))
+                {
+                    return Convert.FromBase64String(existingKey);
+                }
             }
 
             byte[] newKey = RandomNumberGenerator.GetBytes(KeySize);
-            File.WriteAllText(keyFile, Convert.ToBase64String(newKey));
+
+            using (var insert = connection.CreateCommand())
+            {
+                insert.CommandText = "INSERT INTO MasterKey (Id, KeyValue) VALUES (1, $key)";
+                insert.Parameters.AddWithValue("$key", Convert.ToBase64String(newKey));
+                insert.ExecuteNonQuery();
+            }
 
             logger.LogWarning(
-                "No se configuró BACKUPPRO_MASTER_KEY. Se generó automáticamente una clave maestra en {KeyFile}. " +
+                "No se configuró BACKUPPRO_MASTER_KEY. Se generó automáticamente una clave maestra en {KeyStore}. " +
                 "Para producción, define la variable de entorno BACKUPPRO_MASTER_KEY (ver README) y elimina este archivo.",
-                keyFile);
+                keyStorePath);
 
             return newKey;
         }

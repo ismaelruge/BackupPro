@@ -316,7 +316,15 @@ appsettings.Local.json
 appsettings.Production.json
 appsettings.*.local.json
 
-# BackupPro: clave maestra autogenerada para cifrar credenciales (ver Services/CredentialProtector.cs)
+# BackupPro: base de datos principal (usuarios, credenciales cifradas, historial de backups) y la
+# base de datos separada con la clave maestra de cifrado (ver Services/CredentialProtector.cs).
+# Ninguna de las dos debe subirse al repo bajo ningún concepto, mucho menos siendo público.
+backuppro.db
+backuppro.db-shm
+backuppro.db-wal
+keystore.db
+keystore.db-shm
+keystore.db-wal
 master.key
 
 # CodeRush personal settings

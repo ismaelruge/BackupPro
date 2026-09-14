@@ -7,6 +7,10 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591</NoWarn>
     <DisableStaticWebAssets>true</DisableStaticWebAssets>
+    <Authors>Ismael Ruge González</Authors>
+    <Company>Ismael Ruge González</Company>
+    <Product>BackupPro</Product>
+    <Copyright>Copyright (c) 2026 Ismael Ruge González</Copyright>
   </PropertyGroup>
 
   <ItemGroup>

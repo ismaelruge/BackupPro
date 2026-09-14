@@ -58,7 +58,7 @@ secciones anidadas, siguiendo la convención estándar de configuración de ASP.
 
 | Variable | Para qué sirve |
 |---|---|
-| `BACKUPPRO_MASTER_KEY` | Clave maestra (256 bits en Base64) para cifrar credenciales guardadas en la BD. Generar con `openssl rand -base64 32`. Si no se define, la app la genera sola y la guarda en `Data/master.key` **apenas arranca** (no hace falta ninguna acción ni pantalla del usuario) — cómodo para desarrollo, pero en producción se recomienda fijarla explícitamente (así no depende de un archivo local y se puede rotar/recuperar de forma controlada). |
+| `BACKUPPRO_MASTER_KEY` | Clave maestra (256 bits en Base64) para cifrar credenciales guardadas en la BD. Generar con `openssl rand -base64 32`. Si no se define, la app la genera sola **apenas arranca** (no hace falta ninguna acción ni pantalla del usuario) y la guarda en su propia base de datos SQLite, `Data/keystore.db` — separada de `Data/backuppro.db`, donde viven las credenciales ya cifradas, para que copiar/filtrar una no exponga automáticamente la otra. Cómodo para desarrollo, pero en producción se recomienda fijarla explícitamente (así no depende de un archivo local y se puede rotar/recuperar de forma controlada). |
 | `Smtp__Host`, `Smtp__Port`, `Smtp__EnableSSL`, `Smtp__Email`, `Smtp__Password` | Credenciales SMTP para el envío de notificaciones y recuperación de contraseña. |
 | `GoogleOAuth__ClientId`, `GoogleOAuth__ClientSecret` | Credenciales de la app OAuth de Google (para conectar Google Drive como destino). |
 | `OneDrive__ClientId`, `OneDrive__ClientSecret` | Credenciales de la app OAuth de Microsoft/Azure AD (para conectar OneDrive como destino). |
@@ -79,7 +79,7 @@ Google/OneDrive se cifran antes de guardarse en la base de datos (`Services/Cred
   endpoints del lado servidor (`.../ListXxxFoldersById`, `.../CreateXxxFolderById`) que descifran y
   refrescan el token internamente, sin exponerlo nunca al cliente.
 
-Si pierdes `BACKUPPRO_MASTER_KEY` (o se borra `Data/master.key` sin haberla fijado), las
+Si pierdes `BACKUPPRO_MASTER_KEY` (o se borra `Data/keystore.db` sin haberla fijado), las
 credenciales cifradas quedan irrecuperables y habrá que volver a introducirlas.
 
 ## Notas de seguridad
@@ -159,6 +159,10 @@ dotnet test
 error, con providers simulados), `CredentialProtector` (cifrado/descifrado, valores legados sin
 cifrar) y `SetupState` (detección del estado "recién instalado"). No hay pruebas de controladores
 ni de vistas todavía.
+
+## Autor
+
+Creado por **Ismael Ruge González**.
 
 ## Licencia
 
